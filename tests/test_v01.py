@@ -533,6 +533,8 @@ def test_status_reports_local_only_non_identity_cards(tmp_path: Path):
     assert packet["local_source_health"]["local_only_knowledge_cards"] >= 1
     assert any("not portable through git" in warning for warning in packet["warnings"])
     assert "local_source_health:" in run([str(XMEM), "preflight", "local rule"], repo, env).stdout
+    unrelated = json.loads(run([str(XMEM), "context", "definitely-no-local-card-match", "--json"], repo, env).stdout)
+    assert unrelated["local_source_health"] == {}
 
 
 def test_context_fuses_duplicate_cards_by_title(tmp_path: Path):

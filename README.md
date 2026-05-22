@@ -84,7 +84,7 @@ Use `xmem check --sources` to validate export shape before or after another tool
 
 Registry rebuilds are atomic: `xmem sync` builds a temporary SQLite index and swaps it into place at the end, so concurrent `xmem context` readers should not see a half-empty registry during sync.
 
-`xmem status` also reports `next_actions` and audits registered local `.xmem/cards`. Generated identity cards may remain local, but non-identity rule/method/correction cards are flagged as `local_only_knowledge` when they are ignored or untracked by git. That warning means xmem can read them on this machine, but they are not portable through git until the owning project decides to track or export them. Context and preflight packets include the same compact `local_source_health` so agents know when matched local cards are machine-local.
+`xmem status` also reports `next_actions` and audits registered local `.xmem/cards`. Generated identity cards may remain local, but non-identity rule/method/correction cards are flagged as `local_only_knowledge` when they are ignored or untracked by git. That warning means xmem can read them on this machine, but they are not portable through git until the owning project decides to track or export them. Context and preflight packets include compact `local_source_health` when matched cards come from a non-portable local source, so agents know when the evidence is machine-local without adding noise to unrelated queries.
 
 ## Control Plane Contract
 

@@ -82,7 +82,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     freshness = source_freshness()
     if freshness.get("status") != "fresh":
         warnings.append("source exports are newer than registry or registry is missing; run xmem sync before relying on this packet")
-    local_source_health = local_source_health_brief(audit_local_sources())
+    local_source_health = local_source_health_brief(audit_local_sources(), cards)
     if local_source_health.get("local_only_knowledge_cards"):
         warnings.append("some local knowledge cards are not portable through git; treat them as machine-local until tracked or exported")
 
@@ -117,21 +117,32 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     return packet
 
 
-def local_source_health_brief(audit: Dict[str, Any]) -> Dict[str, Any]:
-    details = [
-        {
-            "root": item.get("root", ""),
+def local_source_health_brief(audit: Dict[str, Any], cards: List[Dict[str, Any]]) -> Dict[str, Any]:
+    matched_paths = [str(card.get("path") or card.get("source_ref") or "") for card in cards]
+    details = []
+    for item in audit.get("details", []):
+        root = str(item.get("root") or "")
+        if not root or not item.get("local_only_knowledge_cards"):
+            continue
+        if not any(path.startswith(root + "/") or path == root for path in matched_paths):
+            continue
+        details.append({
+            "root": root,
             "local_only_knowledge_cards": int(item.get("local_only_knowledge_cards") or 0),
             "status": item.get("status", ""),
-        }
-        for item in audit.get("details", [])
-        if item.get("local_only_knowledge_cards")
-    ]
+        })
+    local_only = sum(item["local_only_knowledge_cards"] for item in details)
+    if not local_only:
+        return {}
     return {
         "knowledge_cards": int(audit.get("knowledge_cards") or 0),
         "tracked_cards": int(audit.get("tracked_cards") or 0),
-        "local_only_knowledge_cards": int(audit.get("local_only_knowledge_cards") or 0),
-        "ignored_knowledge_cards": int(audit.get("ignored_knowledge_cards") or 0),
+        "local_only_knowledge_cards": local_only,
+        "ignored_knowledge_cards": sum(
+            int(item.get("ignored_knowledge_cards") or 0)
+            for item in audit.get("details", [])
+            if any(detail["root"] == item.get("root") for detail in details)
+        ),
         "roots": details[:5],
     }
 
