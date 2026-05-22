@@ -1,3 +1,3 @@
 """xmem: lightweight cross-project truth index."""
 
-__version__ = "0.1.13"
+__version__ = "0.1.14"

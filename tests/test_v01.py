@@ -516,6 +516,13 @@ def test_status_reports_local_only_non_identity_cards(tmp_path: Path):
     assert "local_card_warning" in text
     assert "local_only_knowledge=" in text
 
+    sources = json.loads(run([str(XMEM), "check", "--sources", "--json"], repo, env).stdout)
+    sources_text = run([str(XMEM), "check", "--sources"], repo, env).stdout
+    assert sources["status"] == "warn"
+    assert sources["local_card_warnings"] >= 1
+    assert sources["local_source_audit"]["local_only_knowledge_cards"] >= 1
+    assert "local_only_knowledge" in sources_text
+
 
 def test_context_fuses_duplicate_cards_by_title(tmp_path: Path):
     repo, env = init_repo(tmp_path)

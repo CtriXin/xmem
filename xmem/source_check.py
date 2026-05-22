@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 from .importers import bug_pattern_to_export_card, iter_jsonl, looks_like_bug_pattern, normalize_status
+from .sources import audit_local_sources
 from .store import db_path
 
 VALID_STATUSES = {"verified", "inferred", "partial", "stale", "disputed", "unknown"}
@@ -39,17 +40,23 @@ def check_source_exports(paths: Iterable[Dict[str, str]] | None = None) -> Dict[
                 seen_ids[card_id] = str(path)
         result.pop("ids", None)
         entries.append(result)
+    local_source_audit = audit_local_sources()
     total_errors = sum(len(x.get("errors", [])) for x in entries) + len(duplicate_ids)
-    total_warnings = sum(len(x.get("warnings", [])) for x in entries)
+    export_warnings = sum(len(x.get("warnings", [])) for x in entries)
+    local_card_warnings = int(local_source_audit.get("local_only_knowledge_cards") or 0)
+    total_warnings = export_warnings + local_card_warnings
     optional_missing = sum(1 for x in entries if x.get("optional_missing"))
     return {
         "status": "error" if total_errors else ("stale" if freshness["stale_exports"] else ("warn" if total_warnings else "ok")),
         "errors": total_errors,
         "warnings": total_warnings,
+        "export_warnings": export_warnings,
+        "local_card_warnings": local_card_warnings,
         "optional_missing": optional_missing,
         "freshness": freshness,
         "stale_exports": freshness["stale_exports"],
         "duplicate_ids": duplicate_ids,
+        "local_source_audit": local_source_audit,
         "exports": entries,
     }
 
@@ -162,4 +169,18 @@ def compact_source_health(data: Dict[str, Any]) -> List[str]:
         lines.append(f"- {item['kind']}: {marker} rows={item.get('rows', 0)} path={item['path']}")
     for dup in data.get("duplicate_ids", [])[:5]:
         lines.append(f"- duplicate_id: {dup['id']}")
+    audit = data.get("local_source_audit") or {}
+    if audit:
+        lines.append(
+            "- local-cards: "
+            f"knowledge={audit.get('knowledge_cards', 0)} "
+            f"tracked={audit.get('tracked_cards', 0)} "
+            f"local_only_knowledge={audit.get('local_only_knowledge_cards', 0)} "
+            f"ignored_knowledge={audit.get('ignored_knowledge_cards', 0)}"
+        )
+        for item in [d for d in audit.get("details", []) if d.get("local_only_knowledge_cards")][:5]:
+            lines.append(
+                f"- local_only_knowledge: {item.get('local_only_knowledge_cards')} "
+                f"root={item.get('root')} sample={','.join(item.get('sample_local_only') or [])}"
+            )
     return lines
