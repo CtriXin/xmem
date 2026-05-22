@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 
 from .toon import compact
 from .source_check import source_freshness
+from .sources import audit_local_sources
 from .util import list_after_key, normalize_text
 
 
@@ -81,6 +82,9 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     freshness = source_freshness()
     if freshness.get("status") != "fresh":
         warnings.append("source exports are newer than registry or registry is missing; run xmem sync before relying on this packet")
+    local_source_health = local_source_health_brief(audit_local_sources())
+    if local_source_health.get("local_only_knowledge_cards"):
+        warnings.append("some local knowledge cards are not portable through git; treat them as machine-local until tracked or exported")
 
     next_reads = unique_paths(registry[:4] + rules[:3] + methods[:3] + specs[:4] + relations[:3] + memories[:3] + evidence[:3])
     packet = {
@@ -105,11 +109,31 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "relations": [card_brief(c, i + 1) for i, c in enumerate(relations[:5])],
         "evidence": [card_brief(c, i + 1) for i, c in enumerate(evidence[:6])],
         "source_freshness": freshness_brief(freshness),
+        "local_source_health": local_source_health,
         "warnings": warnings,
         "next_reads": next_reads[:10],
         "latest_events": event_briefs(events),
     }
     return packet
+
+
+def local_source_health_brief(audit: Dict[str, Any]) -> Dict[str, Any]:
+    details = [
+        {
+            "root": item.get("root", ""),
+            "local_only_knowledge_cards": int(item.get("local_only_knowledge_cards") or 0),
+            "status": item.get("status", ""),
+        }
+        for item in audit.get("details", [])
+        if item.get("local_only_knowledge_cards")
+    ]
+    return {
+        "knowledge_cards": int(audit.get("knowledge_cards") or 0),
+        "tracked_cards": int(audit.get("tracked_cards") or 0),
+        "local_only_knowledge_cards": int(audit.get("local_only_knowledge_cards") or 0),
+        "ignored_knowledge_cards": int(audit.get("ignored_knowledge_cards") or 0),
+        "roots": details[:5],
+    }
 
 
 def canonical_queries_from_corrections(query: str, corrections: List[Dict[str, Any]], limit: int = 3) -> List[str]:

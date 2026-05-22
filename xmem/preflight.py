@@ -59,6 +59,7 @@ def build_preflight(query: str, current: Dict[str, Any] | None, cards: List[Dict
         "risk_level": preflight_risk(issue_patterns, invariants, methods),
         "action": preflight_action(readiness),
         "source_freshness": freshness,
+        "local_source_health": context.get("local_source_health") or {},
         "resolution": resolution,
         "current": context.get("current") or {},
         "matched_projects": [card_brief(c, i + 1) for i, c in enumerate(registry[:4])],

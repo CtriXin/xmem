@@ -67,6 +67,11 @@ def llm_packet(packet: Dict[str, Any]) -> str:
         lines.append(f"    stale[{len(stale)}]:")
         for item in stale[:5]:
             lines.append(f"      - kind: {quote_scalar(item.get('kind', ''))}; path: {quote_scalar(item.get('path', ''))}")
+    local_health = packet.get("local_source_health") or {}
+    if local_health:
+        lines.append("  local_source_health:")
+        for key in ("knowledge_cards", "tracked_cards", "local_only_knowledge_cards", "ignored_knowledge_cards"):
+            lines.append(f"    {key}: {quote_scalar(local_health.get(key, ''))}")
     suggested_queries = packet.get("suggested_queries") or []
     lines.append(f"  suggested_queries[{len(suggested_queries)}]:")
     for query in suggested_queries:
@@ -116,6 +121,11 @@ def preflight_packet(packet: Dict[str, Any]) -> str:
     lines.append("  source_freshness:")
     for key in ("status", "stale_exports", "registry"):
         lines.append(f"    {key}: {quote_scalar(freshness.get(key, ''))}")
+    local_health = packet.get("local_source_health") or {}
+    if local_health:
+        lines.append("  local_source_health:")
+        for key in ("knowledge_cards", "tracked_cards", "local_only_knowledge_cards", "ignored_knowledge_cards"):
+            lines.append(f"    {key}: {quote_scalar(local_health.get(key, ''))}")
     resolution = packet.get("resolution") or {}
     lines.append("  resolution:")
     for key in ("status", "do_not_assume_single_project", "reason"):
