@@ -166,7 +166,7 @@ xmem_context:
 
 Use `xmem why` for human/debug match reasons and `xmem context --json` for exact structured output.
 
-`xmem preflight` is the development-start packet. It is narrower than `context`: it pulls matched Issue Record bug-patterns, invariant/rule cards, must-keep behavior, known failure modes, and required verification checks before code is edited.
+`xmem preflight` is the development-start packet. It is narrower than `context`: it pulls matched Issue Record bug-patterns, invariant/rule cards, must-keep behavior, known failure modes, and required verification checks before code is edited. Preflight keeps an actionable relevance gate: alias/metadata matches are trusted as direct signals, while weak body-only matches must clear a score threshold before they can become guardrails.
 
 ```text
 xmem_preflight:

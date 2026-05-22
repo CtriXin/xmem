@@ -389,6 +389,58 @@ def test_preflight_returns_issue_patterns_before_development(tmp_path: Path):
     assert "must_keep" in text_packet
 
 
+def test_preflight_filters_weak_body_only_guards(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    cards = tmp_path / "cards"
+    cards.mkdir()
+    (cards / "xmem-control.yaml").write_text(
+        "\n".join(
+            [
+                "id: xmem.control",
+                "type: rule",
+                "title: xmem control",
+                "aliases:",
+                "  - xmem memory router",
+                "truth:",
+                "  status: verified",
+                "  confidence: 0.95",
+                "summary: xmem routes memory to source truth.",
+                "must_include:",
+                "  - Keep source truth pointers.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (cards / "ads-noise.yaml").write_text(
+        "\n".join(
+            [
+                "id: ads.noise",
+                "type: invariant",
+                "title: Ads noise",
+                "aliases:",
+                "  - unrelated ads",
+                "truth:",
+                "  status: verified",
+                "  confidence: 0.9",
+                "summary: This card mentions xmem memory only as an example, but it is about ads.",
+                "must_include:",
+                "  - Preserve ad lazyload.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    run([str(XMEM), "import", "cards", str(cards)], repo, env)
+
+    packet = json.loads(run([str(XMEM), "preflight", "xmem memory router", "--json"], repo, env).stdout)
+
+    ids = {item["id"] for item in packet["invariants"]}
+    assert "xmem.control" in ids
+    assert "ads.noise" not in ids
+    assert all("ads.noise" not in ref for ref in packet["source_refs"])
+
+
 def test_check_sources_reports_export_shape_errors(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     export = tmp_path / "project-wiki" / "data" / "xmem-export.cards.jsonl"

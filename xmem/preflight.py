@@ -4,7 +4,6 @@ import json
 from typing import Any, Dict, List
 
 from .context import (
-    EVIDENCE_TYPES,
     METHOD_TYPES,
     REGISTRY_TYPES,
     RULE_TYPES,
@@ -20,22 +19,25 @@ from .util import field_from_text, list_after_key
 
 
 ISSUE_PATTERN_SOURCES = {"issue-bug-patterns", "issue-tracking-export"}
+ACTIONABLE_WHY_PREFIXES = ("exact_alias:", "alias_match:", "metadata_match:", "alias_term:", "metadata_term:")
+MIN_BODY_MATCH_SCORE = 1.0
+ISSUE_PATTERN_KEYS = ("symptom", "root_cause", "fix_pattern", "verification", "regression_guard")
 
 
 def build_preflight(query: str, current: Dict[str, Any] | None, cards: List[Dict[str, Any]], events: List[Dict[str, Any]]) -> Dict[str, Any]:
     context = build_context(query, current, cards, events)
     fused = fuse_related_cards(cards)
     registry = [c for c in fused if c.get("type") in REGISTRY_TYPES or str(c.get("type", "")).startswith("wiki.")]
-    rules = [c for c in fused if c.get("type") in RULE_TYPES]
-    methods = [c for c in fused if c.get("type") in METHOD_TYPES]
-    specs = [c for c in fused if c.get("type") in SPEC_TYPES]
-    evidence = [c for c in fused if c.get("type") in EVIDENCE_TYPES]
+    actionable = [c for c in fused if is_preflight_actionable(c)]
+    rules = [c for c in actionable if c.get("type") in RULE_TYPES]
+    methods = [c for c in actionable if c.get("type") in METHOD_TYPES]
+    specs = [c for c in actionable if c.get("type") in SPEC_TYPES]
     issue_patterns = [c for c in rules if is_issue_pattern(c)]
     invariants = [c for c in rules if not is_issue_pattern(c)]
 
     must_keep = instruction_items(rules + methods, ["regression_guard", "must_include", "warn_if_removed"], 12)
     avoid = instruction_items(rules + issue_patterns, ["forbid", "warn_if_added"], 10)
-    known_failure_modes = instruction_items(issue_patterns + evidence, ["symptom", "root_cause"], 10)
+    known_failure_modes = instruction_items(issue_patterns, ["symptom", "root_cause"], 10)
     required_checks = instruction_items(rules + methods + issue_patterns, ["verification", "checks"], 10)
     guard_cards = issue_patterns + invariants
     freshness = context.get("source_freshness") or {}
@@ -68,17 +70,32 @@ def build_preflight(query: str, current: Dict[str, Any] | None, cards: List[Dict
         "avoid": avoid,
         "known_failure_modes": known_failure_modes,
         "required_checks": required_checks,
-        "source_refs": unique_paths(guard_cards[:6] + methods[:4] + specs[:4] + evidence[:4] + registry[:3])[:12],
+        "source_refs": unique_paths(guard_cards[:6] + methods[:4] + specs[:4] + registry[:3])[:12],
         "warnings": unique_text_items(warnings),
-        "next_reads": context.get("next_reads") or [],
+        "next_reads": unique_paths(guard_cards[:6] + methods[:4] + specs[:4] + registry[:3])[:10],
         "latest_events": event_briefs(events),
     }
 
 
+def is_preflight_actionable(card: Dict[str, Any]) -> bool:
+    """Keep dev-start guardrails focused; body-only generic terms are not enough."""
+    why = str(card.get("why") or "")
+    if any(part.strip().startswith(ACTIONABLE_WHY_PREFIXES) for part in why.split(";")):
+        return True
+    return float(card.get("score") or 0) >= MIN_BODY_MATCH_SCORE
+
+
 def is_issue_pattern(card: Dict[str, Any]) -> bool:
     source = str(card.get("source") or "")
+    return source in ISSUE_PATTERN_SOURCES or any(has_structured_field(card, key) for key in ISSUE_PATTERN_KEYS)
+
+
+def has_structured_field(card: Dict[str, Any], key: str) -> bool:
     body = str(card.get("body") or "")
-    return source in ISSUE_PATTERN_SOURCES or any(key in body for key in ("regression_guard", "root_cause", "fix_pattern", "symptom"))
+    payload = json_payload(body)
+    if flatten_values(payload_value(payload, key)):
+        return True
+    return bool(list_after_key(body, key) or field_from_text(body, key))
 
 
 def preflight_readiness(
