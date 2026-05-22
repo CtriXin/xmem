@@ -92,57 +92,80 @@ def aggregate_queries(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return sorted(out.values(), key=lambda item: (int(item["estimated_tokens_saved"]), int(item["count"])), reverse=True)[:10]
 
 
-def format_gain_dashboard(data: Dict[str, object]) -> str:
+def format_gain_dashboard(data: Dict[str, object], *, color: bool = False) -> str:
     observed = data.get("observed") if isinstance(data.get("observed"), dict) else {}
     by_event = data.get("by_event") if isinstance(data.get("by_event"), list) else []
     top_queries = data.get("top_queries") if isinstance(data.get("top_queries"), list) else []
     guardrails = data.get("recent_guardrails") if isinstance(data.get("recent_guardrails"), list) else []
     hit_rate = float(observed.get("context_hit_rate", 0) or 0)
+    max_event_saved = max([int(item.get("estimated_tokens_saved") or 0) for item in by_event] or [0])
+    max_query_saved = max([int(item.get("estimated_tokens_saved") or 0) for item in top_queries] or [0])
+    title = paint("XMEM Gain (Global Scope)", "green", color)
+    rule = paint("=" * 88, "dim", color)
+    thin = paint("-" * 88, "dim", color)
     lines = [
-        "XMEM Gain (Global Scope)",
-        "=" * 72,
+        title,
+        rule,
         "",
-        f"Observed log rows:       {int(data.get('rows') or 0)}",
-        f"Context queries:         {int(observed.get('context_queries') or 0)} "
-        f"(hit {int(observed.get('context_hits') or 0)} / miss {int(observed.get('context_misses') or 0)})",
-        f"Context hit rate:        {hit_rate:.1f}%",
-        f"Matches returned:        {int(data.get('matches') or 0)}",
-        f"Guardrail checks:        {int(observed.get('guardrail_checks') or 0)}",
-        f"Rule prevented events:   {int(observed.get('guardrail_prevented') or 0)}",
-        f"Est. tokens saved:       {human_number(int(data.get('estimated_tokens_saved') or 0))}",
-        f"Est. bugs prevented:     {int(data.get('estimated_bug_prevented') or 0)}",
-        f"Confidence note:         events are observed; token/bug savings are estimates",
-        f"Efficiency meter:        {bar(hit_rate)} {hit_rate:.1f}%",
+        metric("Observed log rows", int(data.get("rows") or 0), color),
+        metric(
+            "Context queries",
+            f"{int(observed.get('context_queries') or 0)} "
+            f"(hit {int(observed.get('context_hits') or 0)} / miss {int(observed.get('context_misses') or 0)})",
+            color,
+        ),
+        metric("Context hit rate", f"{hit_rate:.1f}%", color, value_style=rate_style(hit_rate)),
+        metric("Matches returned", int(data.get("matches") or 0), color),
+        metric("Guardrail checks", int(observed.get("guardrail_checks") or 0), color),
+        metric("Rule prevented events", int(observed.get("guardrail_prevented") or 0), color, value_style="yellow"),
+        metric("Est. tokens saved", human_number(int(data.get("estimated_tokens_saved") or 0)), color, value_style="green"),
+        metric("Est. bugs prevented", int(data.get("estimated_bug_prevented") or 0), color, value_style="yellow"),
+        metric("Confidence note", "events observed; token/bug savings estimated", color, value_style="dim"),
+        metric("Efficiency meter", f"{bar(hit_rate, color=color)} {paint(f'{hit_rate:.1f}%', rate_style(hit_rate), color)}", color),
         "",
-        "By Event",
-        "-" * 72,
-        f"{'#':>3}  {'Event':<22} {'Count':>7} {'EstSaved':>10} {'Matches':>8} {'Bugs':>5}",
+        paint("By Event", "green", color),
+        thin,
+        f"{'#':>3}  {'Event':<22} {'Count':>7} {'EstSaved':>10} {'Matches':>8} {'Bugs':>5}  {'Impact':<18}",
     ]
     for idx, item in enumerate(by_event[:10], 1):
+        saved = int(item.get("estimated_tokens_saved") or 0)
+        bugs = int(item.get("estimated_bug_prevented") or 0)
+        event = compact_cell(item.get("event", ""), 22)
         lines.append(
-            f"{idx:>3}. {compact_cell(item.get('event', ''), 22):<22} "
+            f"{idx:>3}. {cell(event, 22, 'cyan', color)} "
             f"{int(item.get('count') or 0):>7} "
-            f"{human_number(int(item.get('estimated_tokens_saved') or 0)):>10} "
+            f"{paint(f'{human_number(saved):>10}', 'green' if saved else 'dim', color)} "
             f"{int(item.get('matches') or 0):>8} "
-            f"{int(item.get('estimated_bug_prevented') or 0):>5}"
+            f"{paint(f'{bugs:>5}', 'yellow' if bugs else 'dim', color)}  "
+            f"{impact_bar(saved, max_event_saved, color=color)}"
         )
     if not by_event:
         lines.append("  - no gain events logged yet")
-    lines.extend(["", "Top Queries", "-" * 72, f"{'#':>3}  {'Query':<36} {'Count':>7} {'EstSaved':>10} {'Matches':>8}"])
+    lines.extend([
+        "",
+        paint("Top Queries", "green", color),
+        thin,
+        f"{'#':>3}  {'Query':<42} {'Count':>7} {'EstSaved':>10} {'Matches':>8}  {'Impact':<18}",
+    ])
     for idx, item in enumerate(top_queries[:10], 1):
+        query = compact_cell(item.get("query", ""), 42)
+        saved = int(item.get("estimated_tokens_saved") or 0)
         lines.append(
-            f"{idx:>3}. {compact_cell(item.get('query', ''), 36):<36} "
+            f"{idx:>3}. {cell(query, 42, 'cyan', color)} "
             f"{int(item.get('count') or 0):>7} "
-            f"{human_number(int(item.get('estimated_tokens_saved') or 0)):>10} "
-            f"{int(item.get('matches') or 0):>8}"
+            f"{paint(f'{human_number(saved):>10}', 'green' if saved else 'dim', color)} "
+            f"{int(item.get('matches') or 0):>8}  "
+            f"{impact_bar(saved, max_query_saved, color=color)}"
         )
     if not top_queries:
         lines.append("  - no query events logged yet")
-    lines.extend(["", "Recent Guardrails", "-" * 72])
+    lines.extend(["", paint("Recent Guardrails", "green", color), thin])
     if guardrails:
         for item in guardrails[-5:]:
+            warnings = int(item.get("warnings") or 0)
+            event_style = "yellow" if warnings else "cyan"
             lines.append(
-                f"- {item.get('event')}: warnings={int(item.get('warnings') or 0)} "
+                f"- {paint(item.get('event'), event_style, color)}: warnings={paint(warnings, 'yellow' if warnings else 'dim', color)} "
                 f"matched_cards={int(item.get('matched_cards') or 0)}"
             )
     else:
@@ -164,6 +187,54 @@ def compact_cell(value: object, width: int) -> str:
     return text if len(text) <= width else text[: max(0, width - 3)] + "..."
 
 
-def bar(percent: float, width: int = 28) -> str:
+def bar(percent: float, width: int = 28, *, color: bool = False) -> str:
     filled = max(0, min(width, round(width * percent / 100)))
-    return "[" + "#" * filled + "." * (width - filled) + "]"
+    if not color:
+        return "[" + "#" * filled + "." * (width - filled) + "]"
+    return "[" + paint("#" * filled, rate_style(percent), color) + paint("." * (width - filled), "dim", color) + "]"
+
+
+def impact_bar(value: int, max_value: int, width: int = 18, *, color: bool = False) -> str:
+    if max_value <= 0 or value <= 0:
+        return paint("." * width, "dim", color)
+    filled = max(1, min(width, round(width * value / max_value)))
+    if not color:
+        return "#" * filled + "." * (width - filled)
+    return paint(" " * filled, "bg_cyan", color) + paint(" " * (width - filled), "bg_dim", color)
+
+
+def metric(label: str, value: object, color: bool, *, value_style: str = "plain") -> str:
+    return f"{label + ':':<24} {paint(value, value_style, color)}"
+
+
+def rate_style(percent: float) -> str:
+    if percent >= 80:
+        return "green"
+    if percent >= 50:
+        return "yellow"
+    return "red"
+
+
+ANSI = {
+    "plain": "",
+    "dim": "\033[2m",
+    "green": "\033[92m",
+    "cyan": "\033[96m",
+    "yellow": "\033[93m",
+    "red": "\033[91m",
+    "bg_cyan": "\033[48;5;73m",
+    "bg_dim": "\033[48;5;238m",
+}
+
+
+def paint(value: object, style: str, enabled: bool) -> str:
+    text = str(value)
+    code = ANSI.get(style, "")
+    if not enabled or not code:
+        return text
+    return f"{code}{text}\033[0m"
+
+
+def cell(value: object, width: int, style: str, color: bool) -> str:
+    text = str(value)
+    return paint(f"{text:<{width}}", style, color)

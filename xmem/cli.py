@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any, List
 
@@ -97,6 +98,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     gain = sub.add_parser("gain", help="Show xmem savings/guardrail stats")
     gain.add_argument("--json", action="store_true")
+    gain.add_argument("--no-color", action="store_true", help="Disable ANSI colors in dashboard output")
 
     tail = sub.add_parser("tail", help="Show recent registry events")
     tail.add_argument("--limit", type=int, default=10)
@@ -243,7 +245,8 @@ def main(argv: List[str] | None = None) -> int:
         if args.json:
             print(json.dumps(data, ensure_ascii=False, indent=2))
         else:
-            print(format_gain_dashboard(data))
+            use_color = sys.stdout.isatty() and not args.no_color and not os.environ.get("NO_COLOR")
+            print(format_gain_dashboard(data, color=use_color))
         return 0
     if args.cmd == "tail":
         events = latest_events(args.limit)
