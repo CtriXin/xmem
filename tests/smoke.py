@@ -38,6 +38,9 @@ def main() -> None:
         assert "local_sources: 1" in status
         help_text = run([str(XMEM), "help"], repo, env).stdout
         assert "xmem sync" in help_text and "xmem fix" in help_text
+        root_help = run([str(XMEM), "-h"], repo, env).stdout
+        assert "用法: xmem <命令> [选项]" in root_help
+        assert "显示帮助并退出" in root_help
         shim = base / "bin" / "xmem"
         shim.parent.mkdir()
         shim.symlink_to(XMEM)

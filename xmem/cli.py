@@ -34,139 +34,164 @@ from .toon import context_packet, llm_packet, preflight_packet
 from .util import emit_yaml, git_root, home_dir, real_user_home, utc_now
 
 
+class ChineseHelpFormatter(argparse.RawTextHelpFormatter):
+    def add_usage(self, usage, actions, groups, prefix=None):
+        return super().add_usage(usage, actions, groups, prefix or "用法: ")
+
+
+class XmemArgumentParser(argparse.ArgumentParser):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("formatter_class", ChineseHelpFormatter)
+        add_help = kwargs.pop("add_help", True)
+        super().__init__(*args, add_help=False, **kwargs)
+        self._positionals.title = "参数"
+        self._optionals.title = "选项"
+        if add_help:
+            self.add_argument("-h", "--help", action="help", help="显示帮助并退出")
+
+
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="xmem", description="Lightweight cross-project truth index for agents")
-    p.add_argument("--version", action="version", version=f"xmem {__version__}")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    p = XmemArgumentParser(
+        prog="xmem",
+        usage="xmem <命令> [选项]",
+        description="xmem：给 Agent 用的轻量跨项目 memory router / truth index。",
+        epilog="常用入口：xmem status / sync / context / preflight / check / gain / help",
+    )
+    p.add_argument("--version", action="version", version=f"xmem {__version__}", help="显示版本号并退出")
+    p._positionals.title = "命令"
+    sub = p.add_subparsers(dest="cmd", required=True, metavar="<命令>", prog="xmem", parser_class=XmemArgumentParser)
 
-    sub.add_parser("help", help="Show the short xmem command card")
+    sub.add_parser("help", help="显示最常用命令卡片")
 
-    status = sub.add_parser("status", help="Show registry path and index counts")
-    status.add_argument("--json", action="store_true")
+    status = sub.add_parser("status", help="查看索引位置、数量和 source 状态")
+    status.add_argument("--json", action="store_true", help="输出 JSON")
 
-    sync = sub.add_parser("sync", help="Sync/rebuild from file truth sources")
-    sync.add_argument("--json", action="store_true")
+    sync = sub.add_parser("sync", help="从文件 truth sources 刷新 SQLite index")
+    sync.add_argument("--json", action="store_true", help="输出 JSON")
 
-    new = sub.add_parser("new", help="Create or refresh xmem files for the current/new folder")
+    new = sub.add_parser("new", help="给当前/指定文件夹创建或刷新 .xmem")
     new.add_argument("path", nargs="?", default=".")
-    new.add_argument("--json", action="store_true")
+    new.add_argument("--json", action="store_true", help="输出 JSON")
 
-    init = sub.add_parser("init", help="Initialize .xmem in the current repo")
+    init = sub.add_parser("init", help="初始化当前 repo 的 .xmem")
     init.add_argument("path", nargs="?", default=".")
     init.add_argument("--project-id", default="")
     init.add_argument("--alias", action="append", default=[])
-    init.add_argument("--force", action="store_true")
+    init.add_argument("--force", action="store_true", help="允许覆盖已有 .xmem")
 
-    sub.add_parser("index", help="Index local .xmem cards into the global registry").add_argument("path", nargs="?", default=".")
+    sub.add_parser("index", help="把本地 .xmem cards 写入全局 index").add_argument("path", nargs="?", default=".")
 
-    imp = sub.add_parser("import", help="Import read-only sources")
-    imp_sub = imp.add_subparsers(dest="source", required=True)
-    pw = imp_sub.add_parser("project-wiki", help="Import /Users/xin/project-wiki index")
+    imp = sub.add_parser("import", help="导入 read-only sources")
+    imp_sub = imp.add_subparsers(dest="source", required=True, metavar="<source>", parser_class=XmemArgumentParser)
+    imp_sub.title = "source"
+    pw = imp_sub.add_parser("project-wiki", help="导入 /Users/xin/project-wiki index")
     pw.add_argument("--path", default="/Users/xin/project-wiki")
-    it = imp_sub.add_parser("issue-tracking", help="Import /Users/xin/issue-tracking issue records")
+    it = imp_sub.add_parser("issue-tracking", help="导入 /Users/xin/issue-tracking issue records")
     it.add_argument("--path", default="/Users/xin/issue-tracking")
-    cards_imp = imp_sub.add_parser("cards", help="Import card YAML files")
+    cards_imp = imp_sub.add_parser("cards", help="导入 card YAML 文件")
     cards_imp.add_argument("path", nargs="?", default="examples/cards")
-    export_imp = imp_sub.add_parser("export", help="Import xmem-export.cards.jsonl")
+    export_imp = imp_sub.add_parser("export", help="导入 xmem-export.cards.jsonl")
     export_imp.add_argument("path", nargs="?", default="xmem-export.cards.jsonl")
-    patterns_imp = imp_sub.add_parser("bug-patterns", help="Import issue bug-patterns.jsonl")
+    patterns_imp = imp_sub.add_parser("bug-patterns", help="导入 issue bug-patterns.jsonl")
     patterns_imp.add_argument("path", nargs="?", default="bug-patterns.jsonl")
-    ctx_imp = imp_sub.add_parser("context-docs", help="Import CONTEXT.md and ADR Markdown files")
+    ctx_imp = imp_sub.add_parser("context-docs", help="导入 CONTEXT.md 和 ADR Markdown")
     ctx_imp.add_argument("path", nargs="?", default=".")
-    openspec_imp = imp_sub.add_parser("openspec", help="Import OpenSpec specs and changes")
+    openspec_imp = imp_sub.add_parser("openspec", help="导入 OpenSpec specs / changes")
     openspec_imp.add_argument("path", nargs="?", default=".")
-    speckit_imp = imp_sub.add_parser("speckit", help="Import Spec Kit specs, plans, tasks, and constitution")
+    speckit_imp = imp_sub.add_parser("speckit", help="导入 Spec Kit specs / plans / tasks / constitution")
     speckit_imp.add_argument("path", nargs="?", default=".")
-    trellis_imp = imp_sub.add_parser("trellis", help="Import Trellis specs, tasks, and workspace memory")
+    trellis_imp = imp_sub.add_parser("trellis", help="导入 Trellis specs / tasks / workspace memory")
     trellis_imp.add_argument("path", nargs="?", default=".")
-    memory_imp = imp_sub.add_parser("project-memory", help="Import known project memory/spec sources")
+    memory_imp = imp_sub.add_parser("project-memory", help="导入已知 project memory / spec sources")
     memory_imp.add_argument("path", nargs="?", default=".")
 
-    find = sub.add_parser("find", help="Search cards/projects/evidence")
+    find = sub.add_parser("find", help="搜索 cards / projects / evidence")
     find.add_argument("query")
     find.add_argument("--limit", type=int, default=8)
-    find.add_argument("--json", action="store_true")
+    find.add_argument("--json", action="store_true", help="输出 JSON")
 
-    ctx = sub.add_parser("context", help="Return compact agent context packet")
+    ctx = sub.add_parser("context", help="返回给 LLM 读的紧凑 context packet")
     ctx.add_argument("query")
     ctx.add_argument("--limit", type=int, default=8)
-    ctx.add_argument("--json", action="store_true")
-    ctx.add_argument("--legacy-toon", action="store_true", help="Print the old flat TOON table")
+    ctx.add_argument("--json", action="store_true", help="输出 JSON")
+    ctx.add_argument("--legacy-toon", action="store_true", help="输出旧版 flat TOON table")
 
-    preflight = sub.add_parser("preflight", help="Return development preflight guards before editing")
+    preflight = sub.add_parser("preflight", help="开发/修 bug 前读取历史坑、invariant 和 required checks")
     preflight.add_argument("query")
     preflight.add_argument("--limit", type=int, default=8)
-    preflight.add_argument("--json", action="store_true")
+    preflight.add_argument("--json", action="store_true", help="输出 JSON")
 
-    card = sub.add_parser("card", help="Manage local cards")
-    card_sub = card.add_subparsers(dest="card_cmd", required=True)
-    cl = card_sub.add_parser("list", help="List local cards")
+    card = sub.add_parser("card", help="管理本地 cards")
+    card_sub = card.add_subparsers(dest="card_cmd", required=True, metavar="<操作>", parser_class=XmemArgumentParser)
+    card_sub.title = "操作"
+    cl = card_sub.add_parser("list", help="列出本地 cards")
     cl.add_argument("path", nargs="?", default=".")
-    cs = card_sub.add_parser("show", help="Show a local card")
+    cs = card_sub.add_parser("show", help="查看本地 card")
     cs.add_argument("id")
     cs.add_argument("path", nargs="?", default=".")
-    cn = card_sub.add_parser("new", help="Create a local card template")
+    cn = card_sub.add_parser("new", help="创建本地 card 模板")
     cn.add_argument("id")
     cn.add_argument("--type", default="method")
     cn.add_argument("--title", default="")
     cn.add_argument("--feature", default="")
     cn.add_argument("--path", default=".")
 
-    chk = sub.add_parser("check", help="Check current diff against local invariants")
+    chk = sub.add_parser("check", help="用本地/索引 invariant 检查当前 diff")
     chk.add_argument("path", nargs="?", default=".")
-    chk.add_argument("--sources", action="store_true", help="Validate Project Wiki / Issue Record xmem exports")
-    chk.add_argument("--json", action="store_true")
+    chk.add_argument("--sources", action="store_true", help="校验 Project Wiki / Issue Record xmem exports")
+    chk.add_argument("--json", action="store_true", help="输出 JSON")
 
-    gain = sub.add_parser("gain", help="Show xmem savings/guardrail stats")
-    gain.add_argument("--json", action="store_true")
-    gain.add_argument("--no-color", action="store_true", help="Disable ANSI colors in dashboard output")
-    gain.add_argument("--limit", type=int, default=None, help="Only read the latest N gain log rows; default reads all rows")
-    gain_sub = gain.add_subparsers(dest="gain_cmd")
-    gain_show = gain_sub.add_parser("show", help="Show xmem telemetry and rough savings hints")
-    gain_show.add_argument("--json", action="store_true")
-    gain_show.add_argument("--no-color", action="store_true", help="Disable ANSI colors in dashboard output")
-    gain_show.add_argument("--limit", type=int, default=None, help="Only read the latest N gain log rows; default reads all rows")
-    gain_confirm = gain_sub.add_parser("confirm", help="Confirm a gain/outcome signal")
+    gain = sub.add_parser("gain", help="查看 xmem telemetry / 收益口径 / guardrail 统计")
+    gain.add_argument("--json", action="store_true", help="输出 JSON")
+    gain.add_argument("--no-color", action="store_true", help="关闭 dashboard ANSI 颜色")
+    gain.add_argument("--limit", type=int, default=None, help="只读取最近 N 条 gain log；默认读取全部")
+    gain_sub = gain.add_subparsers(dest="gain_cmd", metavar="<操作>", parser_class=XmemArgumentParser)
+    gain_sub.title = "操作"
+    gain_show = gain_sub.add_parser("show", help="显示 xmem telemetry 和粗估收益")
+    gain_show.add_argument("--json", action="store_true", help="输出 JSON")
+    gain_show.add_argument("--no-color", action="store_true", help="关闭 dashboard ANSI 颜色")
+    gain_show.add_argument("--limit", type=int, default=None, help="只读取最近 N 条 gain log；默认读取全部")
+    gain_confirm = gain_sub.add_parser("confirm", help="确认一次 gain/outcome 信号")
     gain_confirm.add_argument("query")
     gain_confirm.add_argument("--note", default="")
     gain_confirm.add_argument("--task", default="")
     gain_confirm.add_argument("--actual-tokens-saved", type=int, default=0)
-    gain_confirm.add_argument("--bug-prevented", action="store_true")
-    gain_confirm.add_argument("--json", action="store_true")
-    gain_reject = gain_sub.add_parser("reject", help="Reject an overestimated gain signal")
+    gain_confirm.add_argument("--bug-prevented", action="store_true", help="标记这次避免了 bug")
+    gain_confirm.add_argument("--json", action="store_true", help="输出 JSON")
+    gain_reject = gain_sub.add_parser("reject", help="标记一次被高估/错误的 gain 信号")
     gain_reject.add_argument("query")
     gain_reject.add_argument("--note", default="")
     gain_reject.add_argument("--task", default="")
-    gain_reject.add_argument("--json", action="store_true")
+    gain_reject.add_argument("--json", action="store_true", help="输出 JSON")
 
-    tail = sub.add_parser("tail", help="Show recent registry events")
+    tail = sub.add_parser("tail", help="查看最近 registry events")
     tail.add_argument("--limit", type=int, default=10)
-    tail.add_argument("--json", action="store_true")
+    tail.add_argument("--json", action="store_true", help="输出 JSON")
 
-    opn = sub.add_parser("open", help="Open one card by id or query")
+    opn = sub.add_parser("open", help="按 id 或 query 打开一个 card / evidence 摘要")
     opn.add_argument("id_or_query")
-    opn.add_argument("--json", action="store_true")
-    opn.add_argument("--body", action="store_true", help="Print full card body")
+    opn.add_argument("--json", action="store_true", help="输出 JSON")
+    opn.add_argument("--body", action="store_true", help="输出完整 card body")
 
-    why = sub.add_parser("why", help="Explain why xmem matched a query")
+    why = sub.add_parser("why", help="解释为什么 xmem 匹配这个 query")
     why.add_argument("query")
-    why.add_argument("--json", action="store_true")
+    why.add_argument("--json", action="store_true", help="输出 JSON")
 
-    fix = sub.add_parser("fix", help="Record a simple alias correction/dispute")
+    fix = sub.add_parser("fix", help="记录 alias 纠错或争议")
     fix.add_argument("entity", nargs="?")
-    fix.add_argument("items", nargs="*", help="Use wrong=... correct=... basis=... or answer prompts")
-    fix.add_argument("--json", action="store_true")
+    fix.add_argument("items", nargs="*", help="可写 wrong=... correct=... basis=...，否则按提示回答")
+    fix.add_argument("--json", action="store_true", help="输出 JSON")
 
-    hook = sub.add_parser("hook", help="Agent hook: capture/sync durable work memory")
+    hook = sub.add_parser("hook", help="Agent hook：捕获/同步 durable work memory")
     hook.add_argument("event", help="start, note, finish, fix, bug, release, deploy, decision, status")
-    hook.add_argument("text", nargs="*", help="Short agent-created summary")
+    hook.add_argument("text", nargs="*", help="Agent 写的短摘要")
     hook.add_argument("--path", default=".")
     hook.add_argument("--dest", action="append", default=[], choices=["auto", "xmem", "project-wiki", "issue-tracking", "all"])
-    hook.add_argument("--target", default="", help="Project Wiki target entity id when known")
-    hook.add_argument("--verified", action="store_true")
-    hook.add_argument("--json", action="store_true")
+    hook.add_argument("--target", default="", help="已知时填写 Project Wiki target entity id")
+    hook.add_argument("--verified", action="store_true", help="标记为 verified outcome")
+    hook.add_argument("--json", action="store_true", help="输出 JSON")
 
-    rebuild = sub.add_parser("rebuild", help="Rebuild generated SQLite index from file truth sources")
+    rebuild = sub.add_parser("rebuild", help="从文件 truth sources 重建 generated SQLite index")
     rebuild.add_argument("--project-wiki", default="/Users/xin/project-wiki")
     rebuild.add_argument("--issue-tracking", default="/Users/xin/issue-tracking")
     rebuild.add_argument("--cards", default="examples/cards")
@@ -330,20 +355,21 @@ def help_cmd() -> int:
     print(
         "\n".join(
             [
-                "xmem quick commands:",
-                "- xmem status              # registry path + counts",
-                "- xmem sync                # rebuild from Project Wiki, issue records, known folders",
-                "- xmem preflight <words>   # dev-start bug guards and required checks",
-                "- xmem context <words>     # LLM packet",
-                "- xmem why <words>         # why it matched",
-                "- xmem open <id|words>     # card/evidence excerpt",
-                "- xmem new                 # create/register .xmem for this folder",
-                "- xmem fix                 # prompted alias correction/dispute",
-                "- xmem gain                # telemetry + rough savings hints",
-                "- xmem gain confirm <query> # human/outcome calibration signal",
-                "- agent hooks              # auto-managed: start/finish/fix -> xmem/wiki/issue queues",
+                "xmem 常用命令：",
+                "- xmem status              # 查看索引状态、source 健康度、outbox",
+                "- xmem sync                # 刷新索引；从 Project Wiki / Issue Record / 本地 cards 重建",
+                "- xmem context <query>     # 查历史项目、方法、证据，返回 LLM 好读 packet",
+                "- xmem preflight <query>   # 开发/修 bug 前查历史坑、must_keep、required checks",
+                "- xmem check               # 改完前检查 invariant / rule / guardrail",
+                "- xmem gain                # 查看 telemetry、粗估收益、确认收益口径",
+                "- xmem why <query>         # 解释为什么匹配",
+                "- xmem open <id|query>     # 打开 card / evidence 摘要",
+                "- xmem new                 # 新项目/新文件夹初始化并注册",
+                "- xmem fix                 # 记录 alias 纠错或争议",
                 "",
-                "truth: files/cards/wiki/issues/code are source; SQLite is only cache/index",
+                "Agent 内部：hook / gain confirm / gain reject 会自动记录 outcome 或 outbox，不需要日常记。",
+                "",
+                "truth 规则：Project Wiki / Issue Record / code / files 是 source truth；SQLite 只是 index/cache。",
             ]
         )
     )
