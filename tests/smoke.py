@@ -33,6 +33,11 @@ def main() -> None:
         run([str(XMEM), "init", "--project-id", "smoke", "--alias", "smoke ads"], repo, env)
         status = run([str(XMEM), "status"], repo, env).stdout
         assert "registry_exists: true" in status
+        shim = base / "bin" / "xmem"
+        shim.parent.mkdir()
+        shim.symlink_to(XMEM)
+        linked_status = run([str(shim), "status"], repo, env).stdout
+        assert "registry_exists: true" in linked_status
         shutil.copy(ROOT / "examples" / "cards" / "ads.lazyload.yaml", repo / ".xmem" / "cards" / "ads.lazyload.yaml")
         (repo / "ad.txt").write_text("lazyload\n", encoding="utf-8")
         proc = run([str(XMEM), "check"], repo, env, check=False)

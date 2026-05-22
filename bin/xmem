@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT" ]; do
+  DIR="$(cd "$(dirname "$SCRIPT")" && pwd)"
+  TARGET="$(readlink "$SCRIPT")"
+  case "$TARGET" in
+    /*) SCRIPT="$TARGET" ;;
+    *) SCRIPT="$DIR/$TARGET" ;;
+  esac
+done
+ROOT="$(cd "$(dirname "$SCRIPT")/.." && pwd)"
 PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m xmem "$@"
