@@ -32,7 +32,7 @@ xmem gain
 4. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
 5. Use `xmem gain` when asked what xmem saved.
 
-`xmem context` is LLM-first: use `resolution.status`, `suggested_queries`, `correction_guidance`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true.
+`xmem context` is LLM-first: use `resolution.status`, `suggested_queries`, `correction_guidance`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true. Duplicate cards may be fused; read `supporting_cards` for alternate sources behind the primary card.
 
 ## Agent hooks
 

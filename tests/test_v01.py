@@ -234,3 +234,38 @@ def test_check_sources_accepts_valid_exports_with_optional_missing(tmp_path: Pat
     assert proc.returncode == 0
     assert data["errors"] == 0
     assert data["exports"][0]["rows"] == 1
+
+
+def test_context_fuses_duplicate_cards_by_title(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    export = tmp_path / "dupe-export.cards.jsonl"
+    rows = [
+        {
+            "id": "rule.dupe.partial",
+            "type": "rule",
+            "title": "Duplicate Ad Rule",
+            "aliases": ["duplicate ad rule"],
+            "truth": {"status": "partial", "confidence": 0.5},
+            "summary": "Older partial rule.",
+            "evidence": [{"kind": "test", "ref": "partial"}],
+        },
+        {
+            "id": "rule.dupe.verified",
+            "type": "rule",
+            "title": "Duplicate Ad Rule",
+            "aliases": ["duplicate ad rule"],
+            "truth": {"status": "verified", "confidence": 0.9},
+            "summary": "Verified rule.",
+            "evidence": [{"kind": "test", "ref": "verified"}],
+        },
+    ]
+    export.write_text("\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + "\n", encoding="utf-8")
+
+    run([str(XMEM), "import", "export", str(export)], repo, env)
+    packet = json.loads(run([str(XMEM), "context", "duplicate ad rule", "--json"], repo, env).stdout)
+    matches = [item for item in packet["rules"] if item["title"] == "Duplicate Ad Rule"]
+
+    assert len(matches) == 1
+    assert matches[0]["id"] == "rule.dupe.verified"
+    assert matches[0]["supporting_count"] == 1
+    assert matches[0]["supporting_cards"][0]["id"] == "rule.dupe.partial"

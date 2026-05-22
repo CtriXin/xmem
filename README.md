@@ -143,6 +143,8 @@ xmem_context:
 
 Use `xmem why` for human/debug match reasons and `xmem context --json` for exact structured output.
 
+`xmem context` conservatively fuses duplicate cards with the same title and type family. The best card stays in `rules` / `methods` / `relations`, and matching duplicates appear as `supporting_cards`, keeping LLM packets compact while preserving source traceability.
+
 If a query hits a correction card, xmem expands the canonical alias as an extra search internally and marks the packet as `guided_by_correction` instead of pretending the wrong alias is reliable truth.
 
 ## Guardrails and gain
