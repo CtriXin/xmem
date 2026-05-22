@@ -54,11 +54,17 @@ Rule: files/code/runtime are truth; SQLite is only a generated search index. If 
 
 - Project Wiki at `/Users/xin/project-wiki`.
 - Issue records at `/Users/xin/issue-tracking`.
+- Optional compact source exports:
+  - `/Users/xin/project-wiki/data/xmem-export.cards.jsonl`
+  - `/Users/xin/issue-tracking/index/xmem-export.cards.jsonl`
+  - `/Users/xin/issue-tracking/index/bug-patterns.jsonl`
 - Built-in reusable cards in this repo.
 - User overlay cards in `~/.xmem/cards`, for example alias corrections.
 - Known local project folders recorded in `~/.xmem/sources.json`.
 
 Imports are read-only. xmem does not silently rewrite Project Wiki or issue records; corrections are stored as small overlay cards until the upstream source is fixed.
+
+`xmem-export.cards.jsonl` is the preferred bridge format for other truth systems. Project Wiki can export entity cards, and Issue Record can export verified bug-pattern/rule cards; xmem imports them as generated index rows while keeping the source files as truth.
 
 ## New folders
 

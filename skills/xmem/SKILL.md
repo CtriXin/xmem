@@ -52,6 +52,14 @@ Use `xmem sync` as the default refresh. It rebuilds `~/.xmem/registry.sqlite` fr
 
 These imports are read-only. They create searchable cards and evidence pointers in `~/.xmem/registry.sqlite`. If `xmem status` shows `0 cards`, run `xmem sync`; in isolated agent sessions it should still use `/Users/xin/.xmem`.
 
+If present, xmem also consumes compact source exports:
+
+- `project-wiki/data/xmem-export.cards.jsonl`
+- `issue-tracking/index/xmem-export.cards.jsonl`
+- `issue-tracking/index/bug-patterns.jsonl`
+
+These exports are bridge/index inputs only; Project Wiki and Issue Record remain the source truth.
+
 ## New folders and corrections
 
 Use `xmem new` in a new folder. It creates `.xmem/`, writes an identity card from git/package/folder evidence, and registers the folder so future `xmem sync` can find it from other projects.

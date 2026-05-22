@@ -118,3 +118,69 @@ def test_context_next_reads_include_relation_cards(tmp_path: Path):
     packet = json.loads(run([str(XMEM), "context", "xmem shared skill", "--json"], repo, env).stdout)
 
     assert any("xmem.installation.yaml" in path for path in packet["next_reads"])
+
+
+def test_project_wiki_can_import_xmem_export_only(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    wiki = tmp_path / "project-wiki"
+    data_dir = wiki / "data"
+    data_dir.mkdir(parents=True)
+    export = data_dir / "xmem-export.cards.jsonl"
+    export.write_text(
+        json.dumps(
+            {
+                "id": "project-wiki.service.demo-export",
+                "type": "wiki.service",
+                "title": "demo-export",
+                "project_id": "demo-export",
+                "aliases": ["oral demo", "demo.example.com"],
+                "truth": {"status": "verified", "confidence": 0.91, "basis": ["test"], "last_checked_at": "2026-05-22T00:00:00Z"},
+                "current": {"repo_path": str(repo), "remote": "git@example.com:demo/export.git", "latest_known_branch": "main"},
+                "summary": "oral demo maps to demo-export.",
+                "evidence": [{"kind": "project-wiki", "path": "entities/services/demo-export.yaml"}],
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = json.loads(run([str(XMEM), "import", "project-wiki", "--path", str(wiki)], repo, env).stdout)
+    packet = json.loads(run([str(XMEM), "context", "oral demo", "--json"], repo, env).stdout)
+
+    assert result["export_cards"] == 1
+    assert any(item["id"] == "project-wiki.service.demo-export" for item in packet["registry_candidates"])
+    assert any("xmem-export.cards.jsonl" in path for path in packet["next_reads"])
+
+
+def test_issue_tracking_imports_bug_patterns_as_rules(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    tracking = tmp_path / "issue-tracking"
+    index_dir = tracking / "index"
+    index_dir.mkdir(parents=True)
+    (index_dir / "bug-patterns.jsonl").write_text(
+        json.dumps(
+            {
+                "id": "issue-pattern.ad-lazy-regression",
+                "title": "Ad lazy-load regression",
+                "symptom": "ad iframe fix removed lazy-load",
+                "root_cause": "direct adsbygoogle push bypassed viewport observer",
+                "fix_pattern": "restore IntersectionObserver before push",
+                "verification": "check filled iframe, unfilled collapse, desktop and mobile",
+                "regression_guard": "do not remove lazy-load when fixing ad display",
+                "aliases": ["ad iframe lazy regression", "广告没有延迟加载"],
+                "status": "verified",
+                "confidence": 0.88,
+                "evidence": [{"kind": "issue", "path": "issues/demo/ad-lazy/issue.md"}],
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = json.loads(run([str(XMEM), "import", "issue-tracking", "--path", str(tracking)], repo, env).stdout)
+    packet = json.loads(run([str(XMEM), "context", "ad iframe lazy regression", "--json"], repo, env).stdout)
+
+    assert result["bug_patterns"] == 1
+    assert any(item["id"] == "issue-pattern.ad-lazy-regression" for item in packet["rules"])

@@ -10,7 +10,7 @@ from .checks import check_diff
 from .context import build_context, canonical_queries_from_corrections
 from .gain import summarize_gain
 from .hooks import outbox_counts, run_hook
-from .importers import import_issue_tracking, import_project_wiki
+from .importers import import_bug_patterns, import_issue_tracking, import_project_wiki, import_xmem_export
 from .project import detect_project, index_local, init_project
 from .search import latest_events, search_cards
 from .sources import index_registered_sources, load_sources, register_local_root, sources_path
@@ -52,6 +52,10 @@ def build_parser() -> argparse.ArgumentParser:
     it.add_argument("--path", default="/Users/xin/issue-tracking")
     cards_imp = imp_sub.add_parser("cards", help="Import card YAML files")
     cards_imp.add_argument("path", nargs="?", default="examples/cards")
+    export_imp = imp_sub.add_parser("export", help="Import xmem-export.cards.jsonl")
+    export_imp.add_argument("path", nargs="?", default="xmem-export.cards.jsonl")
+    patterns_imp = imp_sub.add_parser("bug-patterns", help="Import issue bug-patterns.jsonl")
+    patterns_imp.add_argument("path", nargs="?", default="bug-patterns.jsonl")
 
     find = sub.add_parser("find", help="Search cards/projects/evidence")
     find.add_argument("query")
@@ -151,6 +155,10 @@ def main(argv: List[str] | None = None) -> int:
             print(json.dumps(import_issue_tracking(Path(args.path)), ensure_ascii=False, indent=2))
         elif args.source == "cards":
             print(json.dumps(import_cards(Path(args.path)), ensure_ascii=False, indent=2))
+        elif args.source == "export":
+            print(json.dumps(import_xmem_export(Path(args.path)), ensure_ascii=False, indent=2))
+        elif args.source == "bug-patterns":
+            print(json.dumps(import_bug_patterns(Path(args.path)), ensure_ascii=False, indent=2))
         return 0
     if args.cmd == "find":
         cards = search_cards(args.query, args.limit)
@@ -572,10 +580,16 @@ def rebuild_data(args: argparse.Namespace) -> dict[str, Any]:
         result["global_cards"] = import_cards(home_dir() / "cards")
     if not args.skip_project_wiki:
         pw = Path(args.project_wiki)
-        result["project_wiki"] = import_project_wiki(pw) if (pw / "data" / "project-hub.index.json").exists() else {"skipped": str(pw)}
+        has_project_wiki_source = (pw / "data" / "project-hub.index.json").exists() or (pw / "data" / "xmem-export.cards.jsonl").exists()
+        result["project_wiki"] = import_project_wiki(pw) if has_project_wiki_source else {"skipped": str(pw)}
     if not args.skip_issue_tracking:
         it = Path(args.issue_tracking)
-        result["issue_tracking"] = import_issue_tracking(it) if (it / "issues").exists() else {"skipped": str(it)}
+        has_issue_source = (
+            (it / "issues").exists()
+            or (it / "index" / "xmem-export.cards.jsonl").exists()
+            or (it / "index" / "bug-patterns.jsonl").exists()
+        )
+        result["issue_tracking"] = import_issue_tracking(it) if has_issue_source else {"skipped": str(it)}
     return result
 
 

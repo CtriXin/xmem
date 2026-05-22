@@ -4,16 +4,21 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterable, List
 
 from .store import connect, log_event, upsert_card, upsert_evidence, upsert_project
 from .util import field_from_text, flatten_strings, read_json, slugify, utc_now
 
 
 def import_project_wiki(path: Path) -> Dict[str, int]:
+    path = path.expanduser()
     idx = path / "data" / "project-hub.index.json"
+    export = path / "data" / "xmem-export.cards.jsonl"
     data = read_json(idx, {})
     if not isinstance(data, dict) or "entities" not in data:
+        if export.exists():
+            exported = import_xmem_export(export, source="project-wiki-export")
+            return {"cards": 0, "projects": 0, "export_cards": exported["cards"], "evidence": exported["evidence"]}
         raise SystemExit(f"project-wiki index not found: {idx}")
     cards = 0
     projects = 0
@@ -57,12 +62,31 @@ def import_project_wiki(path: Path) -> Dict[str, int]:
             cards += 1
         log_event(conn, "import.project-wiki", payload={"path": str(path), "cards": cards, "projects": projects})
         conn.commit()
-    return {"cards": cards, "projects": projects}
+    result = {"cards": cards, "projects": projects}
+    if export.exists():
+        exported = import_xmem_export(export, source="project-wiki-export")
+        result["export_cards"] = exported["cards"]
+        result["evidence"] = exported["evidence"]
+    return result
 
 
 def import_issue_tracking(path: Path) -> Dict[str, int]:
+    path = path.expanduser()
     issues_dir = path / "issues"
     if not issues_dir.exists():
+        export = path / "index" / "xmem-export.cards.jsonl"
+        patterns = path / "index" / "bug-patterns.jsonl"
+        if export.exists() or patterns.exists():
+            result = {"cards": 0, "evidence": 0}
+            if export.exists():
+                exported = import_xmem_export(export, source="issue-tracking-export")
+                result["export_cards"] = exported["cards"]
+                result["evidence"] += exported["evidence"]
+            if patterns.exists():
+                imported = import_bug_patterns(patterns, source="issue-bug-patterns")
+                result["bug_patterns"] = imported["cards"]
+                result["evidence"] += imported["evidence"]
+            return result
         raise SystemExit(f"issue-tracking issues dir not found: {issues_dir}")
     count = 0
     evidence = 0
@@ -124,7 +148,245 @@ def import_issue_tracking(path: Path) -> Dict[str, int]:
             evidence += 1
         log_event(conn, "import.issue-tracking", payload={"path": str(path), "cards": count, "evidence": evidence})
         conn.commit()
-    return {"cards": count, "evidence": evidence}
+    result = {"cards": count, "evidence": evidence}
+    export = path / "index" / "xmem-export.cards.jsonl"
+    if export.exists():
+        exported = import_xmem_export(export, source="issue-tracking-export")
+        result["export_cards"] = exported["cards"]
+        result["evidence"] += exported["evidence"]
+    patterns = path / "index" / "bug-patterns.jsonl"
+    if patterns.exists():
+        imported = import_bug_patterns(patterns, source="issue-bug-patterns")
+        result["bug_patterns"] = imported["cards"]
+        result["evidence"] += imported["evidence"]
+    return result
+
+
+def import_xmem_export(path: Path, source: str = "xmem-export") -> Dict[str, int]:
+    """Import compact JSONL cards exported by Project Wiki or Issue Record."""
+    files = export_files(path)
+    if not files:
+        return {"cards": 0, "evidence": 0, "skipped": 1}
+    cards = 0
+    evidence = 0
+    with connect() as conn:
+        for file in files:
+            for line_no, item in iter_jsonl(file):
+                card = card_from_export_item(item, file, line_no, source)
+                upsert_project_from_export(conn, item, card, source)
+                upsert_card(conn, card)
+                cards += 1
+                for ev in evidence_from_export_item(item, card, source):
+                    upsert_evidence(conn, ev)
+                    evidence += 1
+        log_event(conn, "import.xmem-export", payload={"path": str(path), "source": source, "cards": cards, "evidence": evidence})
+        conn.commit()
+    return {"cards": cards, "evidence": evidence}
+
+
+def import_bug_patterns(path: Path, source: str = "issue-bug-patterns") -> Dict[str, int]:
+    files = export_files(path, default_name="bug-patterns.jsonl")
+    if not files:
+        return {"cards": 0, "evidence": 0, "skipped": 1}
+    cards = 0
+    evidence = 0
+    with connect() as conn:
+        for file in files:
+            for line_no, item in iter_jsonl(file):
+                exported = bug_pattern_to_export_card(item)
+                card = card_from_export_item(exported, file, line_no, source)
+                upsert_card(conn, card)
+                cards += 1
+                for ev in evidence_from_export_item(exported, card, source):
+                    upsert_evidence(conn, ev)
+                    evidence += 1
+        log_event(conn, "import.bug-patterns", payload={"path": str(path), "source": source, "cards": cards, "evidence": evidence})
+        conn.commit()
+    return {"cards": cards, "evidence": evidence}
+
+
+def export_files(path: Path, default_name: str = "xmem-export.cards.jsonl") -> List[Path]:
+    base = path.expanduser()
+    if base.is_file():
+        return [base]
+    if base.is_dir():
+        direct = base / default_name
+        files = [direct] if direct.exists() else []
+        files.extend(sorted(p for p in base.glob(f"**/{default_name}") if p not in files))
+        return files
+    return []
+
+
+def iter_jsonl(path: Path) -> Iterable[tuple[int, Dict[str, Any]]]:
+    with path.open(encoding="utf-8") as fh:
+        for line_no, line in enumerate(fh, 1):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise SystemExit(f"invalid JSONL at {path}:{line_no}: {exc}") from exc
+            if not isinstance(item, dict):
+                raise SystemExit(f"xmem export row must be an object at {path}:{line_no}")
+            yield line_no, item
+
+
+def card_from_export_item(item: Dict[str, Any], file: Path, line_no: int, source: str) -> Dict[str, Any]:
+    truth = item.get("truth") if isinstance(item.get("truth"), dict) else {}
+    cid = str(item.get("id") or item.get("card_id") or export_row_id(item, file, line_no))
+    status = str(truth.get("status") or item.get("status") or "unknown")
+    confidence = safe_float(truth.get("confidence", item.get("confidence")), 0.95 if status == "verified" else 0.5)
+    updated_at = str(truth.get("last_checked_at") or item.get("updatedAt") or item.get("updated_at") or utc_now())
+    aliases = export_aliases(item)
+    body = json.dumps(item, ensure_ascii=False, sort_keys=True)
+    return {
+        "card_id": cid,
+        "project_id": str(item.get("project_id") or project_from_export(item)),
+        "type": str(item.get("type") or "fact"),
+        "title": str(item.get("title") or item.get("name") or cid),
+        "path": str(file),
+        "status": status,
+        "confidence": confidence,
+        "aliases": aliases[:100],
+        "body": body,
+        "updated_at": updated_at,
+        "source": source,
+        "source_ref": str(item.get("source_ref") or item.get("sourcePath") or f"{file}:{line_no}"),
+    }
+
+
+def bug_pattern_to_export_card(item: Dict[str, Any]) -> Dict[str, Any]:
+    title = str(item.get("title") or item.get("name") or item.get("symptom") or "bug pattern")
+    cid = str(item.get("id") or item.get("card_id") or f"issue-pattern.{slugify(title)}")
+    aliases = list(dict.fromkeys([str(x) for x in flatten_values({
+        "aliases": item.get("aliases"),
+        "symptom": item.get("symptom"),
+        "root_cause": item.get("root_cause"),
+        "fix_pattern": item.get("fix_pattern"),
+        "regression_guard": item.get("regression_guard"),
+    }) if x]))
+    truth = item.get("truth") if isinstance(item.get("truth"), dict) else {}
+    if not truth:
+        truth = {
+            "status": item.get("status") or "partial",
+            "confidence": item.get("confidence") or 0.7,
+            "basis": ["issue_record_pattern"],
+            "last_checked_at": item.get("updatedAt") or item.get("updated_at") or utc_now(),
+        }
+    summary = item.get("summary") or summarize_bug_pattern(item)
+    out = dict(item)
+    out.update({
+        "id": cid,
+        "type": item.get("type") or "rule",
+        "title": title,
+        "aliases": aliases,
+        "truth": truth,
+        "summary": summary,
+    })
+    return out
+
+
+def summarize_bug_pattern(item: Dict[str, Any]) -> str:
+    parts = []
+    for key in ("symptom", "root_cause", "fix_pattern", "verification", "regression_guard"):
+        value = item.get(key)
+        if value:
+            parts.append(f"{key}: {value}")
+    return " | ".join(str(x) for x in parts)[:1600]
+
+
+def upsert_project_from_export(conn: Any, item: Dict[str, Any], card: Dict[str, Any], source: str) -> None:
+    ctype = str(card.get("type") or "")
+    project_id = str(card.get("project_id") or "")
+    if not project_id or not (ctype.startswith("wiki.") or ctype == "identity"):
+        return
+    current = item.get("current") if isinstance(item.get("current"), dict) else {}
+    fields = item.get("fields") if isinstance(item.get("fields"), dict) else {}
+    upsert_project(conn, {
+        "project_id": project_id,
+        "name": str(item.get("name") or item.get("title") or project_id),
+        "root": str(current.get("repo_path") or fields.get("localPath") or current.get("root") or ""),
+        "remote": str(current.get("remote") or fields.get("git") or ""),
+        "branch": str(current.get("branch") or current.get("latest_known_branch") or fields.get("actualGitBranch") or fields.get("serviceBranch") or ""),
+        "tech_stack": str(current.get("tech_stack") or fields.get("techStack") or ""),
+        "aliases": card.get("aliases", []),
+        "status": str(card.get("status") or "unknown"),
+        "updated_at": str(card.get("updated_at") or utc_now()),
+        "source": source,
+    })
+
+
+def evidence_from_export_item(item: Dict[str, Any], card: Dict[str, Any], source: str) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    evidence_items = item.get("evidence") if isinstance(item.get("evidence"), list) else []
+    for idx, ev in enumerate(evidence_items):
+        if not isinstance(ev, dict):
+            ev = {"ref": str(ev)}
+        key = json.dumps({"card": card["card_id"], "idx": idx, "ev": ev}, ensure_ascii=False, sort_keys=True)
+        out.append({
+            "evidence_id": f"{source}.{hashlib.sha1(key.encode()).hexdigest()[:16]}",
+            "card_id": card["card_id"],
+            "project_id": card.get("project_id", ""),
+            "kind": str(ev.get("kind") or "source"),
+            "ref": str(ev.get("ref") or ev.get("id") or ev.get("path") or ""),
+            "path": str(ev.get("path") or ""),
+            "title": str(ev.get("title") or card.get("title") or ""),
+            "status": str(card.get("status") or "unknown"),
+            "body": json.dumps(ev, ensure_ascii=False, sort_keys=True),
+            "updated_at": str(card.get("updated_at") or utc_now()),
+            "source": source,
+        })
+    return out
+
+
+def export_aliases(item: Dict[str, Any]) -> List[str]:
+    aliases = list(dict.fromkeys([str(x) for x in flatten_values({
+        "aliases": item.get("aliases"),
+        "title": item.get("title"),
+        "name": item.get("name"),
+        "scope": item.get("scope"),
+        "relations": item.get("relations"),
+        "current": item.get("current"),
+    }) if x]))
+    return aliases
+
+
+def project_from_export(item: Dict[str, Any]) -> str:
+    scope = item.get("scope") if isinstance(item.get("scope"), dict) else {}
+    for key in ("project", "service", "repo", "domain", "entity"):
+        if scope.get(key):
+            return slugify(str(scope[key]))
+    if str(item.get("type") or "").startswith("wiki.") and item.get("id"):
+        return slugify(str(item["id"]).removeprefix("project-wiki."))
+    return ""
+
+
+def flatten_values(value: Any) -> Iterable[str]:
+    if value is None:
+        return
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for v in value.values():
+            yield from flatten_values(v)
+    elif isinstance(value, list):
+        for item in value:
+            yield from flatten_values(item)
+    else:
+        yield str(value)
+
+
+def export_row_id(item: Dict[str, Any], file: Path, line_no: int) -> str:
+    raw = json.dumps(item, ensure_ascii=False, sort_keys=True)
+    return f"xmem-export.{slugify(file.stem)}.{line_no}.{hashlib.sha1(raw.encode()).hexdigest()[:10]}"
+
+
+def safe_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def summarize_issue(text: str, limit: int = 1600) -> str:
