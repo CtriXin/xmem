@@ -31,7 +31,7 @@ xmem gain
 4. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
 5. Use `xmem gain` when asked what xmem saved.
 
-`xmem context` is LLM-first: use `resolution.status`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true.
+`xmem context` is LLM-first: use `resolution.status`, `suggested_queries`, `correction_guidance`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true.
 
 ## Agent hooks
 
@@ -57,6 +57,8 @@ These imports are read-only. They create searchable cards and evidence pointers 
 Use `xmem new` in a new folder. It creates `.xmem/`, writes an identity card from git/package/folder evidence, and registers the folder so future `xmem sync` can find it from other projects.
 
 Use `xmem fix` when a match is wrong or ambiguous. It asks for the entity/query, wrong alias, optional correct alias, and basis; then writes a correction/dispute card under `~/.xmem/cards/corrections`.
+
+`xmem check` uses local and indexed invariant/rule/guard cards to inspect the current git diff. Treat warnings as blockers until the invariant is preserved or consciously updated.
 
 ## Card schema
 

@@ -58,6 +58,19 @@ def llm_packet(packet: Dict[str, Any]) -> str:
         lines.append("  current:")
         for key in ("project_id", "root", "branch", "git_sha", "tech_stack"):
             lines.append(f"    {key}: {quote_scalar(current.get(key, ''))}")
+    suggested_queries = packet.get("suggested_queries") or []
+    lines.append(f"  suggested_queries[{len(suggested_queries)}]:")
+    for query in suggested_queries:
+        lines.append(f"    - {quote_scalar(query)}")
+    guidance = packet.get("correction_guidance") or []
+    lines.append(f"  correction_guidance[{len(guidance)}]:")
+    for item in guidance:
+        lines.append(f"    - id: {quote_scalar(item.get('id', ''))}")
+        lines.append(f"      truth: {quote_scalar(item.get('truth', ''))}")
+        if item.get("wrong_aliases"):
+            lines.append(f"      wrong_aliases: {quote_scalar(', '.join(map(str, item.get('wrong_aliases') or [])))}")
+        if item.get("canonical_aliases"):
+            lines.append(f"      canonical_aliases: {quote_scalar(', '.join(map(str, item.get('canonical_aliases') or [])))}")
     for section in ("corrections", "alias_guidance", "registry_candidates", "rules", "methods", "memories", "relations", "evidence"):
         items = packet.get(section) or []
         lines.append(f"  {section}[{len(items)}]:")

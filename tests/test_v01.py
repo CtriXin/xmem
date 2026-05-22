@@ -1,0 +1,99 @@
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+XMEM = ROOT / "bin" / "xmem"
+
+
+def run(cmd: list[str], cwd: Path, env: dict[str, str], check: bool = True) -> subprocess.CompletedProcess[str]:
+    proc = subprocess.run(cmd, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if check and proc.returncode != 0:
+        raise AssertionError(f"command failed {cmd}\nstdout={proc.stdout}\nstderr={proc.stderr}")
+    return proc
+
+
+def init_repo(tmp_path: Path) -> tuple[Path, dict[str, str]]:
+    env = {**os.environ, "XMEM_HOME": str(tmp_path / "home"), "XMEM_PROJECT_WIKI": str(tmp_path / "project-wiki")}
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    run(["git", "init", "-q"], repo, env)
+    run(["git", "config", "user.email", "test@example.com"], repo, env)
+    run(["git", "config", "user.name", "test"], repo, env)
+    (repo / "AdBanner.tsx").write_text("lazyload\nIntersectionObserver\n", encoding="utf-8")
+    run(["git", "add", "."], repo, env)
+    run(["git", "commit", "-q", "-m", "init"], repo, env)
+    run([str(XMEM), "init", "--project-id", "demo-ads", "--alias", "demo ads"], repo, env)
+    return repo, env
+
+
+def write_project_wiki(tmp_path: Path, repo: Path) -> Path:
+    wiki = tmp_path / "project-wiki" / "data"
+    wiki.mkdir(parents=True)
+    (wiki / "project-hub.index.json").write_text(
+        json.dumps(
+            {
+                "entities": [
+                    {
+                        "id": "service:car-ads",
+                        "type": "Service",
+                        "name": "car-ads",
+                        "title": "Car Ads",
+                        "status": "active",
+                        "aliases": ["car ads", "automotive ads"],
+                        "fields": {"localPath": str(repo), "techStack": "Node", "actualGitBranch": "main"},
+                        "confidence": 1,
+                        "updatedAt": "2026-05-22T00:00:00Z",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    return wiki.parent
+
+
+def test_context_expands_wrong_alias_to_canonical_project(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    wiki_root = write_project_wiki(tmp_path, repo)
+    run([str(XMEM), "import", "project-wiki", "--path", str(wiki_root)], repo, env)
+    run([str(XMEM), "fix", "car ads", "wrong=old ads", "correct=car ads", "basis=test_confirmed"], repo, env)
+
+    packet = json.loads(run([str(XMEM), "context", "old ads", "--json"], repo, env).stdout)
+
+    assert packet["resolution"]["status"] == "guided_by_correction"
+    assert "car ads" in packet["suggested_queries"]
+    assert packet["correction_guidance"][0]["canonical_aliases"] == ["car ads"]
+    assert any(item["id"] == "project-wiki.service.car-ads" for item in packet["registry_candidates"])
+    assert packet["resolution"]["do_not_assume_single_project"] is True
+
+
+def test_check_uses_registry_invariant_cards(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+    (repo / "AdBanner.tsx").write_text("lazyload\n", encoding="utf-8")
+
+    proc = run([str(XMEM), "check", "--json"], repo, env, check=False)
+    data = json.loads(proc.stdout)
+
+    assert data["warnings"]
+    assert any(item["card"] == "ads.lazyload" and item["term"] == "IntersectionObserver" for item in data["warnings"])
+    assert data["matched_cards"] >= 1
+
+
+def test_gain_reports_queries_and_guardrails(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+    run([str(XMEM), "context", "ad lazyload"], repo, env)
+    (repo / "AdBanner.tsx").write_text("lazyload\n", encoding="utf-8")
+    run([str(XMEM), "check", "--json"], repo, env, check=False)
+
+    gain = json.loads(run([str(XMEM), "gain", "--json"], repo, env).stdout)
+
+    assert gain["top_queries"][0]["query"] == "ad lazyload"
+    assert gain["recent_queries"][0]["top_card"]
+    assert gain["recent_guardrails"]

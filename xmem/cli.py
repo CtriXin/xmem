@@ -7,7 +7,7 @@ from typing import Any, List
 
 from . import __version__
 from .checks import check_diff
-from .context import build_context
+from .context import build_context, canonical_queries_from_corrections
 from .gain import summarize_gain
 from .hooks import outbox_counts, run_hook
 from .importers import import_issue_tracking, import_project_wiki
@@ -171,6 +171,8 @@ def main(argv: List[str] | None = None) -> int:
         except Exception:
             pass
         cards = search_cards(args.query, max(args.limit * 4, 20))
+        for expanded_query in canonical_queries_from_corrections(args.query, cards):
+            cards = merge_cards(cards, search_cards(expanded_query, max(args.limit * 2, 10), record_gain=False))
         events = latest_events(3)
         if args.json:
             print(json.dumps(build_context(args.query, current, cards, events), ensure_ascii=False, indent=2))
@@ -206,6 +208,16 @@ def main(argv: List[str] | None = None) -> int:
             print("events:")
             for key, value in sorted(data["events"].items()):
                 print(f"- {key}: {value}")
+            top_queries = data.get("top_queries") or []
+            if top_queries:
+                print("top_queries:")
+                for item in top_queries[:5]:
+                    print(f"- {item.get('query')}: {item.get('count')}")
+            guardrails = data.get("recent_guardrails") or []
+            if guardrails:
+                print("recent_guardrails:")
+                for item in guardrails[-5:]:
+                    print(f"- {item.get('event')}: warnings={item.get('warnings')} matched_cards={item.get('matched_cards')}")
         return 0
     if args.cmd == "tail":
         events = latest_events(args.limit)
@@ -226,6 +238,20 @@ def main(argv: List[str] | None = None) -> int:
     if args.cmd == "rebuild":
         return rebuild_cmd(args)
     return 1
+
+
+def merge_cards(primary: list[dict[str, Any]], extra: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for card in [*primary, *extra]:
+        card_id = str(card.get("card_id") or "")
+        key = card_id or str(card.get("path") or id(card))
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(card)
+    merged.sort(key=lambda item: (float(item.get("score") or 0), float(item.get("confidence") or 0)), reverse=True)
+    return merged
 
 
 def help_cmd() -> int:

@@ -120,6 +120,8 @@ xmem_context:
   resolution:
     status: resolved | ambiguous | partial | missing
     do_not_assume_single_project: true | false
+  suggested_queries: ...
+  correction_guidance: ...
   registry_candidates: ...
   rules: ...
   methods: ...
@@ -129,6 +131,14 @@ xmem_context:
 ```
 
 Use `xmem why` for human/debug match reasons and `xmem context --json` for exact structured output.
+
+If a query hits a correction card, xmem expands the canonical alias as an extra search internally and marks the packet as `guided_by_correction` instead of pretending the wrong alias is reliable truth.
+
+## Guardrails and gain
+
+`xmem check` inspects the current git diff against local and indexed `invariant` / `rule` / `guard` cards. It is intentionally lightweight: it looks for explicit `diff_guard.warn_if_removed`, `warn_if_added`, and `forbid` terms and exits non-zero for human-visible warnings.
+
+`xmem gain` summarizes recent `context` and `check` events, including top queries, recent guardrail checks, rough tokens saved, and estimated prevented regressions.
 
 ## Useful commands
 

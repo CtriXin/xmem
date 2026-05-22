@@ -4,6 +4,7 @@ import json
 from typing import Any, Dict, List
 
 from .toon import compact
+from .util import list_after_key, normalize_text
 
 
 REGISTRY_TYPES = {"identity", "wiki.service", "wiki.repo", "wiki.domain", "wiki.project"}
@@ -28,6 +29,8 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     strong_alias = [c for c in alias_cards if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
     strong_correction = [c for c in corrections if c.get("status") in {"verified", "disputed"} and float(c.get("score") or 0) >= 8]
     strong_registry = [c for c in registry if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
+    correction_guidance_items = correction_guidance(query, corrections)
+    suggested_queries = canonical_queries_from_corrections(query, corrections)
 
     if not cards:
         resolution = "missing"
@@ -45,6 +48,8 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     warnings: List[str] = []
     if resolution in {"ambiguous", "guided_by_alias_card", "guided_by_correction"}:
         warnings.append("multiple verified registry candidates matched; do not assume a single project")
+    if correction_guidance_items:
+        warnings.append("query matched a correction/dispute overlay; prefer canonical aliases and verify before editing")
     if any(c.get("status") in {"inferred", "partial", "stale", "unknown", "disputed"} for c in cards[:5]):
         warnings.append("some top cards are not verified; use as hints only")
 
@@ -56,9 +61,11 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "resolution": {
             "status": resolution,
             "do_not_assume_single_project": resolution in {"ambiguous", "guided_by_alias_card", "guided_by_correction"},
-            "reason": resolution_reason(resolution, strong_registry, cards),
+            "reason": resolution_reason(resolution, strong_registry, cards, correction_guidance_items),
         },
         "current": current_brief(current),
+        "suggested_queries": suggested_queries,
+        "correction_guidance": correction_guidance_items,
         "corrections": [card_brief(c, i + 1) for i, c in enumerate(corrections[:5])],
         "alias_guidance": [card_brief(c, i + 1) for i, c in enumerate(alias_cards[:5])],
         "registry_candidates": [card_brief(c, i + 1) for i, c in enumerate(registry[:8])],
@@ -74,10 +81,59 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     return packet
 
 
-def resolution_reason(resolution: str, strong_registry: List[Dict[str, Any]], cards: List[Dict[str, Any]]) -> str:
+def canonical_queries_from_corrections(query: str, corrections: List[Dict[str, Any]], limit: int = 3) -> List[str]:
+    out: List[str] = []
+    for item in correction_guidance(query, corrections):
+        for alias in item.get("canonical_aliases") or []:
+            alias = str(alias or "").strip()
+            if alias and alias not in out:
+                out.append(alias)
+            if len(out) >= limit:
+                return out
+    return out
+
+
+def correction_guidance(query: str, corrections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    qnorm = normalize_text(query)
+    out: List[Dict[str, Any]] = []
+    for card in corrections:
+        body = str(card.get("body") or "")
+        wrong_aliases = list_after_key(body, "wrong_aliases")
+        canonical_aliases = list_after_key(body, "canonical_aliases")
+        if not wrong_aliases and not canonical_aliases:
+            continue
+        matched_wrong = [
+            alias for alias in wrong_aliases
+            if alias and (normalize_text(alias) in qnorm or qnorm in normalize_text(alias))
+        ]
+        if not matched_wrong and card.get("status") != "disputed":
+            continue
+        out.append({
+            "id": card.get("card_id", ""),
+            "truth": card.get("status", ""),
+            "wrong_aliases": wrong_aliases[:6],
+            "canonical_aliases": canonical_aliases[:6],
+            "matched_wrong_aliases": matched_wrong[:6],
+            "source_path": card.get("path") or card.get("source_ref", ""),
+        })
+    return out[:5]
+
+
+def resolution_reason(
+    resolution: str,
+    strong_registry: List[Dict[str, Any]],
+    cards: List[Dict[str, Any]],
+    guidance: List[Dict[str, Any]] | None = None,
+) -> str:
     if resolution == "missing":
         return "no indexed card matched query"
     if resolution == "guided_by_correction":
+        if guidance:
+            aliases = []
+            for item in guidance:
+                aliases.extend(item.get("canonical_aliases") or [])
+            if aliases:
+                return "correction/dispute matched; prefer canonical aliases: " + ", ".join(dict.fromkeys(aliases[:5]))
         return f"correction/dispute card matched: {strong_registry_label(strong_registry)}"
     if resolution == "guided_by_alias_card":
         return f"canonical alias guidance matched: {strong_registry_label(strong_registry)}"
