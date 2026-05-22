@@ -9,7 +9,7 @@ from typing import Any, List
 from . import __version__
 from .checks import check_diff
 from .context import build_context, canonical_queries_from_corrections
-from .gain import summarize_gain
+from .gain import format_gain_dashboard, summarize_gain
 from .hooks import outbox_counts, run_hook
 from .importers import import_bug_patterns, import_issue_tracking, import_project_wiki, import_xmem_export
 from .project import detect_project, index_local, init_project
@@ -243,22 +243,7 @@ def main(argv: List[str] | None = None) -> int:
         if args.json:
             print(json.dumps(data, ensure_ascii=False, indent=2))
         else:
-            print(f"estimated_tokens_saved: {data['estimated_tokens_saved']}")
-            print(f"estimated_bug_prevented: {data['estimated_bug_prevented']}")
-            print(f"matches: {data['matches']}")
-            print("events:")
-            for key, value in sorted(data["events"].items()):
-                print(f"- {key}: {value}")
-            top_queries = data.get("top_queries") or []
-            if top_queries:
-                print("top_queries:")
-                for item in top_queries[:5]:
-                    print(f"- {item.get('query')}: {item.get('count')}")
-            guardrails = data.get("recent_guardrails") or []
-            if guardrails:
-                print("recent_guardrails:")
-                for item in guardrails[-5:]:
-                    print(f"- {item.get('event')}: warnings={item.get('warnings')} matched_cards={item.get('matched_cards')}")
+            print(format_gain_dashboard(data))
         return 0
     if args.cmd == "tail":
         events = latest_events(args.limit)

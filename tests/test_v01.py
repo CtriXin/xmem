@@ -110,10 +110,16 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     run([str(XMEM), "check", "--json"], repo, env, check=False)
 
     gain = json.loads(run([str(XMEM), "gain", "--json"], repo, env).stdout)
+    text_gain = run([str(XMEM), "gain"], repo, env).stdout
 
     assert gain["top_queries"][0]["query"] == "ad lazyload"
+    assert gain["top_queries"][0]["estimated_tokens_saved"] > 0
+    assert gain["observed"]["context_hits"] == 1
     assert gain["recent_queries"][0]["top_card"]
     assert gain["recent_guardrails"]
+    assert "XMEM Gain (Global Scope)" in text_gain
+    assert "Confidence note:" in text_gain
+    assert "By Event" in text_gain
 
 
 def test_context_next_reads_include_relation_cards(tmp_path: Path):
