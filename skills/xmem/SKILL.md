@@ -15,6 +15,7 @@ Truth rule: `.xmem/*.yaml`, source Markdown, code, git, runtime APIs, and human 
 xmem help
 xmem status
 xmem sync
+xmem preflight "query"
 xmem context "query"
 xmem why "query"
 xmem open "query"
@@ -26,14 +27,17 @@ xmem gain
 
 ## Workflow
 
-1. Run `xmem context "<task>"` before broad repo traversal or project selection.
-2. If `source_freshness.status` is not `fresh`, run `xmem sync` before relying on the packet.
-3. Trust only cards marked `verified`; treat `inferred`, `partial`, `stale`, `unknown`, and `disputed` as hints.
-4. For edits that hit a feature with invariant cards, run `xmem check` before final response.
-5. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
-6. Use `xmem gain` when asked what xmem saved.
+1. Run `xmem preflight "<task>"` before development or bugfix edits to surface historical bug-patterns, invariants, and required checks.
+2. Run `xmem context "<task>"` before broad repo traversal or project selection.
+3. If `source_freshness.status` is not `fresh`, run `xmem sync` before relying on the packet.
+4. Trust only cards marked `verified`; treat `inferred`, `partial`, `stale`, `unknown`, and `disputed` as hints.
+5. For edits that hit a feature with invariant cards, run `xmem check` before final response.
+6. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
+7. Use `xmem gain` when asked what xmem saved.
 
 `xmem context` is LLM-first: use `resolution.status`, `suggested_queries`, `correction_guidance`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true. Duplicate cards may be fused; read `supporting_cards` for alternate sources behind the primary card.
+
+`xmem preflight` is the development-start packet. Use `readiness`, `risk_level`, `known_bug_patterns`, `must_keep`, `avoid`, `known_failure_modes`, `required_checks`, and `source_refs` before editing. If `readiness` is `blocked_source_stale`, sync first; if it is `needs_disambiguation`, resolve the project/entity before changing code.
 
 ## Agent hooks
 

@@ -19,6 +19,7 @@ truth:
   last_checked_at: 2026-05-22T00:00:00Z
 summary: xmem is the single agent entry and control plane. Project Wiki owns entity truth; Issue Record owns bug truth; xmem owns compact memory, routing, checks, and freshness warnings.
 must_include:
+  - Run xmem preflight before implementation or bugfix edits to surface historical bug-patterns and required checks.
   - Query xmem context before broad traversal or project selection.
   - Route service/repo/domain/branch/deploy/alias facts to Project Wiki export.
   - Route bug symptom/root cause/fix/verification/regression guard to Issue Record bug-pattern export.

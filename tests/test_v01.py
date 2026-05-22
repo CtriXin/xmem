@@ -191,6 +191,44 @@ def test_issue_tracking_imports_bug_patterns_as_rules(tmp_path: Path):
     assert any(item["id"] == "issue-pattern.ad-lazy-regression" for item in packet["rules"])
 
 
+def test_preflight_returns_issue_patterns_before_development(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    tracking = tmp_path / "issue-tracking"
+    index_dir = tracking / "index"
+    index_dir.mkdir(parents=True)
+    (index_dir / "bug-patterns.jsonl").write_text(
+        json.dumps(
+            {
+                "id": "issue-pattern.ad-lazy-regression",
+                "title": "Ad lazy-load regression",
+                "symptom": "ad iframe display was fixed but lazy-load stopped working",
+                "root_cause": "display fix bypassed the lazy-load initialization path",
+                "fix_pattern": "keep lazy-load wrapper when changing ad display",
+                "verification": "check filled iframe, unfilled collapse, desktop and mobile",
+                "regression_guard": "do not remove lazy-load when fixing ad display",
+                "aliases": ["ad iframe lazy regression", "广告没有延迟加载"],
+                "truth": {"status": "verified", "confidence": 0.9},
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    run([str(XMEM), "import", "issue-tracking", "--path", str(tracking)], repo, env)
+
+    packet = json.loads(run([str(XMEM), "preflight", "ad iframe lazy regression", "--json"], repo, env).stdout)
+    text_packet = run([str(XMEM), "preflight", "ad iframe lazy regression"], repo, env).stdout
+
+    assert packet["schema"] == "xmem.preflight.v1"
+    assert packet["readiness"] == "ready_with_guards"
+    assert packet["risk_level"] == "high"
+    assert any(item["id"] == "issue-pattern.ad-lazy-regression" for item in packet["known_bug_patterns"])
+    assert any("lazy-load" in item["text"] for item in packet["must_keep"])
+    assert any("iframe" in item["text"] for item in packet["required_checks"])
+    assert "xmem_preflight:" in text_packet
+    assert "must_keep" in text_packet
+
+
 def test_check_sources_reports_export_shape_errors(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     export = tmp_path / "project-wiki" / "data" / "xmem-export.cards.jsonl"

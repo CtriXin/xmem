@@ -13,11 +13,12 @@ from .gain import summarize_gain
 from .hooks import outbox_counts, run_hook
 from .importers import import_bug_patterns, import_issue_tracking, import_project_wiki, import_xmem_export
 from .project import detect_project, index_local, init_project
+from .preflight import build_preflight
 from .search import latest_events, search_cards
 from .source_check import check_source_exports, compact_source_health
 from .sources import index_registered_sources, load_sources, register_local_root, sources_path
 from .store import connect, rows
-from .toon import context_packet, llm_packet
+from .toon import context_packet, llm_packet, preflight_packet
 from .util import emit_yaml, git_root, home_dir, real_user_home, utc_now
 
 
@@ -69,6 +70,11 @@ def build_parser() -> argparse.ArgumentParser:
     ctx.add_argument("--limit", type=int, default=8)
     ctx.add_argument("--json", action="store_true")
     ctx.add_argument("--legacy-toon", action="store_true", help="Print the old flat TOON table")
+
+    preflight = sub.add_parser("preflight", help="Return development preflight guards before editing")
+    preflight.add_argument("query")
+    preflight.add_argument("--limit", type=int, default=8)
+    preflight.add_argument("--json", action="store_true")
 
     card = sub.add_parser("card", help="Manage local cards")
     card_sub = card.add_subparsers(dest="card_cmd", required=True)
@@ -192,6 +198,23 @@ def main(argv: List[str] | None = None) -> int:
         else:
             print(llm_packet(build_context(args.query, current, cards, events)))
         return 0
+    if args.cmd == "preflight":
+        current = None
+        try:
+            root = git_root(Path.cwd())
+            current = detect_project(root)
+        except Exception:
+            pass
+        cards = search_cards(args.query, max(args.limit * 4, 20))
+        for expanded_query in canonical_queries_from_corrections(args.query, cards):
+            cards = merge_cards(cards, search_cards(expanded_query, max(args.limit * 2, 10), record_gain=False))
+        events = latest_events(3)
+        packet = build_preflight(args.query, current, cards, events)
+        if args.json:
+            print(json.dumps(packet, ensure_ascii=False, indent=2))
+        else:
+            print(preflight_packet(packet))
+        return 0
     if args.cmd == "card":
         return card_cmd(args)
     if args.cmd == "check":
@@ -279,6 +302,7 @@ def help_cmd() -> int:
                 "xmem quick commands:",
                 "- xmem status              # registry path + counts",
                 "- xmem sync                # rebuild from Project Wiki, issue records, known folders",
+                "- xmem preflight <words>   # dev-start bug guards and required checks",
                 "- xmem context <words>     # LLM packet",
                 "- xmem why <words>         # why it matched",
                 "- xmem open <id|words>     # card/evidence excerpt",

@@ -9,6 +9,7 @@ Lightweight cross-project memory for agents. xmem is a truth index, not a heavy 
 - Store invariant cards, for example ad lazy-load must not regress.
 - Import read-only sources such as Project Wiki and issue-tracking.
 - Return compact agent context with freshness and evidence status.
+- Return development preflight packets that surface historical bug patterns before edits.
 - Track rough token savings and prevented regressions with `xmem gain`.
 
 ## Quick start
@@ -17,6 +18,7 @@ Lightweight cross-project memory for agents. xmem is a truth index, not a heavy 
 xmem help
 xmem status
 xmem sync
+xmem preflight "ads lazyload change"
 xmem context "how did we add ads before"
 xmem why "car ads lazyload"
 xmem open ads.lazyload
@@ -132,7 +134,7 @@ This gives an automatic path: LLM observes work -> hook captures compact truth/e
 
 xmem should stay small. A repo starts with at most a few cards. Full text search and RAG can be added later, but cards and evidence pointers remain the source of truth.
 
-## LLM packet
+## LLM packets
 
 `xmem context` defaults to an LLM-first packet:
 
@@ -153,6 +155,23 @@ xmem_context:
 
 Use `xmem why` for human/debug match reasons and `xmem context --json` for exact structured output.
 
+`xmem preflight` is the development-start packet. It is narrower than `context`: it pulls matched Issue Record bug-patterns, invariant/rule cards, must-keep behavior, known failure modes, and required verification checks before code is edited.
+
+```text
+xmem_preflight:
+  readiness: ready_with_guards | needs_disambiguation | blocked_source_stale | no_prior_memory
+  risk_level: high | medium | low | unknown
+  known_bug_patterns: ...
+  invariants: ...
+  must_keep: ...
+  avoid: ...
+  known_failure_modes: ...
+  required_checks: ...
+  source_refs: ...
+```
+
+Agents should run `xmem preflight "<task>"` before implementation/bugfix work, then preserve `must_keep`, avoid known failure modes, and run `required_checks`. If source freshness is stale, sync first; if project identity is ambiguous, disambiguate before editing.
+
 `xmem context` conservatively fuses duplicate cards with the same title and type family. The best card stays in `rules` / `methods` / `relations`, and matching duplicates appear as `supporting_cards`, keeping LLM packets compact while preserving source traceability.
 
 If a query hits a correction card, xmem expands the canonical alias as an extra search internally and marks the packet as `guided_by_correction` instead of pretending the wrong alias is reliable truth.
@@ -168,6 +187,7 @@ If a query hits a correction card, xmem expands the canonical alias as an extra 
 ```bash
 xmem status                 # registry health and counts
 xmem sync                   # rebuild from truth sources
+xmem preflight <query>      # dev-start bug guards and required checks
 xmem check --sources        # validate Project Wiki / Issue Record exports
 xmem new                    # create/register .xmem for this folder
 xmem why <query>            # explain matches

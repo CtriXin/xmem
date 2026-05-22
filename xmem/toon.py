@@ -107,6 +107,53 @@ def llm_packet(packet: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def preflight_packet(packet: Dict[str, Any]) -> str:
+    """Emit a compact development-preflight packet for agents."""
+    lines = ["xmem_preflight:"]
+    for key in ("schema", "truth_policy", "query", "intent", "readiness", "risk_level", "action"):
+        lines.append(f"  {key}: {quote_scalar(packet.get(key, ''))}")
+    freshness = packet.get("source_freshness") or {}
+    lines.append("  source_freshness:")
+    for key in ("status", "stale_exports", "registry"):
+        lines.append(f"    {key}: {quote_scalar(freshness.get(key, ''))}")
+    resolution = packet.get("resolution") or {}
+    lines.append("  resolution:")
+    for key in ("status", "do_not_assume_single_project", "reason"):
+        lines.append(f"    {key}: {quote_scalar(resolution.get(key, ''))}")
+    current = packet.get("current") or {}
+    if current:
+        lines.append("  current:")
+        for key in ("project_id", "root", "branch", "git_sha", "tech_stack"):
+            lines.append(f"    {key}: {quote_scalar(current.get(key, ''))}")
+    for section in ("matched_projects", "known_bug_patterns", "invariants", "methods"):
+        items = packet.get(section) or []
+        lines.append(f"  {section}[{len(items)}]:")
+        for item in items:
+            lines.extend(brief_item(item, 4))
+    for section in ("must_keep", "avoid", "known_failure_modes", "required_checks"):
+        items = packet.get(section) or []
+        lines.append(f"  {section}[{len(items)}]:")
+        for item in items:
+            lines.append(f"    - text: {quote_scalar(item.get('text', ''))}")
+            lines.append(f"      field: {quote_scalar(item.get('field', ''))}")
+            lines.append(f"      card_id: {quote_scalar(item.get('card_id', ''))}")
+            lines.append(f"      truth: {quote_scalar(item.get('truth', ''))}")
+            lines.append(f"      source_ref: {quote_scalar(compact(item.get('source_ref', ''), 160))}")
+    source_refs = packet.get("source_refs") or []
+    lines.append(f"  source_refs[{len(source_refs)}]:")
+    for path in source_refs:
+        lines.append(f"    - {quote_scalar(path)}")
+    warnings = packet.get("warnings") or []
+    lines.append(f"  warnings[{len(warnings)}]:")
+    for warning in warnings:
+        lines.append(f"    - {quote_scalar(warning)}")
+    next_reads = packet.get("next_reads") or []
+    lines.append(f"  next_reads[{len(next_reads)}]:")
+    for path in next_reads:
+        lines.append(f"    - {quote_scalar(path)}")
+    return "\n".join(lines)
+
+
 def brief_item(item: Dict[str, Any], indent: int) -> List[str]:
     pad = " " * indent
     sub = " " * (indent + 2)
