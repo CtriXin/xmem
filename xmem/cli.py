@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any, List
 
@@ -13,6 +14,7 @@ from .hooks import outbox_counts, run_hook
 from .importers import import_bug_patterns, import_issue_tracking, import_project_wiki, import_xmem_export
 from .project import detect_project, index_local, init_project
 from .search import latest_events, search_cards
+from .source_check import check_source_exports, compact_source_health
 from .sources import index_registered_sources, load_sources, register_local_root, sources_path
 from .store import connect, rows
 from .toon import context_packet, llm_packet
@@ -84,6 +86,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     chk = sub.add_parser("check", help="Check current diff against local invariants")
     chk.add_argument("path", nargs="?", default=".")
+    chk.add_argument("--sources", action="store_true", help="Validate Project Wiki / Issue Record xmem exports")
     chk.add_argument("--json", action="store_true")
 
     gain = sub.add_parser("gain", help="Show xmem savings/guardrail stats")
@@ -192,6 +195,13 @@ def main(argv: List[str] | None = None) -> int:
     if args.cmd == "card":
         return card_cmd(args)
     if args.cmd == "check":
+        if args.sources:
+            result = check_source_exports()
+            if args.json:
+                print(json.dumps(result, ensure_ascii=False, indent=2))
+            else:
+                print("\n".join(compact_source_health(result)))
+            return 2 if result.get("errors") else 0
         result = check_diff(Path(args.path))
         if args.json:
             print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -379,6 +389,7 @@ def registry_status() -> dict[str, Any]:
         "registry_exists": db.exists(),
         "real_user_home": str(real_user_home()),
         "sources": str(sources_path()),
+        "source_exports": check_source_exports(),
         "local_source_count": len(load_sources().get("local_roots", [])),
         "outbox": outbox_counts(),
         "counts": counts,
@@ -398,6 +409,14 @@ def status_cmd(args: argparse.Namespace) -> int:
         print(f"local_sources: {data['local_source_count']}")
         outbox = data.get("outbox", {})
         print(f"outbox: project_wiki={outbox.get('project_wiki', 0)} issue_tracking={outbox.get('issue_tracking', 0)}")
+        source_exports = data.get("source_exports") or {}
+        print(
+            "source_exports: "
+            f"{source_exports.get('status', 'unknown')} "
+            f"errors={source_exports.get('errors', 0)} "
+            f"warnings={source_exports.get('warnings', 0)} "
+            f"optional_missing={source_exports.get('optional_missing', 0)}"
+        )
         counts = data.get("counts", {})
         if counts:
             print("counts:")
@@ -565,32 +584,46 @@ def rebuild_data(args: argparse.Namespace) -> dict[str, Any]:
     from .store import db_path
 
     db = db_path()
-    if db.exists():
-        db.unlink()
-    result: dict[str, Any] = {"reset": str(db)}
-    if not args.skip_local:
-        local_root = git_root(Path(args.local))
-        if (local_root / ".xmem").exists():
-            register_local_root(local_root, "xmem.sync")
-            result["local_sources"] = index_registered_sources([local_root])
+    db.parent.mkdir(parents=True, exist_ok=True)
+    temp = db.with_name(f"{db.name}.tmp-{os.getpid()}")
+    if temp.exists():
+        temp.unlink()
+    result: dict[str, Any] = {"rebuilt": str(db), "temp": str(temp)}
+    previous = os.environ.get("XMEM_REGISTRY_PATH")
+    os.environ["XMEM_REGISTRY_PATH"] = str(temp)
+    try:
+        if not args.skip_local:
+            local_root = git_root(Path(args.local))
+            if (local_root / ".xmem").exists():
+                register_local_root(local_root, "xmem.sync")
+                result["local_sources"] = index_registered_sources([local_root])
+            else:
+                result["local_sources"] = index_registered_sources()
+        if not args.skip_cards:
+            result["cards"] = import_cards(Path(args.cards))
+            result["global_cards"] = import_cards(home_dir() / "cards")
+        if not args.skip_project_wiki:
+            pw = Path(args.project_wiki)
+            has_project_wiki_source = (pw / "data" / "project-hub.index.json").exists() or (pw / "data" / "xmem-export.cards.jsonl").exists()
+            result["project_wiki"] = import_project_wiki(pw) if has_project_wiki_source else {"skipped": str(pw)}
+        if not args.skip_issue_tracking:
+            it = Path(args.issue_tracking)
+            has_issue_source = (
+                (it / "issues").exists()
+                or (it / "index" / "xmem-export.cards.jsonl").exists()
+                or (it / "index" / "bug-patterns.jsonl").exists()
+            )
+            result["issue_tracking"] = import_issue_tracking(it) if has_issue_source else {"skipped": str(it)}
+        os.replace(temp, db)
+        result["atomic_swap"] = True
+        return result
+    finally:
+        if previous is None:
+            os.environ.pop("XMEM_REGISTRY_PATH", None)
         else:
-            result["local_sources"] = index_registered_sources()
-    if not args.skip_cards:
-        result["cards"] = import_cards(Path(args.cards))
-        result["global_cards"] = import_cards(home_dir() / "cards")
-    if not args.skip_project_wiki:
-        pw = Path(args.project_wiki)
-        has_project_wiki_source = (pw / "data" / "project-hub.index.json").exists() or (pw / "data" / "xmem-export.cards.jsonl").exists()
-        result["project_wiki"] = import_project_wiki(pw) if has_project_wiki_source else {"skipped": str(pw)}
-    if not args.skip_issue_tracking:
-        it = Path(args.issue_tracking)
-        has_issue_source = (
-            (it / "issues").exists()
-            or (it / "index" / "xmem-export.cards.jsonl").exists()
-            or (it / "index" / "bug-patterns.jsonl").exists()
-        )
-        result["issue_tracking"] = import_issue_tracking(it) if has_issue_source else {"skipped": str(it)}
-    return result
+            os.environ["XMEM_REGISTRY_PATH"] = previous
+        if temp.exists():
+            temp.unlink()
 
 
 def rebuild_cmd(args: argparse.Namespace) -> int:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -71,6 +72,9 @@ CREATE INDEX IF NOT EXISTS idx_alias_entity ON aliases(entity_kind, entity_id);
 
 
 def db_path() -> Path:
+    explicit = os.environ.get("XMEM_REGISTRY_PATH")
+    if explicit:
+        return Path(explicit).expanduser()
     return home_dir() / "registry.sqlite"
 
 

@@ -19,6 +19,7 @@ xmem context "query"
 xmem why "query"
 xmem open "query"
 xmem new
+xmem check --sources
 xmem fix
 xmem gain
 ```
@@ -59,6 +60,10 @@ If present, xmem also consumes compact source exports:
 - `issue-tracking/index/bug-patterns.jsonl`
 
 These exports are bridge/index inputs only; Project Wiki and Issue Record remain the source truth.
+
+Use `xmem check --sources` when Project Wiki or Issue Record changes its export. Missing optional exports are reported as optional_missing; malformed JSONL rows, duplicate ids, invalid truth status, or invalid confidence are errors.
+
+`xmem sync` rebuilds the generated SQLite registry atomically through a temp file and final swap, so concurrent agents should keep reading the previous complete registry until the new one is ready.
 
 ## New folders and corrections
 

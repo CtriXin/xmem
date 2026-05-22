@@ -9,6 +9,8 @@ from typing import Any, Dict, Iterable, List
 from .store import connect, log_event, upsert_card, upsert_evidence, upsert_project
 from .util import field_from_text, flatten_strings, read_json, slugify, utc_now
 
+VALID_STATUSES = {"verified", "inferred", "partial", "stale", "disputed", "unknown"}
+
 
 def import_project_wiki(path: Path) -> Dict[str, int]:
     path = path.expanduser()
@@ -79,7 +81,7 @@ def import_issue_tracking(path: Path) -> Dict[str, int]:
         if export.exists() or patterns.exists():
             result = {"cards": 0, "evidence": 0}
             if export.exists():
-                exported = import_xmem_export(export, source="issue-tracking-export")
+                exported = import_xmem_export(export, source="issue-tracking-export", skip_bug_patterns=patterns.exists())
                 result["export_cards"] = exported["cards"]
                 result["evidence"] += exported["evidence"]
             if patterns.exists():
@@ -150,11 +152,11 @@ def import_issue_tracking(path: Path) -> Dict[str, int]:
         conn.commit()
     result = {"cards": count, "evidence": evidence}
     export = path / "index" / "xmem-export.cards.jsonl"
+    patterns = path / "index" / "bug-patterns.jsonl"
     if export.exists():
-        exported = import_xmem_export(export, source="issue-tracking-export")
+        exported = import_xmem_export(export, source="issue-tracking-export", skip_bug_patterns=patterns.exists())
         result["export_cards"] = exported["cards"]
         result["evidence"] += exported["evidence"]
-    patterns = path / "index" / "bug-patterns.jsonl"
     if patterns.exists():
         imported = import_bug_patterns(patterns, source="issue-bug-patterns")
         result["bug_patterns"] = imported["cards"]
@@ -162,16 +164,22 @@ def import_issue_tracking(path: Path) -> Dict[str, int]:
     return result
 
 
-def import_xmem_export(path: Path, source: str = "xmem-export") -> Dict[str, int]:
+def import_xmem_export(path: Path, source: str = "xmem-export", *, skip_bug_patterns: bool = False) -> Dict[str, int]:
     """Import compact JSONL cards exported by Project Wiki or Issue Record."""
     files = export_files(path)
     if not files:
         return {"cards": 0, "evidence": 0, "skipped": 1}
     cards = 0
     evidence = 0
+    skipped_bug_patterns = 0
     with connect() as conn:
         for file in files:
             for line_no, item in iter_jsonl(file):
+                if skip_bug_patterns and looks_like_bug_pattern(item):
+                    skipped_bug_patterns += 1
+                    continue
+                if source.startswith("issue-") and looks_like_bug_pattern(item):
+                    item = bug_pattern_to_export_card(item)
                 card = card_from_export_item(item, file, line_no, source)
                 upsert_project_from_export(conn, item, card, source)
                 upsert_card(conn, card)
@@ -179,9 +187,9 @@ def import_xmem_export(path: Path, source: str = "xmem-export") -> Dict[str, int
                 for ev in evidence_from_export_item(item, card, source):
                     upsert_evidence(conn, ev)
                     evidence += 1
-        log_event(conn, "import.xmem-export", payload={"path": str(path), "source": source, "cards": cards, "evidence": evidence})
+        log_event(conn, "import.xmem-export", payload={"path": str(path), "source": source, "cards": cards, "evidence": evidence, "skipped_bug_patterns": skipped_bug_patterns})
         conn.commit()
-    return {"cards": cards, "evidence": evidence}
+    return {"cards": cards, "evidence": evidence, "skipped_bug_patterns": skipped_bug_patterns}
 
 
 def import_bug_patterns(path: Path, source: str = "issue-bug-patterns") -> Dict[str, int]:
@@ -235,7 +243,7 @@ def iter_jsonl(path: Path) -> Iterable[tuple[int, Dict[str, Any]]]:
 def card_from_export_item(item: Dict[str, Any], file: Path, line_no: int, source: str) -> Dict[str, Any]:
     truth = item.get("truth") if isinstance(item.get("truth"), dict) else {}
     cid = str(item.get("id") or item.get("card_id") or export_row_id(item, file, line_no))
-    status = str(truth.get("status") or item.get("status") or "unknown")
+    status = normalize_status(truth.get("status") or item.get("status") or "unknown")
     confidence = safe_float(truth.get("confidence", item.get("confidence")), 0.95 if status == "verified" else 0.5)
     updated_at = str(truth.get("last_checked_at") or item.get("updatedAt") or item.get("updated_at") or utc_now())
     aliases = export_aliases(item)
@@ -259,21 +267,26 @@ def card_from_export_item(item: Dict[str, Any], file: Path, line_no: int, source
 def bug_pattern_to_export_card(item: Dict[str, Any]) -> Dict[str, Any]:
     title = str(item.get("title") or item.get("name") or item.get("symptom") or "bug pattern")
     cid = str(item.get("id") or item.get("card_id") or f"issue-pattern.{slugify(title)}")
+    symptom = bug_field(item, "symptom", "symptoms")
+    root_cause = bug_field(item, "root_cause", "rootCause")
+    fix_pattern = bug_field(item, "fix_pattern", "fix", "fixPattern", "guardrail")
+    verification = bug_field(item, "verification", "checks", "check")
+    regression_guard = bug_field(item, "regression_guard", "guardrail", "guard")
     aliases = list(dict.fromkeys([str(x) for x in flatten_values({
         "aliases": item.get("aliases"),
-        "symptom": item.get("symptom"),
-        "root_cause": item.get("root_cause"),
-        "fix_pattern": item.get("fix_pattern"),
-        "regression_guard": item.get("regression_guard"),
+        "symptom": symptom,
+        "root_cause": root_cause,
+        "fix_pattern": fix_pattern,
+        "regression_guard": regression_guard,
     }) if x]))
     truth = item.get("truth") if isinstance(item.get("truth"), dict) else {}
-    if not truth:
-        truth = {
-            "status": item.get("status") or "partial",
-            "confidence": item.get("confidence") or 0.7,
-            "basis": ["issue_record_pattern"],
-            "last_checked_at": item.get("updatedAt") or item.get("updated_at") or utc_now(),
-        }
+    truth = {
+        **truth,
+        "status": normalize_status(truth.get("status") or item.get("status") or "partial"),
+        "confidence": truth.get("confidence", item.get("confidence") or 0.7),
+        "basis": truth.get("basis") or ["issue_record_pattern"],
+        "last_checked_at": truth.get("last_checked_at") or item.get("updatedAt") or item.get("updated_at") or utc_now(),
+    }
     summary = item.get("summary") or summarize_bug_pattern(item)
     out = dict(item)
     out.update({
@@ -283,6 +296,11 @@ def bug_pattern_to_export_card(item: Dict[str, Any]) -> Dict[str, Any]:
         "aliases": aliases,
         "truth": truth,
         "summary": summary,
+        "symptom": symptom,
+        "root_cause": root_cause,
+        "fix_pattern": fix_pattern,
+        "verification": verification,
+        "regression_guard": regression_guard,
     })
     return out
 
@@ -290,10 +308,26 @@ def bug_pattern_to_export_card(item: Dict[str, Any]) -> Dict[str, Any]:
 def summarize_bug_pattern(item: Dict[str, Any]) -> str:
     parts = []
     for key in ("symptom", "root_cause", "fix_pattern", "verification", "regression_guard"):
-        value = item.get(key)
+        value = bug_field(item, key)
         if value:
             parts.append(f"{key}: {value}")
     return " | ".join(str(x) for x in parts)[:1600]
+
+
+def looks_like_bug_pattern(item: Dict[str, Any]) -> bool:
+    truth = item.get("truth") if isinstance(item.get("truth"), dict) else {}
+    keys = {"symptom", "symptoms", "root_cause", "rootCause", "fix_pattern", "guardrail", "verification", "checks", "regression_guard"}
+    return any(key in item for key in keys) or any(key in truth for key in keys)
+
+
+def bug_field(item: Dict[str, Any], *names: str) -> Any:
+    truth = item.get("truth") if isinstance(item.get("truth"), dict) else {}
+    for name in names:
+        if item.get(name):
+            return item.get(name)
+        if truth.get(name):
+            return truth.get(name)
+    return ""
 
 
 def upsert_project_from_export(conn: Any, item: Dict[str, Any], card: Dict[str, Any], source: str) -> None:
@@ -387,6 +421,17 @@ def safe_float(value: Any, default: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def normalize_status(value: Any) -> str:
+    status = str(value or "unknown").strip().lower()
+    if status in VALID_STATUSES:
+        return status
+    if status in {"done", "closed", "passed", "pass"}:
+        return "verified"
+    if status in {"active", "open", "todo", "wip"}:
+        return "partial"
+    return "unknown"
 
 
 def summarize_issue(text: str, limit: int = 1600) -> str:

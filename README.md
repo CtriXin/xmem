@@ -21,6 +21,7 @@ xmem context "how did we add ads before"
 xmem why "car ads lazyload"
 xmem open ads.lazyload
 xmem new
+xmem check --sources
 xmem fix
 xmem gain
 ```
@@ -65,6 +66,10 @@ Rule: files/code/runtime are truth; SQLite is only a generated search index. If 
 Imports are read-only. xmem does not silently rewrite Project Wiki or issue records; corrections are stored as small overlay cards until the upstream source is fixed.
 
 `xmem-export.cards.jsonl` is the preferred bridge format for other truth systems. Project Wiki can export entity cards, and Issue Record can export verified bug-pattern/rule cards; xmem imports them as generated index rows while keeping the source files as truth.
+
+Use `xmem check --sources` to validate export shape before or after another tool generates it. Missing exports are reported as optional_missing; malformed rows, invalid truth status, duplicate ids, and bad confidence values are errors.
+
+Registry rebuilds are atomic: `xmem sync` builds a temporary SQLite index and swaps it into place at the end, so concurrent `xmem context` readers should not see a half-empty registry during sync.
 
 ## New folders
 
@@ -151,6 +156,7 @@ If a query hits a correction card, xmem expands the canonical alias as an extra 
 ```bash
 xmem status                 # registry health and counts
 xmem sync                   # rebuild from truth sources
+xmem check --sources        # validate Project Wiki / Issue Record exports
 xmem new                    # create/register .xmem for this folder
 xmem why <query>            # explain matches
 xmem open <card-id-or-query>

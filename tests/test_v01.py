@@ -20,7 +20,12 @@ def run(cmd: list[str], cwd: Path, env: dict[str, str], check: bool = True) -> s
 
 
 def init_repo(tmp_path: Path) -> tuple[Path, dict[str, str]]:
-    env = {**os.environ, "XMEM_HOME": str(tmp_path / "home"), "XMEM_PROJECT_WIKI": str(tmp_path / "project-wiki")}
+    env = {
+        **os.environ,
+        "XMEM_HOME": str(tmp_path / "home"),
+        "XMEM_PROJECT_WIKI": str(tmp_path / "project-wiki"),
+        "XMEM_ISSUE_TRACKING": str(tmp_path / "issue-tracking"),
+    }
     repo = tmp_path / "repo"
     repo.mkdir()
     run(["git", "init", "-q"], repo, env)
@@ -184,3 +189,48 @@ def test_issue_tracking_imports_bug_patterns_as_rules(tmp_path: Path):
 
     assert result["bug_patterns"] == 1
     assert any(item["id"] == "issue-pattern.ad-lazy-regression" for item in packet["rules"])
+
+
+def test_check_sources_reports_export_shape_errors(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    export = tmp_path / "project-wiki" / "data" / "xmem-export.cards.jsonl"
+    export.parent.mkdir(parents=True)
+    export.write_text(
+        json.dumps({"id": "bad.card", "title": "Bad Card", "truth": {"status": "certain", "confidence": 1.2}}, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    proc = run([str(XMEM), "check", "--sources", "--json"], repo, env, check=False)
+    data = json.loads(proc.stdout)
+
+    assert proc.returncode == 2
+    assert data["errors"] >= 2
+    assert data["exports"][0]["errors"]
+
+
+def test_check_sources_accepts_valid_exports_with_optional_missing(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    export = tmp_path / "project-wiki" / "data" / "xmem-export.cards.jsonl"
+    export.parent.mkdir(parents=True)
+    export.write_text(
+        json.dumps(
+            {
+                "id": "project-wiki.service.ok",
+                "type": "wiki.service",
+                "title": "ok",
+                "truth": {"status": "verified", "confidence": 0.9},
+                "summary": "ok service",
+                "evidence": [{"kind": "test", "ref": "unit"}],
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    proc = run([str(XMEM), "check", "--sources", "--json"], repo, env)
+    data = json.loads(proc.stdout)
+
+    assert proc.returncode == 0
+    assert data["errors"] == 0
+    assert data["exports"][0]["rows"] == 1
