@@ -57,7 +57,7 @@ Rule: files/code/runtime are truth; SQLite is only a generated search index. If 
 
 ## Sync model
 
-`xmem sync` is the normal refresh path. It rebuilds the generated SQLite index from:
+`xmem sync` is the normal refresh path. It rebuilds the generated SQLite index and prints source health plus `next_actions` from the rebuilt status. It imports from:
 
 - Project Wiki at `/Users/xin/project-wiki`.
 - Issue records at `/Users/xin/issue-tracking`.

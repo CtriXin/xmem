@@ -399,6 +399,21 @@ def sync_cmd(args: argparse.Namespace) -> int:
         local_sources = data.get("local_sources", {})
         if local_sources:
             print(f"local_sources: {local_sources.get('roots', 0)} roots, {local_sources.get('cards', 0)} cards")
+        status = data.get("status", {})
+        source_exports = status.get("source_exports") or {}
+        if source_exports:
+            print(
+                "source_exports: "
+                f"{source_exports.get('status', 'unknown')} "
+                f"errors={source_exports.get('errors', 0)} "
+                f"warnings={source_exports.get('warnings', 0)} "
+                f"stale_exports={source_exports.get('stale_exports', 0)}"
+            )
+        actions = status.get("next_actions") or []
+        if actions:
+            print("next_actions:")
+            for action in actions:
+                print(f"- {action}")
     return 0
 
 

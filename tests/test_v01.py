@@ -526,6 +526,9 @@ def test_status_reports_local_only_non_identity_cards(tmp_path: Path):
     assert "local_only_knowledge" in sources_text
     strict = run([str(XMEM), "check", "--sources", "--strict"], repo, env, check=False)
     assert strict.returncode == 2
+    sync_text = run([str(XMEM), "sync"], repo, env).stdout
+    assert "source_exports: warn" in sync_text
+    assert "next_actions:" in sync_text
 
 
 def test_context_fuses_duplicate_cards_by_title(tmp_path: Path):
