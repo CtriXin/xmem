@@ -1,0 +1,40 @@
+id: ads.lazyload
+type: invariant
+title: Ads must preserve lazy-load
+scope:
+  feature: ads
+  paths:
+    - "**/*Ad*"
+    - "**/ads/**"
+aliases:
+  - ad lazyload
+  - ads lazy-load
+  - advertisement lazy loading
+truth:
+  status: verified
+  confidence: 0.95
+  basis:
+    - issue_record
+    - code_observed
+  last_checked_at: 2026-05-22T00:00:00Z
+summary: Ad rendering must keep lazy-load or an equivalent viewport gate.
+must_include:
+  - lazy-load or viewport gate
+  - normal ad display for filled slots
+  - collapse behavior for unfilled/error slots
+forbid:
+  - request all ads during initial render
+  - remove IntersectionObserver without replacement
+diff_guard:
+  warn_if_removed:
+    - lazyload
+    - lazy-load
+    - IntersectionObserver
+    - loading="lazy"
+    - observeAdSlot
+checks:
+  - xmem check
+  - verify below-the-fold ads do not request before viewport entry
+evidence:
+  - kind: issue
+    ref: ad-monetization-invariants-20260519

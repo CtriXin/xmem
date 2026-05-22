@@ -1,0 +1,26 @@
+id: ads.add
+type: method
+title: Add ads to a project
+scope:
+  feature: ads
+aliases:
+  - how to add ads
+  - ad integration
+truth:
+  status: inferred
+  confidence: 0.45
+  basis:
+    - template
+  last_checked_at: 2026-05-22T00:00:00Z
+summary: Durable ad integration should be captured per project after code is observed.
+must_include:
+  - SDK/script singleton loading
+  - ad slot registration
+  - lazy-load or equivalent viewport gate
+  - cleanup/destroy path
+  - responsive slot sizing
+  - empty/error fallback
+checks:
+  - build/test project
+  - verify filled and unfilled ad states
+evidence: []

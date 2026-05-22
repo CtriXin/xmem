@@ -1,0 +1,43 @@
+id: alias.webnovel-template-1
+type: alias
+title: 网文模板1 canonical mapping
+scope:
+  domain: webnovel
+aliases:
+  - 网文模板1
+  - 网文模版1
+  - 网文一
+  - 网文1
+  - 网文小说模版一
+  - 网文小说模板一
+truth:
+  status: verified
+  confidence: 0.9
+  basis:
+    - project_wiki_import
+    - issue_record_calibration
+  last_checked_at: 2026-05-22T00:00:00Z
+summary: 网文模板1 is an ambiguous family alias; use current and legacy mappings below instead of assuming one repo.
+resolution:
+  status: ambiguous_family
+  current_primary:
+    service: ptc-v5-novabeats
+    repo: ptc/fe/ai_novabeats
+    note: current webnovel 1 family in Project Wiki evidence
+  legacy_or_related:
+    - service: ptc-temp-noval
+      repo: ptc/fe/ptc_ssr_noval
+      note: legacy/SSR novel family; confirm before editing
+    - service: ptc-v5-novabeats1
+      repo: ptc/fe/ptc_v5_reading
+      note: webnovel 2 family; often confused with webnovel 1
+do_not_assume:
+  - Do not pick a single project from oral name only.
+  - Confirm domain/service/branch before editing.
+checks:
+  - xmem context "<domain or exact service>"
+evidence:
+  - kind: project-wiki
+    path: /Users/xin/project-wiki/data/project-hub.index.json
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ai_novabeats/home-2-ad-size-clickrate-webnovel2-20260518/issue.md
