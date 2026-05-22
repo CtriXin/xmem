@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
@@ -73,3 +74,122 @@ def index_registered_sources(extra_roots: Iterable[Path] = ()) -> Dict[str, Any]
         result["roots"] += 1
         result["cards"] += index_local(root)
     return result
+
+
+def audit_local_sources(extra_roots: Iterable[Path] = ()) -> Dict[str, Any]:
+    result: Dict[str, Any] = {
+        "roots": 0,
+        "roots_with_cards": 0,
+        "cards": 0,
+        "knowledge_cards": 0,
+        "tracked_cards": 0,
+        "local_only_cards": 0,
+        "local_only_knowledge_cards": 0,
+        "ignored_cards": 0,
+        "ignored_knowledge_cards": 0,
+        "untracked_cards": 0,
+        "untracked_knowledge_cards": 0,
+        "missing_roots": 0,
+        "details": [],
+    }
+    for root in registered_roots(extra_roots):
+        detail = audit_one_local_source(root)
+        result["roots"] += 1
+        if detail["status"] == "missing":
+            result["missing_roots"] += 1
+        if detail["cards"]:
+            result["roots_with_cards"] += 1
+        for key in (
+            "cards",
+            "knowledge_cards",
+            "tracked_cards",
+            "local_only_cards",
+            "local_only_knowledge_cards",
+            "ignored_cards",
+            "ignored_knowledge_cards",
+            "untracked_cards",
+            "untracked_knowledge_cards",
+        ):
+            result[key] += int(detail.get(key) or 0)
+        if detail["cards"] or detail["status"] in {"missing", "no_git"}:
+            result["details"].append(detail)
+    return result
+
+
+def audit_one_local_source(root: Path) -> Dict[str, Any]:
+    root = root.expanduser()
+    detail: Dict[str, Any] = {
+        "root": str(root),
+        "status": "missing",
+        "cards": 0,
+        "knowledge_cards": 0,
+        "tracked_cards": 0,
+        "local_only_cards": 0,
+        "local_only_knowledge_cards": 0,
+        "ignored_cards": 0,
+        "ignored_knowledge_cards": 0,
+        "untracked_cards": 0,
+        "untracked_knowledge_cards": 0,
+        "sample_local_only": [],
+    }
+    if not root.exists():
+        return detail
+    cards_dir = root / ".xmem" / "cards"
+    cards = sorted(cards_dir.glob("*.yaml")) if cards_dir.exists() else []
+    rels = [".xmem/cards/" + card.name for card in cards]
+    identity_rels = {".xmem/cards/project.identity.yaml"}
+    knowledge_rels = [rel for rel in rels if rel not in identity_rels]
+    detail["cards"] = len(cards)
+    detail["knowledge_cards"] = len(knowledge_rels)
+    if not cards:
+        detail["status"] = "no_cards"
+        return detail
+
+    if not git_available(root):
+        detail["status"] = "local_only"
+        detail["local_only_cards"] = len(cards)
+        detail["local_only_knowledge_cards"] = len(knowledge_rels)
+        detail["sample_local_only"] = (knowledge_rels or rels)[:5]
+        return detail
+
+    tracked = set(git_lines(root, ["ls-files", "--", ".xmem/cards"]))
+    ignored = set(git_lines(root, ["ls-files", "--others", "--ignored", "--exclude-standard", "--", ".xmem/cards"]))
+    untracked = set(git_lines(root, ["ls-files", "--others", "--exclude-standard", "--", ".xmem/cards"]))
+
+    tracked_cards = [rel for rel in rels if rel in tracked]
+    ignored_cards = [rel for rel in rels if rel in ignored]
+    untracked_cards = [rel for rel in rels if rel in untracked]
+    local_only = [rel for rel in rels if rel not in tracked]
+    local_only_knowledge = [rel for rel in knowledge_rels if rel not in tracked]
+
+    detail["tracked_cards"] = len(tracked_cards)
+    detail["ignored_cards"] = len(ignored_cards)
+    detail["ignored_knowledge_cards"] = len([rel for rel in knowledge_rels if rel in ignored])
+    detail["untracked_cards"] = len(untracked_cards)
+    detail["untracked_knowledge_cards"] = len([rel for rel in knowledge_rels if rel in untracked])
+    detail["local_only_cards"] = len(local_only)
+    detail["local_only_knowledge_cards"] = len(local_only_knowledge)
+    detail["sample_local_only"] = (local_only_knowledge or local_only)[:5]
+    if not local_only:
+        detail["status"] = "portable"
+    elif tracked_cards:
+        detail["status"] = "mixed"
+    else:
+        detail["status"] = "local_only"
+    return detail
+
+
+def git_available(root: Path) -> bool:
+    return bool(git_lines(root, ["rev-parse", "--show-toplevel"]))
+
+
+def git_lines(root: Path, args: List[str]) -> List[str]:
+    proc = subprocess.run(
+        ["git", "-C", str(root), *args],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    if proc.returncode != 0:
+        return []
+    return [line.strip() for line in proc.stdout.splitlines() if line.strip()]

@@ -84,6 +84,8 @@ Use `xmem check --sources` to validate export shape before or after another tool
 
 Registry rebuilds are atomic: `xmem sync` builds a temporary SQLite index and swaps it into place at the end, so concurrent `xmem context` readers should not see a half-empty registry during sync.
 
+`xmem status` also audits registered local `.xmem/cards`. Generated identity cards may remain local, but non-identity rule/method/correction cards are flagged as `local_only_knowledge` when they are ignored or untracked by git. That warning means xmem can read them on this machine, but they are not portable through git until the owning project decides to track or export them.
+
 ## Control Plane Contract
 
 xmem is the single agent entry and control plane:

@@ -486,6 +486,37 @@ def test_check_sources_accepts_valid_exports_with_optional_missing(tmp_path: Pat
     assert data["exports"][0]["rows"] == 1
 
 
+def test_status_reports_local_only_non_identity_cards(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    (repo / ".gitignore").write_text(".xmem/\n", encoding="utf-8")
+    (repo / ".xmem" / "cards" / "local.rule.yaml").write_text(
+        "\n".join(
+            [
+                "id: local.rule",
+                "type: rule",
+                "title: Local Rule",
+                "truth:",
+                "  status: verified",
+                "  confidence: 0.9",
+                "summary: Local-only knowledge should be visible in status.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    data = json.loads(run([str(XMEM), "status", "--json"], repo, env).stdout)
+    audit = data["local_source_audit"]
+    detail = next(item for item in audit["details"] if item["root"] == str(repo))
+    text = run([str(XMEM), "status"], repo, env).stdout
+
+    assert audit["local_only_knowledge_cards"] >= 1
+    assert detail["ignored_knowledge_cards"] >= 1
+    assert ".xmem/cards/local.rule.yaml" in detail["sample_local_only"]
+    assert "local_card_warning" in text
+    assert "local_only_knowledge=" in text
+
+
 def test_context_fuses_duplicate_cards_by_title(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     export = tmp_path / "dupe-export.cards.jsonl"

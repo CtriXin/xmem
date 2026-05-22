@@ -28,7 +28,7 @@ from .project import detect_project, index_local, init_project
 from .preflight import build_preflight
 from .search import latest_events, search_cards
 from .source_check import check_source_exports, compact_source_health
-from .sources import index_registered_sources, load_sources, register_local_root, registered_roots, sources_path
+from .sources import audit_local_sources, index_registered_sources, load_sources, register_local_root, registered_roots, sources_path
 from .store import connect, rows
 from .toon import context_packet, llm_packet, preflight_packet
 from .util import emit_yaml, git_root, home_dir, real_user_home, utc_now
@@ -473,6 +473,7 @@ def registry_status() -> dict[str, Any]:
         "sources": str(sources_path()),
         "source_exports": check_source_exports(),
         "local_source_count": len(load_sources().get("local_roots", [])),
+        "local_source_audit": audit_local_sources(),
         "outbox": outbox_counts(),
         "counts": counts,
     }
@@ -489,6 +490,22 @@ def status_cmd(args: argparse.Namespace) -> int:
         print(f"real_user_home: {data['real_user_home']}")
         print(f"sources: {data['sources']}")
         print(f"local_sources: {data['local_source_count']}")
+        audit = data.get("local_source_audit") or {}
+        if audit:
+            print(
+                "local_cards: "
+                f"cards={audit.get('cards', 0)} "
+                f"knowledge={audit.get('knowledge_cards', 0)} "
+                f"tracked={audit.get('tracked_cards', 0)} "
+                f"local_only={audit.get('local_only_cards', 0)} "
+                f"local_only_knowledge={audit.get('local_only_knowledge_cards', 0)} "
+                f"ignored={audit.get('ignored_cards', 0)} "
+                f"untracked={audit.get('untracked_cards', 0)}"
+            )
+            if audit.get("local_only_knowledge_cards"):
+                print("local_card_warning: some non-identity .xmem/cards are local-only and not portable via git")
+                for item in [d for d in audit.get("details", []) if d.get("local_only_knowledge_cards")][:3]:
+                    print(f"- {item.get('root')}: {item.get('local_only_knowledge_cards')} local-only knowledge cards ({item.get('status')})")
         outbox = data.get("outbox", {})
         print(f"outbox: project_wiki={outbox.get('project_wiki', 0)} issue_tracking={outbox.get('issue_tracking', 0)}")
         source_exports = data.get("source_exports") or {}
