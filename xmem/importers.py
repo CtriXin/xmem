@@ -213,6 +213,315 @@ def import_bug_patterns(path: Path, source: str = "issue-bug-patterns") -> Dict[
     return {"cards": cards, "evidence": evidence}
 
 
+def import_context_docs(path: Path) -> Dict[str, int]:
+    root = path.expanduser()
+    files = collect_context_docs(root)
+    return import_markdown_cards(root, files, "context-docs", classify_context_doc)
+
+
+def import_openspec(path: Path) -> Dict[str, int]:
+    root = path.expanduser()
+    files = collect_prefixed_markdown(root, [("openspec/specs", "**/*.md"), ("openspec/changes", "**/*.md")])
+    return import_markdown_cards(root, files, "openspec", classify_openspec_doc)
+
+
+def import_speckit(path: Path) -> Dict[str, int]:
+    root = path.expanduser()
+    files = collect_prefixed_markdown(
+        root,
+        [
+            (".specify/memory", "**/*.md"),
+            (".specify/specs", "**/*.md"),
+            ("specs", "**/spec.md"),
+            ("specs", "**/plan.md"),
+            ("specs", "**/tasks.md"),
+        ],
+    )
+    return import_markdown_cards(root, files, "speckit", classify_speckit_doc)
+
+
+def import_trellis(path: Path) -> Dict[str, int]:
+    root = path.expanduser()
+    files = collect_prefixed_markdown(
+        root,
+        [
+            (".trellis/spec", "**/*.md"),
+            (".trellis/tasks", "**/*.md"),
+            (".trellis/workspace", "**/*.md"),
+        ],
+    )
+    return import_markdown_cards(root, files, "trellis", classify_trellis_doc)
+
+
+def import_project_memory_sources(path: Path) -> Dict[str, Any]:
+    root = path.expanduser()
+    result = {
+        "context_docs": import_context_docs(root),
+        "openspec": import_openspec(root),
+        "speckit": import_speckit(root),
+        "trellis": import_trellis(root),
+    }
+    result["cards"] = sum(int(item.get("cards") or 0) for item in result.values() if isinstance(item, dict))
+    result["evidence"] = sum(int(item.get("evidence") or 0) for item in result.values() if isinstance(item, dict))
+    return result
+
+
+def import_project_memory_roots(roots: Iterable[Path]) -> Dict[str, Any]:
+    result: Dict[str, Any] = {"roots": 0, "cards": 0, "evidence": 0, "sources": []}
+    seen: set[str] = set()
+    for root in roots:
+        base = root.expanduser()
+        key = str(base)
+        if key in seen or not base.exists():
+            continue
+        seen.add(key)
+        imported = import_project_memory_sources(base)
+        cards = int(imported.get("cards") or 0)
+        evidence = int(imported.get("evidence") or 0)
+        if cards or evidence:
+            result["roots"] += 1
+            result["cards"] += cards
+            result["evidence"] += evidence
+            result["sources"].append({"root": str(base), "cards": cards, "evidence": evidence})
+    return result
+
+
+def collect_context_docs(root: Path) -> List[Path]:
+    if root.is_file():
+        return [root] if root.suffix.lower() == ".md" else []
+    patterns = [
+        "CONTEXT.md",
+        "CONTEXT-MAP.md",
+        "CONTEXT*.md",
+        "docs/adr/*.md",
+        "adr/*.md",
+        "docs/decisions/*.md",
+    ]
+    return unique_existing(root, patterns)
+
+
+def collect_prefixed_markdown(root: Path, specs: Iterable[tuple[str, str]]) -> List[Path]:
+    if root.is_file():
+        return [root] if root.suffix.lower() == ".md" else []
+    files: List[Path] = []
+    for prefix, pattern in specs:
+        base = root / prefix
+        if base.exists():
+            files.extend(p for p in base.glob(pattern) if p.is_file() and p.suffix.lower() == ".md")
+    return unique_files(files)
+
+
+def unique_existing(root: Path, patterns: Iterable[str]) -> List[Path]:
+    files: List[Path] = []
+    for pattern in patterns:
+        files.extend(p for p in root.glob(pattern) if p.is_file() and p.suffix.lower() == ".md")
+    return unique_files(files)
+
+
+def unique_files(files: Iterable[Path]) -> List[Path]:
+    seen: set[str] = set()
+    out: List[Path] = []
+    for file in files:
+        key = str(file.expanduser())
+        if key not in seen:
+            seen.add(key)
+            out.append(file)
+    return sorted(out)
+
+
+def import_markdown_cards(root: Path, files: List[Path], source: str, classifier: Any) -> Dict[str, int]:
+    if not files:
+        return {"cards": 0, "evidence": 0, "skipped": str(root)}
+    base = root if root.is_dir() else root.parent
+    project_id = slugify(base.name, "project")
+    cards = 0
+    evidence = 0
+    with connect() as conn:
+        upsert_project(conn, {
+            "project_id": project_id,
+            "name": base.name,
+            "root": str(base),
+            "remote": "",
+            "branch": "",
+            "tech_stack": "",
+            "aliases": [base.name, project_id],
+            "status": "inferred",
+            "updated_at": utc_now(),
+            "source": source,
+        })
+        for file in files:
+            text = read_markdown(file)
+            meta = classifier(base, file, text)
+            rel = relative_path(base, file)
+            card_id = f"{source}.{project_id}.{slugify(str(rel), 'doc')}.{hashlib.sha1(str(rel).encode()).hexdigest()[:8]}"
+            card = {
+                "card_id": card_id,
+                "project_id": project_id,
+                "type": meta["type"],
+                "title": meta["title"],
+                "path": str(file),
+                "status": meta["status"],
+                "confidence": meta["confidence"],
+                "aliases": meta["aliases"],
+                "body": text,
+                "updated_at": utc_now(),
+                "source": source,
+                "source_ref": str(rel),
+            }
+            upsert_card(conn, card)
+            upsert_evidence(conn, {
+                "evidence_id": f"{source}.{hashlib.sha1(str(file).encode()).hexdigest()[:16]}",
+                "card_id": card_id,
+                "project_id": project_id,
+                "kind": meta["evidence_kind"],
+                "ref": str(rel),
+                "path": str(file),
+                "title": meta["title"],
+                "status": meta["status"],
+                "body": summarize_markdown(text),
+                "updated_at": utc_now(),
+                "source": source,
+            })
+            cards += 1
+            evidence += 1
+        log_event(conn, f"import.{source}", payload={"path": str(root), "cards": cards, "evidence": evidence})
+        conn.commit()
+    return {"cards": cards, "evidence": evidence}
+
+
+def classify_context_doc(root: Path, file: Path, text: str) -> Dict[str, Any]:
+    rel = str(relative_path(root, file)).lower()
+    is_adr = "/adr/" in rel or rel.startswith("adr/") or "/decisions/" in rel
+    status = markdown_status(text)
+    return markdown_meta(
+        root,
+        file,
+        text,
+        card_type="decision.adr" if is_adr else "context.terms",
+        evidence_kind="adr" if is_adr else "context-doc",
+        status=status if is_adr else "partial",
+        confidence=0.85 if is_adr and status == "verified" else (0.72 if not is_adr else 0.65),
+    )
+
+
+def classify_openspec_doc(root: Path, file: Path, text: str) -> Dict[str, Any]:
+    rel = str(relative_path(root, file)).lower()
+    if "openspec/specs/" in rel:
+        card_type = "spec.current"
+        status = "partial"
+        confidence = 0.78
+    elif rel.endswith("tasks.md"):
+        card_type = "spec.task"
+        status = "partial"
+        confidence = 0.55
+    else:
+        card_type = "spec.change"
+        status = "partial"
+        confidence = 0.62
+    return markdown_meta(root, file, text, card_type=card_type, evidence_kind="openspec", status=status, confidence=confidence)
+
+
+def classify_speckit_doc(root: Path, file: Path, text: str) -> Dict[str, Any]:
+    rel = str(relative_path(root, file)).lower()
+    if "constitution" in rel:
+        card_type = "spec.constitution"
+        confidence = 0.78
+    elif rel.endswith("tasks.md"):
+        card_type = "spec.task"
+        confidence = 0.55
+    elif rel.endswith("plan.md"):
+        card_type = "spec.plan"
+        confidence = 0.58
+    else:
+        card_type = "spec.current"
+        confidence = 0.68
+    return markdown_meta(root, file, text, card_type=card_type, evidence_kind="speckit", status="partial", confidence=confidence)
+
+
+def classify_trellis_doc(root: Path, file: Path, text: str) -> Dict[str, Any]:
+    rel = str(relative_path(root, file)).lower()
+    if ".trellis/workspace/" in rel:
+        card_type = "memory"
+        status = "inferred"
+        confidence = 0.45
+        evidence_kind = "trellis-workspace"
+    elif ".trellis/tasks/" in rel:
+        card_type = "spec.task"
+        status = "partial"
+        confidence = 0.55
+        evidence_kind = "trellis-task"
+    else:
+        card_type = "spec.current"
+        status = "partial"
+        confidence = 0.65
+        evidence_kind = "trellis-spec"
+    return markdown_meta(root, file, text, card_type=card_type, evidence_kind=evidence_kind, status=status, confidence=confidence)
+
+
+def markdown_meta(root: Path, file: Path, text: str, *, card_type: str, evidence_kind: str, status: str, confidence: float) -> Dict[str, Any]:
+    title = markdown_title(text) or file.stem
+    aliases = list(dict.fromkeys([title, file.stem, root.name, *markdown_headings(text)[:8]]))
+    return {
+        "type": card_type,
+        "title": title,
+        "status": normalize_status(status),
+        "confidence": confidence,
+        "aliases": [alias for alias in aliases if alias][:30],
+        "evidence_kind": evidence_kind,
+    }
+
+
+def read_markdown(path: Path, limit: int = 60000) -> str:
+    return path.read_text(encoding="utf-8", errors="ignore")[:limit]
+
+
+def relative_path(root: Path, file: Path) -> Path:
+    try:
+        return file.relative_to(root)
+    except ValueError:
+        return Path(file.name)
+
+
+def markdown_title(text: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            return stripped.lstrip("#").strip()
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped[:96]
+    return ""
+
+
+def markdown_headings(text: str) -> List[str]:
+    out: List[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            title = stripped.lstrip("#").strip()
+            if title and title not in out:
+                out.append(title)
+    return out
+
+
+def markdown_status(text: str) -> str:
+    value = field_from_text(text, "Status") or field_from_text(text, "status")
+    value = value.lower()
+    if any(item in value for item in ("accepted", "adopted", "done", "approved")):
+        return "verified"
+    if any(item in value for item in ("rejected", "superseded", "deprecated")):
+        return "stale"
+    if any(item in value for item in ("proposed", "draft", "wip")):
+        return "partial"
+    return "partial"
+
+
+def summarize_markdown(text: str, limit: int = 1600) -> str:
+    compact = re.sub(r"\s+", " ", text).strip()
+    return compact[:limit]
+
+
 def export_files(path: Path, default_name: str = "xmem-export.cards.jsonl") -> List[Path]:
     base = path.expanduser()
     if base.is_file():

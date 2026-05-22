@@ -8,6 +8,7 @@ from .context import (
     METHOD_TYPES,
     REGISTRY_TYPES,
     RULE_TYPES,
+    SPEC_TYPES,
     build_context,
     card_brief,
     event_briefs,
@@ -27,6 +28,7 @@ def build_preflight(query: str, current: Dict[str, Any] | None, cards: List[Dict
     registry = [c for c in fused if c.get("type") in REGISTRY_TYPES or str(c.get("type", "")).startswith("wiki.")]
     rules = [c for c in fused if c.get("type") in RULE_TYPES]
     methods = [c for c in fused if c.get("type") in METHOD_TYPES]
+    specs = [c for c in fused if c.get("type") in SPEC_TYPES]
     evidence = [c for c in fused if c.get("type") in EVIDENCE_TYPES]
     issue_patterns = [c for c in rules if is_issue_pattern(c)]
     invariants = [c for c in rules if not is_issue_pattern(c)]
@@ -61,11 +63,12 @@ def build_preflight(query: str, current: Dict[str, Any] | None, cards: List[Dict
         "known_bug_patterns": [card_brief(c, i + 1) for i, c in enumerate(issue_patterns[:6])],
         "invariants": [card_brief(c, i + 1) for i, c in enumerate(invariants[:6])],
         "methods": [card_brief(c, i + 1) for i, c in enumerate(methods[:4])],
+        "specs": [card_brief(c, i + 1) for i, c in enumerate(specs[:4])],
         "must_keep": must_keep,
         "avoid": avoid,
         "known_failure_modes": known_failure_modes,
         "required_checks": required_checks,
-        "source_refs": unique_paths(guard_cards[:6] + methods[:4] + evidence[:4] + registry[:3])[:12],
+        "source_refs": unique_paths(guard_cards[:6] + methods[:4] + specs[:4] + evidence[:4] + registry[:3])[:12],
         "warnings": unique_text_items(warnings),
         "next_reads": context.get("next_reads") or [],
         "latest_events": event_briefs(events),

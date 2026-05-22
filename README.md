@@ -2,7 +2,7 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.6`.
+Current package version: `0.1.10`.
 
 ## Goals
 
@@ -10,6 +10,7 @@ Current package version: `0.1.6`.
 - Store durable method cards, for example how ads are added.
 - Store invariant cards, for example ad lazy-load must not regress.
 - Import read-only sources such as Project Wiki and issue-tracking.
+- Import lightweight project memory/spec sources such as `CONTEXT.md`, ADRs, OpenSpec, Spec Kit, and Trellis.
 - Return compact agent context with freshness and evidence status.
 - Return development preflight packets that surface historical bug patterns before edits.
 - Track xmem telemetry and rough, uncalibrated savings hints with `xmem gain`.
@@ -66,8 +67,15 @@ Rule: files/code/runtime are truth; SQLite is only a generated search index. If 
 - Built-in reusable cards in this repo.
 - User overlay cards in `~/.xmem/cards`, for example alias corrections.
 - Known local project folders recorded in `~/.xmem/sources.json`.
+- Read-only project memory/spec files from known local project folders:
+  - `CONTEXT.md`, `CONTEXT-MAP.md`, `docs/adr/*.md`, `adr/*.md`
+  - `openspec/specs/**`, `openspec/changes/**`
+  - `.specify/memory/**`, `.specify/specs/**`, `specs/*/{spec,plan,tasks}.md`
+  - `.trellis/spec/**`, `.trellis/tasks/**`, `.trellis/workspace/**`
 
 Imports are read-only. xmem does not silently rewrite Project Wiki or issue records; corrections are stored as small overlay cards until the upstream source is fixed.
+
+These project-memory adapters are source routers, not workflow dependencies. xmem reads their Markdown outputs as evidence pointers and compact cards; it does not require OpenSpec, Spec Kit, Trellis, or grill-with-docs to be installed.
 
 `xmem-export.cards.jsonl` is the preferred bridge format for other truth systems. Project Wiki can export entity cards, and Issue Record can export verified bug-pattern/rule cards; xmem imports them as generated index rows while keeping the source files as truth.
 
@@ -193,6 +201,10 @@ xmem status                 # registry health and counts
 xmem sync                   # rebuild from truth sources
 xmem preflight <query>      # dev-start bug guards and required checks
 xmem check --sources        # validate Project Wiki / Issue Record exports
+xmem import project-memory  # import CONTEXT/ADR/OpenSpec/Spec Kit/Trellis from this folder
+xmem import openspec        # import OpenSpec files only
+xmem import speckit         # import Spec Kit files only
+xmem import trellis         # import Trellis files only
 xmem new                    # create/register .xmem for this folder
 xmem why <query>            # explain matches
 xmem open <card-id-or-query>

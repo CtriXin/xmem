@@ -219,6 +219,50 @@ def test_project_wiki_can_import_xmem_export_only(tmp_path: Path):
     assert any("xmem-export.cards.jsonl" in path for path in packet["next_reads"])
 
 
+def test_imports_context_specs_and_trellis_sources(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    (repo / "CONTEXT.md").write_text(
+        "# Ads Context\n\ncanonical term: aurora ads means car ads lazyload platform\n",
+        encoding="utf-8",
+    )
+    (repo / "docs" / "adr").mkdir(parents=True)
+    (repo / "docs" / "adr" / "0001-lazyload.md").write_text(
+        "# Keep lazyload\n\nStatus: Accepted\n\nDecision: preserve IntersectionObserver for ad display fixes.\n",
+        encoding="utf-8",
+    )
+    (repo / "openspec" / "specs" / "ads").mkdir(parents=True)
+    (repo / "openspec" / "specs" / "ads" / "spec.md").write_text(
+        "# Ads Lazyload Spec\n\nRequirement: ads keep lazyload and collapse empty slots.\n",
+        encoding="utf-8",
+    )
+    (repo / ".specify" / "memory").mkdir(parents=True)
+    (repo / ".specify" / "memory" / "constitution.md").write_text(
+        "# Project Constitution\n\nInvariant: never remove lazyload guards.\n",
+        encoding="utf-8",
+    )
+    (repo / ".trellis" / "tasks").mkdir(parents=True)
+    (repo / ".trellis" / "tasks" / "lazyload.md").write_text(
+        "# Trellis Lazyload Task\n\nTask: verify ad lazyload after bug fixes.\n",
+        encoding="utf-8",
+    )
+
+    context_docs = json.loads(run([str(XMEM), "import", "context-docs", str(repo)], repo, env).stdout)
+    openspec = json.loads(run([str(XMEM), "import", "openspec", str(repo)], repo, env).stdout)
+    speckit = json.loads(run([str(XMEM), "import", "speckit", str(repo)], repo, env).stdout)
+    trellis = json.loads(run([str(XMEM), "import", "trellis", str(repo)], repo, env).stdout)
+    packet = json.loads(run([str(XMEM), "context", "aurora ads lazyload constitution trellis", "--json"], repo, env).stdout)
+
+    assert context_docs["cards"] == 2
+    assert openspec["cards"] == 1
+    assert speckit["cards"] == 1
+    assert trellis["cards"] == 1
+    assert any(item["source"] == "context-docs" for item in packet["specs"])
+    assert any(item["source"] == "openspec" for item in packet["specs"])
+    assert any(item["source"] == "speckit" for item in packet["specs"])
+    assert any(item["source"] == "trellis" for item in packet["specs"])
+    assert any("CONTEXT.md" in path for path in packet["next_reads"])
+
+
 def test_issue_tracking_imports_bug_patterns_as_rules(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     tracking = tmp_path / "issue-tracking"

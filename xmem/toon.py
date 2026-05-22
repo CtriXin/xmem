@@ -80,7 +80,7 @@ def llm_packet(packet: Dict[str, Any]) -> str:
             lines.append(f"      wrong_aliases: {quote_scalar(', '.join(map(str, item.get('wrong_aliases') or [])))}")
         if item.get("canonical_aliases"):
             lines.append(f"      canonical_aliases: {quote_scalar(', '.join(map(str, item.get('canonical_aliases') or [])))}")
-    for section in ("corrections", "alias_guidance", "registry_candidates", "rules", "methods", "memories", "relations", "evidence"):
+    for section in ("corrections", "alias_guidance", "registry_candidates", "rules", "methods", "memories", "specs", "relations", "evidence"):
         items = packet.get(section) or []
         lines.append(f"  {section}[{len(items)}]:")
         for item in items:
@@ -125,7 +125,7 @@ def preflight_packet(packet: Dict[str, Any]) -> str:
         lines.append("  current:")
         for key in ("project_id", "root", "branch", "git_sha", "tech_stack"):
             lines.append(f"    {key}: {quote_scalar(current.get(key, ''))}")
-    for section in ("matched_projects", "known_bug_patterns", "invariants", "methods"):
+    for section in ("matched_projects", "known_bug_patterns", "invariants", "methods", "specs"):
         items = packet.get(section) or []
         lines.append(f"  {section}[{len(items)}]:")
         for item in items:

@@ -16,12 +16,25 @@ ALIAS_TYPES = {"alias", "canonical-alias"}
 RELATION_TYPES = {"relation", "link"}
 CORRECTION_TYPES = {"correction", "alias-correction"}
 MEMORY_TYPES = {"hook.memory", "memory"}
+SPEC_TYPES = {
+    "context.terms",
+    "decision.adr",
+    "spec.current",
+    "spec.change",
+    "spec.plan",
+    "spec.task",
+    "spec.constitution",
+}
 STATUS_RANK = {"verified": 60, "partial": 40, "inferred": 30, "stale": 20, "unknown": 10, "disputed": 0}
 SOURCE_RANK = {
     "local-card": 100,
     "card-file": 95,
     "issue-bug-patterns": 90,
+    "context-docs": 88,
+    "openspec": 86,
+    "speckit": 84,
     "issue-tracking-export": 82,
+    "trellis": 80,
     "project-wiki-export": 78,
     "project-wiki": 70,
     "issue-tracking": 60,
@@ -38,6 +51,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     relations = [c for c in cards if c.get("type") in RELATION_TYPES]
     evidence = [c for c in cards if c.get("type") in EVIDENCE_TYPES]
     memories = [c for c in cards if c.get("type") in MEMORY_TYPES]
+    specs = [c for c in cards if c.get("type") in SPEC_TYPES]
     strong_alias = [c for c in alias_cards if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
     strong_correction = [c for c in corrections if c.get("status") in {"verified", "disputed"} and float(c.get("score") or 0) >= 8]
     strong_registry = [c for c in registry if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
@@ -68,7 +82,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     if freshness.get("status") != "fresh":
         warnings.append("source exports are newer than registry or registry is missing; run xmem sync before relying on this packet")
 
-    next_reads = unique_paths(registry[:4] + rules[:3] + methods[:3] + relations[:3] + memories[:3] + evidence[:3])
+    next_reads = unique_paths(registry[:4] + rules[:3] + methods[:3] + specs[:4] + relations[:3] + memories[:3] + evidence[:3])
     packet = {
         "schema": "xmem.context.v1",
         "truth_policy": "files/code/runtime are truth; sqlite is generated index/cache",
@@ -87,6 +101,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "rules": [card_brief(c, i + 1) for i, c in enumerate(rules[:5])],
         "methods": [card_brief(c, i + 1) for i, c in enumerate(methods[:5])],
         "memories": [card_brief(c, i + 1) for i, c in enumerate(memories[:5])],
+        "specs": [card_brief(c, i + 1) for i, c in enumerate(specs[:6])],
         "relations": [card_brief(c, i + 1) for i, c in enumerate(relations[:5])],
         "evidence": [card_brief(c, i + 1) for i, c in enumerate(evidence[:6])],
         "source_freshness": freshness_brief(freshness),
@@ -318,6 +333,8 @@ def fusion_family(card_type: str) -> str:
         return "correction"
     if card_type in MEMORY_TYPES:
         return "memory"
+    if card_type in SPEC_TYPES:
+        return "spec"
     return ""
 
 

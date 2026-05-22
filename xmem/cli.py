@@ -12,12 +12,23 @@ from .checks import check_diff
 from .context import build_context, canonical_queries_from_corrections
 from .gain import format_gain_dashboard, summarize_gain
 from .hooks import outbox_counts, run_hook
-from .importers import import_bug_patterns, import_issue_tracking, import_project_wiki, import_xmem_export
+from .importers import (
+    import_bug_patterns,
+    import_context_docs,
+    import_issue_tracking,
+    import_openspec,
+    import_project_memory_roots,
+    import_project_memory_sources,
+    import_project_wiki,
+    import_speckit,
+    import_trellis,
+    import_xmem_export,
+)
 from .project import detect_project, index_local, init_project
 from .preflight import build_preflight
 from .search import latest_events, search_cards
 from .source_check import check_source_exports, compact_source_health
-from .sources import index_registered_sources, load_sources, register_local_root, sources_path
+from .sources import index_registered_sources, load_sources, register_local_root, registered_roots, sources_path
 from .store import connect, rows
 from .toon import context_packet, llm_packet, preflight_packet
 from .util import emit_yaml, git_root, home_dir, real_user_home, utc_now
@@ -60,6 +71,16 @@ def build_parser() -> argparse.ArgumentParser:
     export_imp.add_argument("path", nargs="?", default="xmem-export.cards.jsonl")
     patterns_imp = imp_sub.add_parser("bug-patterns", help="Import issue bug-patterns.jsonl")
     patterns_imp.add_argument("path", nargs="?", default="bug-patterns.jsonl")
+    ctx_imp = imp_sub.add_parser("context-docs", help="Import CONTEXT.md and ADR Markdown files")
+    ctx_imp.add_argument("path", nargs="?", default=".")
+    openspec_imp = imp_sub.add_parser("openspec", help="Import OpenSpec specs and changes")
+    openspec_imp.add_argument("path", nargs="?", default=".")
+    speckit_imp = imp_sub.add_parser("speckit", help="Import Spec Kit specs, plans, tasks, and constitution")
+    speckit_imp.add_argument("path", nargs="?", default=".")
+    trellis_imp = imp_sub.add_parser("trellis", help="Import Trellis specs, tasks, and workspace memory")
+    trellis_imp.add_argument("path", nargs="?", default=".")
+    memory_imp = imp_sub.add_parser("project-memory", help="Import known project memory/spec sources")
+    memory_imp.add_argument("path", nargs="?", default=".")
 
     find = sub.add_parser("find", help="Search cards/projects/evidence")
     find.add_argument("query")
@@ -171,6 +192,16 @@ def main(argv: List[str] | None = None) -> int:
             print(json.dumps(import_xmem_export(Path(args.path)), ensure_ascii=False, indent=2))
         elif args.source == "bug-patterns":
             print(json.dumps(import_bug_patterns(Path(args.path)), ensure_ascii=False, indent=2))
+        elif args.source == "context-docs":
+            print(json.dumps(import_context_docs(Path(args.path)), ensure_ascii=False, indent=2))
+        elif args.source == "openspec":
+            print(json.dumps(import_openspec(Path(args.path)), ensure_ascii=False, indent=2))
+        elif args.source == "speckit":
+            print(json.dumps(import_speckit(Path(args.path)), ensure_ascii=False, indent=2))
+        elif args.source == "trellis":
+            print(json.dumps(import_trellis(Path(args.path)), ensure_ascii=False, indent=2))
+        elif args.source == "project-memory":
+            print(json.dumps(import_project_memory_sources(Path(args.path)), ensure_ascii=False, indent=2))
         return 0
     if args.cmd == "find":
         cards = search_cards(args.query, args.limit, gain_event="find")
@@ -613,6 +644,7 @@ def rebuild_data(args: argparse.Namespace) -> dict[str, Any]:
                 result["local_sources"] = index_registered_sources([local_root])
             else:
                 result["local_sources"] = index_registered_sources()
+            result["project_memory"] = import_project_memory_roots(registered_roots([local_root]))
         if not args.skip_cards:
             result["cards"] = import_cards(Path(args.cards))
             result["global_cards"] = import_cards(home_dir() / "cards")
