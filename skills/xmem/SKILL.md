@@ -33,6 +33,16 @@ xmem gain
 
 `xmem context` is LLM-first: use `resolution.status`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true.
 
+## Agent hooks
+
+When acting as an agent, use xmem hooks without asking the user to remember commands:
+
+- On session/task start: run the `start` hook to register the project and refresh local cards.
+- When durable knowledge is discovered: run a `note` or `finish` hook with a short LLM-written summary.
+- For bugfix/release/deploy work: use `fix`, `release`, or `deploy` events so xmem can queue Project Wiki and issue-tracking follow-up.
+
+Hook rule: xmem may create `.xmem/cards/hook.*.yaml`, append a Project Wiki write request, or create an issue seed. It must not silently rewrite Project Wiki Markdown or promote guessed data to a final issue record.
+
 ## Sync
 
 Use `xmem sync` as the default refresh. It rebuilds `~/.xmem/registry.sqlite` from Project Wiki, issue-tracking, built-in cards, `~/.xmem/cards`, and known local folders in `~/.xmem/sources.json`.

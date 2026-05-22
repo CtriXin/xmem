@@ -21,7 +21,7 @@ def run(cmd, cwd, env, check=True):
 def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         base = Path(tmp)
-        env = {**os.environ, "XMEM_HOME": str(base / "home")}
+        env = {**os.environ, "XMEM_HOME": str(base / "home"), "XMEM_PROJECT_WIKI": str(base / "project-wiki")}
         repo = base / "repo"
         repo.mkdir()
         run(["git", "init", "-q"], repo, env)
@@ -73,6 +73,19 @@ def main() -> None:
         corrected = run([str(XMEM), "context", "old ads"], repo, env).stdout
         assert "corrections[1]" in corrected
         assert "wrong_aliases:" in corrected
+        hooked = run([
+            str(XMEM), "hook", "finish",
+            "Added lazyload invariant for car ads and preserved IntersectionObserver",
+            "--dest", "all",
+            "--verified",
+        ], repo, env).stdout
+        assert "hooked: finish" in hooked
+        assert "project_wiki: queued" in hooked
+        assert "issue_tracking: seeded" in hooked
+        assert "xmem_hook_memory" in (wiki / "agent-inbox.jsonl").read_text(encoding="utf-8")
+        assert list((base / "home" / "outbox" / "issue-tracking").glob("*.md"))
+        hook_context = run([str(XMEM), "context", "IntersectionObserver"], repo, env).stdout
+        assert "hook.memory" in hook_context
         rebuilt = run([
             str(XMEM), "rebuild",
             "--project-wiki", str(wiki.parent),

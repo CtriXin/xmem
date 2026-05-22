@@ -73,6 +73,20 @@ Creation basis is intentionally narrow:
 
 If only the folder name is known, the identity starts as `inferred`. Add small cards when durable facts are known; do not inflate it into a long wiki page.
 
+## Agent hooks
+
+Agents can call `xmem hook` at start/finish/fix/release boundaries. This is intentionally managed by agents, not something the user has to remember.
+
+Hook behavior:
+
+- `start` registers a real project folder and refreshes local xmem cards.
+- `note` / `finish` / `fix` / `release` can create a small `.xmem/cards/hook.*.yaml` memory card.
+- When a change looks like service/domain/repo/deploy knowledge, xmem queues an append-only Project Wiki write request in `project-wiki/data/agent-inbox.jsonl`.
+- When a change looks like bug/fix/release work, xmem writes an issue-tracking seed under `~/.xmem/outbox/issue-tracking`.
+- xmem never silently edits Project Wiki source Markdown and never creates a full issue record from guessed data; review/issue-recorder promotes queued records.
+
+This gives an automatic path: LLM observes work -> hook captures compact truth/evidence -> Project Wiki/issue queues receive durable candidates -> `xmem sync` imports the approved sources back into the registry.
+
 ## Truth status
 
 - `verified`: backed by code, tests, runtime API, human confirmation, or durable evidence.
@@ -88,6 +102,7 @@ If only the folder name is known, the identity starts as `inferred`. Add small c
 - `method`: how to do a durable feature.
 - `invariant`: behavior that must not regress.
 - `correction`: alias correction or dispute overlay.
+- `hook.memory`: agent hook memory waiting to become durable project knowledge.
 - `evidence.issue`: imported issue record.
 - `wiki.service`, `wiki.repo`, `wiki.domain`: imported Project Wiki entity cards.
 
@@ -107,6 +122,7 @@ xmem_context:
   registry_candidates: ...
   rules: ...
   methods: ...
+  memories: ...
   evidence: ...
   next_reads: ...
 ```

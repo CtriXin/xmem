@@ -9,6 +9,7 @@ from . import __version__
 from .checks import check_diff
 from .context import build_context
 from .gain import summarize_gain
+from .hooks import outbox_counts, run_hook
 from .importers import import_issue_tracking, import_project_wiki
 from .project import detect_project, index_local, init_project
 from .search import latest_events, search_cards
@@ -101,6 +102,15 @@ def build_parser() -> argparse.ArgumentParser:
     fix.add_argument("entity", nargs="?")
     fix.add_argument("items", nargs="*", help="Use wrong=... correct=... basis=... or answer prompts")
     fix.add_argument("--json", action="store_true")
+
+    hook = sub.add_parser("hook", help="Agent hook: capture/sync durable work memory")
+    hook.add_argument("event", help="start, note, finish, fix, bug, release, deploy, decision, status")
+    hook.add_argument("text", nargs="*", help="Short agent-created summary")
+    hook.add_argument("--path", default=".")
+    hook.add_argument("--dest", action="append", default=[], choices=["auto", "xmem", "project-wiki", "issue-tracking", "all"])
+    hook.add_argument("--target", default="", help="Project Wiki target entity id when known")
+    hook.add_argument("--verified", action="store_true")
+    hook.add_argument("--json", action="store_true")
 
     rebuild = sub.add_parser("rebuild", help="Rebuild generated SQLite index from file truth sources")
     rebuild.add_argument("--project-wiki", default="/Users/xin/project-wiki")
@@ -211,6 +221,8 @@ def main(argv: List[str] | None = None) -> int:
         return why_cmd(args)
     if args.cmd == "fix":
         return fix_cmd(args)
+    if args.cmd == "hook":
+        return hook_cmd(args)
     if args.cmd == "rebuild":
         return rebuild_cmd(args)
     return 1
@@ -229,6 +241,7 @@ def help_cmd() -> int:
                 "- xmem new                 # create/register .xmem for this folder",
                 "- xmem fix                 # prompted alias correction/dispute",
                 "- xmem gain                # savings stats",
+                "- agent hooks              # auto-managed: start/finish/fix -> xmem/wiki/issue queues",
                 "",
                 "truth: files/cards/wiki/issues/code are source; SQLite is only cache/index",
             ]
@@ -333,6 +346,7 @@ def registry_status() -> dict[str, Any]:
         "real_user_home": str(real_user_home()),
         "sources": str(sources_path()),
         "local_source_count": len(load_sources().get("local_roots", [])),
+        "outbox": outbox_counts(),
         "counts": counts,
     }
 
@@ -348,6 +362,8 @@ def status_cmd(args: argparse.Namespace) -> int:
         print(f"real_user_home: {data['real_user_home']}")
         print(f"sources: {data['sources']}")
         print(f"local_sources: {data['local_source_count']}")
+        outbox = data.get("outbox", {})
+        print(f"outbox: project_wiki={outbox.get('project_wiki', 0)} issue_tracking={outbox.get('issue_tracking', 0)}")
         counts = data.get("counts", {})
         if counts:
             print("counts:")
@@ -456,6 +472,32 @@ def write_fix_card(entity: str, wrong: str, correct: str, basis: str, note: str 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(emit_yaml(data) + "\n", encoding="utf-8")
     return path
+
+
+def hook_cmd(args: argparse.Namespace) -> int:
+    text = " ".join(args.text).strip()
+    data = run_hook(args.event, text=text, path=Path(args.path), destinations=args.dest, verified=args.verified, target=args.target)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        print(f"hooked: {data.get('event')}")
+        project = data.get("project") or {}
+        if project:
+            print(f"project: {project.get('project_id', '')}")
+        if data.get("card"):
+            print(f"card: {data['card']}")
+        if data.get("destinations"):
+            print(f"destinations: {', '.join(data['destinations'])}")
+        outbox = data.get("outbox") or {}
+        for name, item in outbox.items():
+            if isinstance(item, dict):
+                print(f"{name}: {item.get('status')} {item.get('path')}")
+        counts = data.get("outbox_counts") or data.get("outbox") or {}
+        if "project_wiki" in counts or "issue_tracking" in counts:
+            print(f"outbox: project_wiki={counts.get('project_wiki', 0)} issue_tracking={counts.get('issue_tracking', 0)}")
+        if data.get("matches"):
+            print(f"matches: {len(data['matches'])}")
+    return 0
 
 
 
