@@ -9,27 +9,18 @@ xmem is a lightweight truth index between wiki and DB. Use it to find durable pr
 
 Truth rule: `.xmem/*.yaml`, source Markdown, code, git, runtime APIs, and human confirmations are truth. `~/.xmem/registry.sqlite` is generated index/cache only.
 
-## Commands
-
-From the xmem repo:
+## Short Commands
 
 ```bash
-./bin/xmem init
-./bin/xmem status
-./bin/xmem find "ads lazyload"
-./bin/xmem context "previous car ads work"
-./bin/xmem open ads.lazyload
-./bin/xmem check
-./bin/xmem rebuild
-./bin/xmem gain
-```
-
-Installed package equivalent:
-
-```bash
-xmem init
+xmem help
 xmem status
+xmem sync
 xmem context "query"
+xmem why "query"
+xmem open "query"
+xmem new
+xmem fix
+xmem gain
 ```
 
 ## Workflow
@@ -42,18 +33,17 @@ xmem context "query"
 
 `xmem context` is LLM-first: use `resolution.status`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true.
 
-## Source import
+## Sync
 
-```bash
-xmem import project-wiki --path /Users/xin/project-wiki
-xmem import issue-tracking --path /Users/xin/issue-tracking
-xmem import cards /Users/xin/auto-skills/CtriXin-repo/xmem/examples/cards
-```
+Use `xmem sync` as the default refresh. It rebuilds `~/.xmem/registry.sqlite` from Project Wiki, issue-tracking, built-in cards, `~/.xmem/cards`, and known local folders in `~/.xmem/sources.json`.
 
-These imports are read-only. They create searchable cards and evidence pointers in `~/.xmem/registry.sqlite`.
+These imports are read-only. They create searchable cards and evidence pointers in `~/.xmem/registry.sqlite`. If `xmem status` shows `0 cards`, run `xmem sync`; in isolated agent sessions it should still use `/Users/xin/.xmem`.
 
-Use `xmem rebuild` when the SQLite cache looks stale; it deletes and regenerates the index from file truth sources.
-If `xmem status` shows `0 cards`, run `xmem rebuild`; in isolated agent sessions it should still use `/Users/xin/.xmem`.
+## New folders and corrections
+
+Use `xmem new` in a new folder. It creates `.xmem/`, writes an identity card from git/package/folder evidence, and registers the folder so future `xmem sync` can find it from other projects.
+
+Use `xmem fix` when a match is wrong or ambiguous. It asks for the entity/query, wrong alias, optional correct alias, and basis; then writes a correction/dispute card under `~/.xmem/cards/corrections`.
 
 ## Card schema
 

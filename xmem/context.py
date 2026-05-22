@@ -12,20 +12,25 @@ METHOD_TYPES = {"method", "playbook", "howto"}
 EVIDENCE_TYPES = {"evidence.issue"}
 ALIAS_TYPES = {"alias", "canonical-alias"}
 RELATION_TYPES = {"relation", "link"}
+CORRECTION_TYPES = {"correction", "alias-correction"}
 
 
 def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[str, Any]], events: List[Dict[str, Any]]) -> Dict[str, Any]:
     alias_cards = [c for c in cards if c.get("type") in ALIAS_TYPES]
+    corrections = [c for c in cards if c.get("type") in CORRECTION_TYPES]
     registry = [c for c in cards if c.get("type") in REGISTRY_TYPES or str(c.get("type", "")).startswith("wiki.")]
     rules = [c for c in cards if c.get("type") in RULE_TYPES]
     methods = [c for c in cards if c.get("type") in METHOD_TYPES]
     relations = [c for c in cards if c.get("type") in RELATION_TYPES]
     evidence = [c for c in cards if c.get("type") in EVIDENCE_TYPES]
     strong_alias = [c for c in alias_cards if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
+    strong_correction = [c for c in corrections if c.get("status") in {"verified", "disputed"} and float(c.get("score") or 0) >= 8]
     strong_registry = [c for c in registry if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
 
     if not cards:
         resolution = "missing"
+    elif strong_correction:
+        resolution = "guided_by_correction"
     elif strong_alias:
         resolution = "guided_by_alias_card"
     elif len(strong_registry) == 1:
@@ -36,7 +41,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         resolution = "partial"
 
     warnings: List[str] = []
-    if resolution in {"ambiguous", "guided_by_alias_card"}:
+    if resolution in {"ambiguous", "guided_by_alias_card", "guided_by_correction"}:
         warnings.append("multiple verified registry candidates matched; do not assume a single project")
     if any(c.get("status") in {"inferred", "partial", "stale", "unknown", "disputed"} for c in cards[:5]):
         warnings.append("some top cards are not verified; use as hints only")
@@ -48,10 +53,11 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "query": query,
         "resolution": {
             "status": resolution,
-            "do_not_assume_single_project": resolution in {"ambiguous", "guided_by_alias_card"},
+            "do_not_assume_single_project": resolution in {"ambiguous", "guided_by_alias_card", "guided_by_correction"},
             "reason": resolution_reason(resolution, strong_registry, cards),
         },
         "current": current_brief(current),
+        "corrections": [card_brief(c, i + 1) for i, c in enumerate(corrections[:5])],
         "alias_guidance": [card_brief(c, i + 1) for i, c in enumerate(alias_cards[:5])],
         "registry_candidates": [card_brief(c, i + 1) for i, c in enumerate(registry[:8])],
         "rules": [card_brief(c, i + 1) for i, c in enumerate(rules[:5])],
@@ -68,6 +74,8 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
 def resolution_reason(resolution: str, strong_registry: List[Dict[str, Any]], cards: List[Dict[str, Any]]) -> str:
     if resolution == "missing":
         return "no indexed card matched query"
+    if resolution == "guided_by_correction":
+        return f"correction/dispute card matched: {strong_registry_label(strong_registry)}"
     if resolution == "guided_by_alias_card":
         return f"canonical alias guidance matched: {strong_registry_label(strong_registry)}"
     if resolution == "resolved":
@@ -123,7 +131,7 @@ def card_hints(body: str) -> List[str]:
     hints: List[str] = []
     if not body:
         return hints
-    keys = ("summary:", "do_not_assume:", "resolution:", "must_include:", "forbid:")
+    keys = ("summary:", "do_not_assume:", "resolution:", "must_include:", "forbid:", "wrong_aliases:", "canonical_aliases:", "effect:")
     capture = False
     for line in body.splitlines():
         stripped = line.strip()

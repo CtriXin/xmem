@@ -31,8 +31,13 @@ def main() -> None:
         run(["git", "add", "ad.txt"], repo, env)
         run(["git", "commit", "-q", "-m", "init"], repo, env)
         run([str(XMEM), "init", "--project-id", "smoke", "--alias", "smoke ads"], repo, env)
+        sources = json.loads((base / "home" / "sources.json").read_text(encoding="utf-8"))
+        assert str(repo.resolve()) in [item["root"] for item in sources["local_roots"]]
         status = run([str(XMEM), "status"], repo, env).stdout
         assert "registry_exists: true" in status
+        assert "local_sources: 1" in status
+        help_text = run([str(XMEM), "help"], repo, env).stdout
+        assert "xmem sync" in help_text and "xmem fix" in help_text
         shim = base / "bin" / "xmem"
         shim.parent.mkdir()
         shim.symlink_to(XMEM)
@@ -64,6 +69,10 @@ def main() -> None:
         assert "source_path:" in packet
         opened = run([str(XMEM), "open", "project-wiki.service.demo-ads"], repo, env).stdout
         assert "source_ref: service:demo-ads" in opened
+        run([str(XMEM), "fix", "car ads", "wrong=old ads", "correct=car ads", "basis=test_confirmed"], repo, env)
+        corrected = run([str(XMEM), "context", "old ads"], repo, env).stdout
+        assert "corrections[1]" in corrected
+        assert "wrong_aliases:" in corrected
         rebuilt = run([
             str(XMEM), "rebuild",
             "--project-wiki", str(wiki.parent),

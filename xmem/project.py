@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .store import connect, log_event, upsert_card, upsert_project
+from .sources import register_local_root
 from .toon import project_snapshot
 from .util import append_jsonl, emit_yaml, field_from_text, front_value, git_root, git_value, list_after_key, read_json, slugify, utc_now
 
@@ -76,6 +77,7 @@ def detect_project(root: Path) -> Dict[str, Any]:
 
 def init_project(path: Path, project_id: str = "", aliases: List[str] | None = None, force: bool = False) -> Dict[str, Any]:
     root = git_root(path)
+    register_local_root(root, "xmem.new")
     xdir = root / ".xmem"
     cards_dir = xdir / "cards"
     cards_dir.mkdir(parents=True, exist_ok=True)
@@ -105,6 +107,7 @@ def init_project(path: Path, project_id: str = "", aliases: List[str] | None = N
 
 
 def default_identity_card(project: Dict[str, Any]) -> Dict[str, Any]:
+    basis = identity_basis(project)
     return {
         "id": "project.identity",
         "type": "identity",
@@ -114,12 +117,23 @@ def default_identity_card(project: Dict[str, Any]) -> Dict[str, Any]:
         "truth": {
             "status": project.get("status", "inferred"),
             "confidence": 0.9 if project.get("status") == "verified" else 0.5,
-            "basis": ["git_observed"],
+            "basis": basis,
             "git_sha": project.get("git_sha", ""),
             "last_checked_at": utc_now(),
         },
         "evidence": [{"kind": "repo", "path": project.get("root", ""), "ref": project.get("remote", "")}],
     }
+
+
+def identity_basis(project: Dict[str, Any]) -> List[str]:
+    root = Path(str(project.get("root", "")))
+    basis: List[str] = []
+    if project.get("remote") or project.get("git_sha"):
+        basis.append("git_observed")
+    if root.exists() and ((root / "package.json").exists() or (root / "pyproject.toml").exists() or (root / "Cargo.toml").exists() or (root / "go.mod").exists()):
+        basis.append("manifest_observed")
+    basis.append("folder_name_observed")
+    return list(dict.fromkeys(basis))
 
 
 def card_from_file(path: Path, default_project: str = "") -> Dict[str, Any]:

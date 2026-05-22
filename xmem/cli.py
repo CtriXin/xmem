@@ -12,6 +12,7 @@ from .gain import summarize_gain
 from .importers import import_issue_tracking, import_project_wiki
 from .project import detect_project, index_local, init_project
 from .search import latest_events, search_cards
+from .sources import index_registered_sources, load_sources, register_local_root, sources_path
 from .store import connect, rows
 from .toon import context_packet, llm_packet
 from .util import emit_yaml, git_root, home_dir, real_user_home, utc_now
@@ -22,8 +23,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"xmem {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    sub.add_parser("help", help="Show the short xmem command card")
+
     status = sub.add_parser("status", help="Show registry path and index counts")
     status.add_argument("--json", action="store_true")
+
+    sync = sub.add_parser("sync", help="Sync/rebuild from file truth sources")
+    sync.add_argument("--json", action="store_true")
+
+    new = sub.add_parser("new", help="Create or refresh xmem files for the current/new folder")
+    new.add_argument("path", nargs="?", default=".")
+    new.add_argument("--json", action="store_true")
 
     init = sub.add_parser("init", help="Initialize .xmem in the current repo")
     init.add_argument("path", nargs="?", default=".")
@@ -83,6 +93,15 @@ def build_parser() -> argparse.ArgumentParser:
     opn.add_argument("--json", action="store_true")
     opn.add_argument("--body", action="store_true", help="Print full card body")
 
+    why = sub.add_parser("why", help="Explain why xmem matched a query")
+    why.add_argument("query")
+    why.add_argument("--json", action="store_true")
+
+    fix = sub.add_parser("fix", help="Record a simple alias correction/dispute")
+    fix.add_argument("entity", nargs="?")
+    fix.add_argument("items", nargs="*", help="Use wrong=... correct=... basis=... or answer prompts")
+    fix.add_argument("--json", action="store_true")
+
     rebuild = sub.add_parser("rebuild", help="Rebuild generated SQLite index from file truth sources")
     rebuild.add_argument("--project-wiki", default="/Users/xin/project-wiki")
     rebuild.add_argument("--issue-tracking", default="/Users/xin/issue-tracking")
@@ -97,8 +116,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: List[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.cmd == "help":
+        return help_cmd()
     if args.cmd == "status":
         return status_cmd(args)
+    if args.cmd == "sync":
+        return sync_cmd(args)
+    if args.cmd == "new":
+        return new_cmd(args)
     if args.cmd == "init":
         project = init_project(Path(args.path), args.project_id, args.alias, args.force)
         print(f"initialized {project['project_id']} at {project['root']}")
@@ -182,19 +207,103 @@ def main(argv: List[str] | None = None) -> int:
         return 0
     if args.cmd == "open":
         return open_cmd(args)
+    if args.cmd == "why":
+        return why_cmd(args)
+    if args.cmd == "fix":
+        return fix_cmd(args)
     if args.cmd == "rebuild":
         return rebuild_cmd(args)
     return 1
 
 
-def import_cards(path: Path) -> dict[str, int]:
+def help_cmd() -> int:
+    print(
+        "\n".join(
+            [
+                "xmem quick commands:",
+                "- xmem status              # registry path + counts",
+                "- xmem sync                # rebuild from Project Wiki, issue records, known folders",
+                "- xmem context <words>     # LLM packet",
+                "- xmem why <words>         # why it matched",
+                "- xmem open <id|words>     # card/evidence excerpt",
+                "- xmem new                 # create/register .xmem for this folder",
+                "- xmem fix                 # prompted alias correction/dispute",
+                "- xmem gain                # savings stats",
+                "",
+                "truth: files/cards/wiki/issues/code are source; SQLite is only cache/index",
+            ]
+        )
+    )
+    return 0
+
+
+def package_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def default_cards_path() -> Path:
+    return package_root() / "examples" / "cards"
+
+
+def sync_cmd(args: argparse.Namespace) -> int:
+    data = sync_sources()
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        print("synced")
+        print(f"registry: {data.get('status', {}).get('registry', '')}")
+        counts = data.get("status", {}).get("counts", {})
+        for key in ("projects", "cards", "evidence", "aliases", "events"):
+            if key in counts:
+                print(f"- {key}: {counts[key]}")
+        local_sources = data.get("local_sources", {})
+        if local_sources:
+            print(f"local_sources: {local_sources.get('roots', 0)} roots, {local_sources.get('cards', 0)} cards")
+    return 0
+
+
+def sync_sources() -> dict[str, Any]:
+    class RebuildArgs:
+        project_wiki = "/Users/xin/project-wiki"
+        issue_tracking = "/Users/xin/issue-tracking"
+        cards = str(default_cards_path())
+        local = "."
+        skip_project_wiki = False
+        skip_issue_tracking = False
+        skip_cards = False
+        skip_local = False
+
+    result = rebuild_data(RebuildArgs())
+    result["status"] = registry_status()
+    return result
+
+
+def new_cmd(args: argparse.Namespace) -> int:
+    project = init_project(Path(args.path))
+    count = index_local(Path(args.path))
+    data = {"project": project, "indexed_cards": count, "status": registry_status()}
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        print(f"project: {project['project_id']}")
+        print(f"root: {project['root']}")
+        print(f"truth: {Path(project['root']) / '.xmem'}")
+        print(f"indexed_cards: {count}")
+        print("registered: yes")
+        print("basis: git/package/folder evidence; add small cards when durable facts are known")
+    return 0
+
+
+def import_cards(path: Path) -> dict[str, Any]:
     from .project import card_from_file
     from .store import log_event, upsert_card
 
     base = path.expanduser()
     if not base.is_absolute():
         base = Path.cwd() / base
-    files = [base] if base.is_file() else sorted(base.glob("*.yaml"))
+    if not base.exists():
+        return {"cards": 0, "skipped": str(base)}
+    files = [base] if base.is_file() else sorted(base.glob("**/*.yaml"))
     count = 0
     with connect() as conn:
         for card_path in files:
@@ -208,7 +317,7 @@ def import_cards(path: Path) -> dict[str, int]:
     return {"cards": count}
 
 
-def status_cmd(args: argparse.Namespace) -> int:
+def registry_status() -> dict[str, Any]:
     from .store import db_path
 
     db = db_path()
@@ -217,13 +326,19 @@ def status_cmd(args: argparse.Namespace) -> int:
         with connect() as conn:
             for table in ("projects", "cards", "evidence", "aliases", "events"):
                 counts[table] = rows(conn, f"SELECT COUNT(*) AS count FROM {table}")[0]["count"]
-    data = {
+    return {
         "xmem_home": str(home_dir()),
         "registry": str(db),
         "registry_exists": db.exists(),
         "real_user_home": str(real_user_home()),
+        "sources": str(sources_path()),
+        "local_source_count": len(load_sources().get("local_roots", [])),
         "counts": counts,
     }
+
+
+def status_cmd(args: argparse.Namespace) -> int:
+    data = registry_status()
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2))
     else:
@@ -231,11 +346,117 @@ def status_cmd(args: argparse.Namespace) -> int:
         print(f"registry: {data['registry']}")
         print(f"registry_exists: {str(data['registry_exists']).lower()}")
         print(f"real_user_home: {data['real_user_home']}")
+        print(f"sources: {data['sources']}")
+        print(f"local_sources: {data['local_source_count']}")
+        counts = data.get("counts", {})
         if counts:
             print("counts:")
             for key, value in counts.items():
                 print(f"- {key}: {value}")
     return 0
+
+
+def why_cmd(args: argparse.Namespace) -> int:
+    cards = search_cards(args.query, 5)
+    data = {"query": args.query, "matches": explain_cards(cards)}
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        print(f"query: {args.query}")
+        for i, item in enumerate(data["matches"], 1):
+            print(f"{i}. {item['id']} [{item['truth']}] score={item['score']}")
+            print(f"   why: {item['why']}")
+            print(f"   source: {item['source_ref']}")
+    return 0
+
+
+def explain_cards(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for card in cards:
+        out.append(
+            {
+                "id": card.get("card_id", ""),
+                "title": card.get("title", ""),
+                "type": card.get("type", ""),
+                "truth": card.get("status", ""),
+                "score": card.get("score", 0),
+                "why": card.get("why", ""),
+                "source_ref": card.get("source_ref") or card.get("path", ""),
+            }
+        )
+    return out
+
+
+def fix_cmd(args: argparse.Namespace) -> int:
+    values = parse_key_items(args.items)
+    entity = args.entity or values.get("entity") or prompt("entity/query")
+    wrong = values["wrong"] if "wrong" in values else prompt("wrong alias (blank if unknown)", allow_blank=True)
+    correct = values["correct"] if "correct" in values else prompt("correct alias (blank if unknown)", allow_blank=True)
+    basis = values.get("basis") or prompt("basis", default="human_confirmed" if correct else "user_reported_dispute")
+    note = values.get("note") or ""
+    card_path = write_fix_card(entity, wrong, correct, basis, note)
+    imported = import_cards(card_path)
+    data = {"card": str(card_path), "imported": imported, "status": registry_status()}
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        print(f"wrote: {card_path}")
+        print(f"status: {'verified correction' if correct else 'dispute recorded'}")
+        print("synced: yes")
+    return 0
+
+
+def parse_key_items(items: list[str]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for item in items:
+        if "=" in item:
+            key, value = item.split("=", 1)
+            out[key.strip().lstrip("-")] = value.strip()
+    return out
+
+
+def prompt(label: str, default: str = "", allow_blank: bool = False) -> str:
+    suffix = f" [{default}]" if default else ""
+    while True:
+        value = input(f"{label}{suffix}: ").strip()
+        if not value and default:
+            return default
+        if value or allow_blank:
+            return value
+
+
+def write_fix_card(entity: str, wrong: str, correct: str, basis: str, note: str = "") -> Path:
+    from .util import slugify
+
+    status = "verified" if correct else "disputed"
+    cid = f"alias-correction.{slugify(entity)}"
+    path = home_dir() / "cards" / "corrections" / f"{cid}.yaml"
+    data: dict[str, Any] = {
+        "id": cid,
+        "type": "correction",
+        "title": f"{entity} alias correction",
+        "scope": {"entity": entity},
+        "aliases": [x for x in [entity, wrong, correct] if x],
+        "truth": {
+            "status": status,
+            "confidence": 0.95 if status == "verified" else 0.55,
+            "basis": [basis],
+            "last_checked_at": utc_now(),
+        },
+        "summary": "Alias correction/dispute captured by xmem.",
+        "wrong_aliases": [wrong] if wrong else [],
+        "canonical_aliases": [correct] if correct else [],
+        "effect": [
+            "Warn when source still contains wrong alias.",
+            "Prefer canonical aliases when present.",
+            "Do not silently edit upstream Project Wiki; keep this card as truth overlay until source is corrected.",
+        ],
+        "evidence": [{"kind": basis, "ref": note or "xmem fix"}],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(emit_yaml(data) + "\n", encoding="utf-8")
+    return path
+
 
 
 def open_cmd(args: argparse.Namespace) -> int:
@@ -264,7 +485,7 @@ def open_cmd(args: argparse.Namespace) -> int:
     return 0
 
 
-def rebuild_cmd(args: argparse.Namespace) -> int:
+def rebuild_data(args: argparse.Namespace) -> dict[str, Any]:
     from .store import db_path
 
     db = db_path()
@@ -272,15 +493,26 @@ def rebuild_cmd(args: argparse.Namespace) -> int:
         db.unlink()
     result: dict[str, Any] = {"reset": str(db)}
     if not args.skip_local:
-        result["local_cards"] = index_local(Path(args.local))
+        local_root = git_root(Path(args.local))
+        if (local_root / ".xmem").exists():
+            register_local_root(local_root, "xmem.sync")
+            result["local_sources"] = index_registered_sources([local_root])
+        else:
+            result["local_sources"] = index_registered_sources()
     if not args.skip_cards:
         result["cards"] = import_cards(Path(args.cards))
+        result["global_cards"] = import_cards(home_dir() / "cards")
     if not args.skip_project_wiki:
         pw = Path(args.project_wiki)
         result["project_wiki"] = import_project_wiki(pw) if (pw / "data" / "project-hub.index.json").exists() else {"skipped": str(pw)}
     if not args.skip_issue_tracking:
         it = Path(args.issue_tracking)
         result["issue_tracking"] = import_issue_tracking(it) if (it / "issues").exists() else {"skipped": str(it)}
+    return result
+
+
+def rebuild_cmd(args: argparse.Namespace) -> int:
+    result = rebuild_data(args)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 

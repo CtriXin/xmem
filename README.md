@@ -14,16 +14,15 @@ Lightweight cross-project memory for agents. xmem is a truth index, not a heavy 
 ## Quick start
 
 ```bash
-./bin/xmem init
-./bin/xmem status
-./bin/xmem import project-wiki --path /Users/xin/project-wiki
-./bin/xmem import issue-tracking --path /Users/xin/issue-tracking
-./bin/xmem find "car ads lazyload"
-./bin/xmem context "how did we add ads before"
-./bin/xmem open ads.lazyload
-./bin/xmem check
-./bin/xmem rebuild
-./bin/xmem gain
+xmem help
+xmem status
+xmem sync
+xmem context "how did we add ads before"
+xmem why "car ads lazyload"
+xmem open ads.lazyload
+xmem new
+xmem fix
+xmem gain
 ```
 
 Truth files live with the project:
@@ -41,11 +40,38 @@ Generated index/cache lives globally:
 ```text
 ~/.xmem/
   registry.sqlite
+  sources.json
+  cards/
   events.jsonl
   gain.jsonl
 ```
 
 Rule: files/code/runtime are truth; SQLite is only a generated search index. If `registry.sqlite` is wrong, delete and rebuild it from `.xmem/`, Project Wiki, issue-tracking, git, and runtime sources.
+
+## Sync model
+
+`xmem sync` is the normal refresh path. It rebuilds the generated SQLite index from:
+
+- Project Wiki at `/Users/xin/project-wiki`.
+- Issue records at `/Users/xin/issue-tracking`.
+- Built-in reusable cards in this repo.
+- User overlay cards in `~/.xmem/cards`, for example alias corrections.
+- Known local project folders recorded in `~/.xmem/sources.json`.
+
+Imports are read-only. xmem does not silently rewrite Project Wiki or issue records; corrections are stored as small overlay cards until the upstream source is fixed.
+
+## New folders
+
+`xmem new` creates `.xmem/` for the current folder and registers that folder in `~/.xmem/sources.json`, so future `xmem sync` can index it from any other project.
+
+Creation basis is intentionally narrow:
+
+- Git remote, branch, and sha when present.
+- Package or project manifests when present.
+- Folder name and detected tech stack as fallback.
+- Human confirmation or runtime/code evidence only when explicitly captured in cards.
+
+If only the folder name is known, the identity starts as `inferred`. Add small cards when durable facts are known; do not inflate it into a long wiki page.
 
 ## Truth status
 
@@ -61,6 +87,7 @@ Rule: files/code/runtime are truth; SQLite is only a generated search index. If 
 - `identity`: what this project is.
 - `method`: how to do a durable feature.
 - `invariant`: behavior that must not regress.
+- `correction`: alias correction or dispute overlay.
 - `evidence.issue`: imported issue record.
 - `wiki.service`, `wiki.repo`, `wiki.domain`: imported Project Wiki entity cards.
 
@@ -84,15 +111,17 @@ xmem_context:
   next_reads: ...
 ```
 
-Use `xmem find` for human/debug candidate lists and `xmem context --json` for exact structured output.
+Use `xmem why` for human/debug match reasons and `xmem context --json` for exact structured output.
 
 ## Useful commands
 
 ```bash
-xmem import cards examples/cards       # import reusable cards such as rules/aliases
-xmem open <card-id-or-query>           # show source-backed card excerpt
-xmem open <card-id> --body             # print full source body
-xmem rebuild                           # rebuild SQLite from file truth sources
+xmem status                 # registry health and counts
+xmem sync                   # rebuild from truth sources
+xmem new                    # create/register .xmem for this folder
+xmem why <query>            # explain matches
+xmem open <card-id-or-query>
+xmem fix                    # record alias correction/dispute
 ```
 
 `xmem status` should show the stable registry at `/Users/xin/.xmem` on this machine. In isolated agent sessions, xmem detects the real user home so agents do not accidentally create an empty per-session registry.
