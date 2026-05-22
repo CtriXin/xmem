@@ -38,12 +38,13 @@ xmem gain
 When acting as an agent, use xmem hooks without asking the user to remember commands:
 
 - On session/task start: run the `start` hook to register the project and refresh local cards.
+- On session/task end: a silent `finish` hook without text may record a close marker; it must not create memory or inject context.
 - When durable knowledge is discovered: run a `note` or `finish` hook with a short LLM-written summary.
 - For bugfix/release/deploy work: use `fix`, `release`, or `deploy` events so xmem can queue Project Wiki and issue-tracking follow-up.
 
 Hook rule: xmem may create `.xmem/cards/hook.*.yaml`, append a Project Wiki write request, or create an issue seed. It must not silently rewrite Project Wiki Markdown or promote guessed data to a final issue record.
 
-MMS sessions normally inject this skill and run the xmem session-start hook automatically. Do not ask the user to install or remember hook commands inside MMS-launched Codex/Claude/OpenCode/agy sessions.
+MMS sessions normally inject this skill and run lightweight xmem session-start/session-end hooks automatically. Do not ask the user to install or remember hook commands inside MMS-launched Codex/Claude/OpenCode/agy sessions.
 
 ## Sync
 

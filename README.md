@@ -80,6 +80,7 @@ Agents can call `xmem hook` at start/finish/fix/release boundaries. This is inte
 Hook behavior:
 
 - `start` registers a real project folder and refreshes local xmem cards.
+- `finish` without text is a lightweight close marker only; it must not create a memory card or inject context.
 - `note` / `finish` / `fix` / `release` can create a small `.xmem/cards/hook.*.yaml` memory card.
 - When a change looks like service/domain/repo/deploy knowledge, xmem queues an append-only Project Wiki write request in `project-wiki/data/agent-inbox.jsonl`.
 - When a change looks like bug/fix/release work, xmem writes an issue-tracking seed under `~/.xmem/outbox/issue-tracking`.
