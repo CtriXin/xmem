@@ -1,0 +1,47 @@
+id: xmem.installation
+type: relation
+title: xmem shared skill and CLI installation
+scope:
+  project: xmem
+aliases:
+  - xmem skill
+  - xmem cli
+  - xmem shared skill
+  - xmem installation
+truth:
+  status: verified
+  confidence: 0.98
+  basis:
+    - symlink_verified
+    - smoke_test_passed
+  last_checked_at: 2026-05-22T00:00:00Z
+summary: xmem CLI lives in the xmem repo; agent skill consumers read the shared-skills copy through symlinks.
+relations:
+  - source: /Users/xin/.local/bin/xmem
+    target: /Users/xin/auto-skills/CtriXin-repo/xmem/bin/xmem
+    kind: cli_symlink
+  - source: /Users/xin/.codex/skills/xmem
+    target: /Users/xin/auto-skills/shared-skills/xmem
+    kind: codex_skill_symlink
+  - source: /Users/xin/.claude/skills/xmem
+    target: /Users/xin/auto-skills/shared-skills/xmem
+    kind: claude_skill_symlink
+  - source: /Users/xin/.opencode/skills/xmem
+    target: /Users/xin/auto-skills/shared-skills/xmem
+    kind: opencode_skill_symlink
+  - source: /Users/xin/.agents/skills/xmem
+    target: /Users/xin/auto-skills/shared-skills/xmem
+    kind: generic_agent_skill_symlink
+must_include:
+  - Keep shared skill copy at /Users/xin/auto-skills/shared-skills/xmem.
+  - Keep CLI symlink pointed at the repo bin/xmem.
+  - Use /Users/xin/.xmem as stable registry from isolated agent HOME sessions.
+checks:
+  - xmem status
+  - xmem context "xmem shared skill"
+  - python3 tests/smoke.py
+evidence:
+  - kind: repo
+    path: /Users/xin/auto-skills/CtriXin-repo/xmem
+  - kind: shared-skill
+    path: /Users/xin/auto-skills/shared-skills/xmem/SKILL.md

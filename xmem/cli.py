@@ -14,13 +14,16 @@ from .project import detect_project, index_local, init_project
 from .search import latest_events, search_cards
 from .store import connect, rows
 from .toon import context_packet, llm_packet
-from .util import emit_yaml, git_root, home_dir, utc_now
+from .util import emit_yaml, git_root, home_dir, real_user_home, utc_now
 
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="xmem", description="Lightweight cross-project truth index for agents")
     p.add_argument("--version", action="version", version=f"xmem {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
+
+    status = sub.add_parser("status", help="Show registry path and index counts")
+    status.add_argument("--json", action="store_true")
 
     init = sub.add_parser("init", help="Initialize .xmem in the current repo")
     init.add_argument("path", nargs="?", default=".")
@@ -94,6 +97,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: List[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.cmd == "status":
+        return status_cmd(args)
     if args.cmd == "init":
         project = init_project(Path(args.path), args.project_id, args.alias, args.force)
         print(f"initialized {project['project_id']} at {project['root']}")
@@ -201,6 +206,36 @@ def import_cards(path: Path) -> dict[str, int]:
         log_event(conn, "import.cards", payload={"path": str(base), "cards": count})
         conn.commit()
     return {"cards": count}
+
+
+def status_cmd(args: argparse.Namespace) -> int:
+    from .store import db_path
+
+    db = db_path()
+    counts: dict[str, Any] = {}
+    if db.exists():
+        with connect() as conn:
+            for table in ("projects", "cards", "evidence", "aliases", "events"):
+                counts[table] = rows(conn, f"SELECT COUNT(*) AS count FROM {table}")[0]["count"]
+    data = {
+        "xmem_home": str(home_dir()),
+        "registry": str(db),
+        "registry_exists": db.exists(),
+        "real_user_home": str(real_user_home()),
+        "counts": counts,
+    }
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        print(f"xmem_home: {data['xmem_home']}")
+        print(f"registry: {data['registry']}")
+        print(f"registry_exists: {str(data['registry_exists']).lower()}")
+        print(f"real_user_home: {data['real_user_home']}")
+        if counts:
+            print("counts:")
+            for key, value in counts.items():
+                print(f"- {key}: {value}")
+    return 0
 
 
 def open_cmd(args: argparse.Namespace) -> int:

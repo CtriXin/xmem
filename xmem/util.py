@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import pwd
 import re
 import subprocess
 from datetime import datetime, timezone
@@ -14,7 +15,34 @@ def utc_now() -> str:
 
 
 def home_dir() -> Path:
-    return Path(os.environ.get("XMEM_HOME", Path.home() / ".xmem")).expanduser()
+    explicit = os.environ.get("XMEM_HOME")
+    if explicit:
+        return Path(explicit).expanduser()
+    host_home = os.environ.get("XMEM_HOST_HOME") or os.environ.get("MMS_HOST_HOME") or os.environ.get("HOST_HOME")
+    if host_home:
+        base = Path(host_home).expanduser()
+        return base if base.name == ".xmem" else base / ".xmem"
+    current_home = Path.home()
+    real_home = real_user_home()
+    if is_isolated_home(current_home, real_home):
+        return real_home / ".xmem"
+    return current_home / ".xmem"
+
+
+def real_user_home() -> Path:
+    try:
+        return Path(pwd.getpwuid(os.getuid()).pw_dir).expanduser()
+    except Exception:
+        return Path.home()
+
+
+def is_isolated_home(current_home: Path, real_home: Path) -> bool:
+    current = str(current_home)
+    real = str(real_home)
+    if current == real:
+        return False
+    markers = ("/.config/mms/", "/.codex/", "/.claude/", "/.opencode/", "/.agents/")
+    return any(marker in current for marker in markers) and real_home.exists()
 
 
 def run(cmd: List[str], cwd: Optional[Path] = None) -> str:

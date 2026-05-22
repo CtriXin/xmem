@@ -15,6 +15,7 @@ Lightweight cross-project memory for agents. xmem is a truth index, not a heavy 
 
 ```bash
 ./bin/xmem init
+./bin/xmem status
 ./bin/xmem import project-wiki --path /Users/xin/project-wiki
 ./bin/xmem import issue-tracking --path /Users/xin/issue-tracking
 ./bin/xmem find "car ads lazyload"
@@ -93,6 +94,8 @@ xmem open <card-id-or-query>           # show source-backed card excerpt
 xmem open <card-id> --body             # print full source body
 xmem rebuild                           # rebuild SQLite from file truth sources
 ```
+
+`xmem status` should show the stable registry at `/Users/xin/.xmem` on this machine. In isolated agent sessions, xmem detects the real user home so agents do not accidentally create an empty per-session registry.
 
 ## Installed local links
 

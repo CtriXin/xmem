@@ -56,10 +56,10 @@ def search_cards(query: str, limit: int = 10) -> List[Dict[str, Any]]:
                 # Body matches are evidence hints, not identity proof.
                 score += 0.35
                 why.append(f"body_term:{term}")
-        if card.get("source") == "project-wiki" and card.get("type", "").startswith("wiki."):
+        if score and card.get("source") == "project-wiki" and card.get("type", "").startswith("wiki."):
             score += 0.8
             why.append("registry_source:project-wiki")
-        if card.get("type") == "evidence.issue":
+        if score and card.get("type") == "evidence.issue":
             score -= 0.25
             why.append("evidence_source:issue-tracking")
         if score:

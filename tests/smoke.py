@@ -31,6 +31,8 @@ def main() -> None:
         run(["git", "add", "ad.txt"], repo, env)
         run(["git", "commit", "-q", "-m", "init"], repo, env)
         run([str(XMEM), "init", "--project-id", "smoke", "--alias", "smoke ads"], repo, env)
+        status = run([str(XMEM), "status"], repo, env).stdout
+        assert "registry_exists: true" in status
         shutil.copy(ROOT / "examples" / "cards" / "ads.lazyload.yaml", repo / ".xmem" / "cards" / "ads.lazyload.yaml")
         (repo / "ad.txt").write_text("lazyload\n", encoding="utf-8")
         proc = run([str(XMEM), "check"], repo, env, check=False)
@@ -66,6 +68,9 @@ def main() -> None:
             "--skip-issue-tracking",
         ], repo, env).stdout
         assert '"project_wiki"' in rebuilt and '"cards"' in rebuilt
+        relation = run([str(XMEM), "context", "xmem shared skill"], repo, env).stdout
+        assert "relations[" in relation
+        assert "xmem.installation" in relation
         gain = run([str(XMEM), "gain", "--json"], repo, env).stdout
         assert "estimated_tokens_saved" in gain
     print("smoke ok")

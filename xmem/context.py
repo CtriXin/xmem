@@ -11,6 +11,7 @@ RULE_TYPES = {"invariant", "rule", "guard"}
 METHOD_TYPES = {"method", "playbook", "howto"}
 EVIDENCE_TYPES = {"evidence.issue"}
 ALIAS_TYPES = {"alias", "canonical-alias"}
+RELATION_TYPES = {"relation", "link"}
 
 
 def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[str, Any]], events: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -18,6 +19,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     registry = [c for c in cards if c.get("type") in REGISTRY_TYPES or str(c.get("type", "")).startswith("wiki.")]
     rules = [c for c in cards if c.get("type") in RULE_TYPES]
     methods = [c for c in cards if c.get("type") in METHOD_TYPES]
+    relations = [c for c in cards if c.get("type") in RELATION_TYPES]
     evidence = [c for c in cards if c.get("type") in EVIDENCE_TYPES]
     strong_alias = [c for c in alias_cards if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
     strong_registry = [c for c in registry if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
@@ -54,6 +56,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "registry_candidates": [card_brief(c, i + 1) for i, c in enumerate(registry[:8])],
         "rules": [card_brief(c, i + 1) for i, c in enumerate(rules[:5])],
         "methods": [card_brief(c, i + 1) for i, c in enumerate(methods[:5])],
+        "relations": [card_brief(c, i + 1) for i, c in enumerate(relations[:5])],
         "evidence": [card_brief(c, i + 1) for i, c in enumerate(evidence[:6])],
         "warnings": warnings,
         "next_reads": next_reads[:10],

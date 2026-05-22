@@ -15,6 +15,7 @@ From the xmem repo:
 
 ```bash
 ./bin/xmem init
+./bin/xmem status
 ./bin/xmem find "ads lazyload"
 ./bin/xmem context "previous car ads work"
 ./bin/xmem open ads.lazyload
@@ -27,6 +28,7 @@ Installed package equivalent:
 
 ```bash
 xmem init
+xmem status
 xmem context "query"
 ```
 
@@ -51,6 +53,7 @@ xmem import cards /Users/xin/auto-skills/CtriXin-repo/xmem/examples/cards
 These imports are read-only. They create searchable cards and evidence pointers in `~/.xmem/registry.sqlite`.
 
 Use `xmem rebuild` when the SQLite cache looks stale; it deletes and regenerates the index from file truth sources.
+If `xmem status` shows `0 cards`, run `xmem rebuild`; in isolated agent sessions it should still use `/Users/xin/.xmem`.
 
 ## Card schema
 

@@ -58,7 +58,7 @@ def llm_packet(packet: Dict[str, Any]) -> str:
         lines.append("  current:")
         for key in ("project_id", "root", "branch", "git_sha", "tech_stack"):
             lines.append(f"    {key}: {quote_scalar(current.get(key, ''))}")
-    for section in ("alias_guidance", "registry_candidates", "rules", "methods", "evidence"):
+    for section in ("alias_guidance", "registry_candidates", "rules", "methods", "relations", "evidence"):
         items = packet.get(section) or []
         lines.append(f"  {section}[{len(items)}]:")
         for item in items:
