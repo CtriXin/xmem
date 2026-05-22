@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
+from .gain import record_task_outcome
 from .project import card_from_file, detect_project, index_local, init_project
 from .search import search_cards
 from .store import connect, log_event, upsert_card
@@ -53,6 +54,14 @@ def run_hook(
             result["outbox"]["project_wiki"] = write_project_wiki_request(project, event, text, card_path, target, verified)
         if "issue-tracking" in dests:
             result["outbox"]["issue_tracking"] = write_issue_seed(project, event, text, card_path, verified)
+        if event in {"finish", "fix", "bug", "release", "deploy"}:
+            result["outcome"] = record_task_outcome(
+                event,
+                text,
+                project_id=project.get("project_id", ""),
+                matches=matches,
+                verified=verified,
+            )
 
     with connect() as conn:
         log_event(conn, "hook." + event, project_id=project.get("project_id", ""), payload={"text": text[:500], "destinations": dests})

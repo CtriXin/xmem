@@ -5,7 +5,7 @@ import shutil
 import unicodedata
 from typing import Any, Dict, List, Optional
 
-from .util import home_dir, load_jsonl
+from .util import append_jsonl, home_dir, load_jsonl, utc_now
 
 
 def summarize_gain(limit: Optional[int] = None) -> Dict[str, object]:
@@ -14,6 +14,7 @@ def summarize_gain(limit: Optional[int] = None) -> Dict[str, object]:
     queries = Counter(str(row.get("query") or "") for row in rows if row.get("query"))
     top_cards = {str(row.get("top_card") or "") for row in rows if row.get("top_card")}
     tokens = sum(int(row.get("estimated_tokens_saved") or 0) for row in rows)
+    actual_tokens = sum(int(row.get("actual_tokens_saved") or 0) for row in rows)
     bugs = sum(int(row.get("estimated_bug_prevented") or 0) for row in rows)
     matches = sum(int(row.get("matches") or 0) for row in rows)
     event_rows = aggregate_events(rows)
@@ -53,6 +54,7 @@ def summarize_gain(limit: Optional[int] = None) -> Dict[str, object]:
         "limit": limit,
         "scope": "all" if limit is None else "latest",
         "estimated_tokens_saved": tokens,
+        "actual_tokens_saved": actual_tokens,
         "estimated_bug_prevented": bugs,
         "matches": matches,
         "rows": len(rows),
@@ -116,12 +118,13 @@ def build_calibration(rows: List[Dict[str, Any]], top_queries: List[Dict[str, An
     estimated_rows = [row for row in rows if int(row.get("estimated_tokens_saved") or 0) or int(row.get("estimated_bug_prevented") or 0)]
     confirmed = [row for row in rows if str(row.get("event") or "") == "gain.confirmed"]
     rejected = [row for row in rows if str(row.get("event") or "") == "gain.rejected"]
+    outcome_rows = [row for row in rows if str(row.get("event") or "").startswith("outcome.")]
     score_rows = [row for row in retrieval_rows if float(row.get("top_score") or 0) > 0]
     verified_rows = [row for row in retrieval_rows if str(row.get("top_status") or "") == "verified"]
     avg_score = round(sum(float(row.get("top_score") or 0) for row in score_rows) / len(score_rows), 2) if score_rows else 0.0
     status = "telemetry_only"
     confidence = "low"
-    if confirmed or rejected:
+    if confirmed or rejected or outcome_rows:
         status = "partially_calibrated"
         confidence = "medium"
     elif score_rows:
@@ -145,6 +148,10 @@ def build_calibration(rows: List[Dict[str, Any]], top_queries: List[Dict[str, An
         "confidence": confidence,
         "confirmed": len(confirmed),
         "rejected": len(rejected),
+        "confirmed_actual_tokens_saved": sum(int(row.get("actual_tokens_saved") or 0) for row in confirmed),
+        "confirmed_bug_prevented": sum(int(row.get("estimated_bug_prevented") or 0) for row in confirmed),
+        "outcomes": len(outcome_rows),
+        "successful_outcomes": sum(1 for row in outcome_rows if str(row.get("outcome") or "") in {"success", "verified", "fixed"}),
         "retrieval_rows": len(retrieval_rows),
         "estimated_rows": len(estimated_rows),
         "scored_rows": len(score_rows),
@@ -153,6 +160,56 @@ def build_calibration(rows: List[Dict[str, Any]], top_queries: List[Dict[str, An
         "needs_review": needs_review,
         "truth_statement": "telemetry/proxy only; cannot prove actual token savings or avoided production bugs without confirmation",
     }
+
+
+def record_gain_confirmation(
+    action: str,
+    query: str,
+    *,
+    note: str = "",
+    task: str = "",
+    actual_tokens_saved: int = 0,
+    bug_prevented: bool = False,
+) -> Dict[str, object]:
+    if action not in {"confirmed", "rejected"}:
+        raise ValueError("action must be confirmed or rejected")
+    row = {
+        "ts": utc_now(),
+        "event": f"gain.{action}",
+        "query": query,
+        "task": task,
+        "note": note,
+        "actual_tokens_saved": int(actual_tokens_saved or 0),
+        "estimated_bug_prevented": 1 if bug_prevented else 0,
+        "estimate_kind": "human_confirmed_outcome" if action == "confirmed" else "human_rejected_outcome",
+    }
+    append_jsonl(home_dir() / "gain.jsonl", row)
+    return row
+
+
+def record_task_outcome(
+    event: str,
+    text: str,
+    *,
+    project_id: str = "",
+    matches: List[Dict[str, Any]] | None = None,
+    verified: bool = False,
+) -> Dict[str, object]:
+    outcome = "verified" if verified else ("fixed" if event in {"fix", "bug"} else "success")
+    row = {
+        "ts": utc_now(),
+        "event": f"outcome.{event}",
+        "outcome": outcome,
+        "project_id": project_id,
+        "query": text[:300],
+        "task": text[:300],
+        "matched_cards": len(matches or []),
+        "matched_card_ids": [item.get("id", "") for item in (matches or [])[:8]],
+        "estimate_kind": "task_outcome_signal_not_proof",
+        "verified": bool(verified),
+    }
+    append_jsonl(home_dir() / "gain.jsonl", row)
+    return row
 
 
 def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width: Optional[int] = None) -> str:
@@ -206,6 +263,7 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width
         metric("check 运行次数", int(observed.get("guardrail_checks") or 0), color),
         metric("规则告警次数", int(observed.get("guardrail_prevented") or 0), color, value_style="yellow"),
         metric("理论少读 tokens", human_number(int(data.get("estimated_tokens_saved") or 0)), color, value_style="green"),
+        metric("确认省 tokens", human_number(int(data.get("actual_tokens_saved") or 0)), color, value_style="green"),
         metric("风险提示次数", int(data.get("estimated_bug_prevented") or 0), color, value_style="yellow"),
         metric("日志计数字段", "rows / hit / miss / check / matches", color, value_style="dim"),
         metric("估算字段(非事实)", "理论少读 tokens；不是账单/真实省量", color, value_style="dim"),
@@ -214,7 +272,7 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width
         metric("token 估算公式", "context/preflight matches * 1200", color, value_style="dim"),
         metric(
             "自校准状态",
-            f"{calibration_status_text(calibration)}；avg top_score={float(calibration.get('avg_top_score') or 0):.2f}",
+            f"{calibration_status_text(calibration)}；outcomes={int(calibration.get('outcomes') or 0)} avg top_score={float(calibration.get('avg_top_score') or 0):.2f}",
             color,
             value_style="yellow" if calibration.get("confidence") == "low" else "green",
         ),

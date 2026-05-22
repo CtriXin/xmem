@@ -10,7 +10,7 @@ from typing import Any, List
 from . import __version__
 from .checks import check_diff
 from .context import build_context, canonical_queries_from_corrections
-from .gain import format_gain_dashboard, summarize_gain
+from .gain import format_gain_dashboard, record_gain_confirmation, summarize_gain
 from .hooks import outbox_counts, run_hook
 from .importers import (
     import_bug_patterns,
@@ -121,6 +121,23 @@ def build_parser() -> argparse.ArgumentParser:
     gain.add_argument("--json", action="store_true")
     gain.add_argument("--no-color", action="store_true", help="Disable ANSI colors in dashboard output")
     gain.add_argument("--limit", type=int, default=None, help="Only read the latest N gain log rows; default reads all rows")
+    gain_sub = gain.add_subparsers(dest="gain_cmd")
+    gain_show = gain_sub.add_parser("show", help="Show xmem telemetry and rough savings hints")
+    gain_show.add_argument("--json", action="store_true")
+    gain_show.add_argument("--no-color", action="store_true", help="Disable ANSI colors in dashboard output")
+    gain_show.add_argument("--limit", type=int, default=None, help="Only read the latest N gain log rows; default reads all rows")
+    gain_confirm = gain_sub.add_parser("confirm", help="Confirm a gain/outcome signal")
+    gain_confirm.add_argument("query")
+    gain_confirm.add_argument("--note", default="")
+    gain_confirm.add_argument("--task", default="")
+    gain_confirm.add_argument("--actual-tokens-saved", type=int, default=0)
+    gain_confirm.add_argument("--bug-prevented", action="store_true")
+    gain_confirm.add_argument("--json", action="store_true")
+    gain_reject = gain_sub.add_parser("reject", help="Reject an overestimated gain signal")
+    gain_reject.add_argument("query")
+    gain_reject.add_argument("--note", default="")
+    gain_reject.add_argument("--task", default="")
+    gain_reject.add_argument("--json", action="store_true")
 
     tail = sub.add_parser("tail", help="Show recent registry events")
     tail.add_argument("--limit", type=int, default=10)
@@ -273,13 +290,7 @@ def main(argv: List[str] | None = None) -> int:
             print("ok")
         return 0
     if args.cmd == "gain":
-        data = summarize_gain(limit=args.limit)
-        if args.json:
-            print(json.dumps(data, ensure_ascii=False, indent=2))
-        else:
-            use_color = sys.stdout.isatty() and not args.no_color and not os.environ.get("NO_COLOR")
-            print(format_gain_dashboard(data, color=use_color))
-        return 0
+        return gain_cmd(args)
     if args.cmd == "tail":
         events = latest_events(args.limit)
         if args.json:
@@ -329,6 +340,7 @@ def help_cmd() -> int:
                 "- xmem new                 # create/register .xmem for this folder",
                 "- xmem fix                 # prompted alias correction/dispute",
                 "- xmem gain                # telemetry + rough savings hints",
+                "- xmem gain confirm <query> # human/outcome calibration signal",
                 "- agent hooks              # auto-managed: start/finish/fix -> xmem/wiki/issue queues",
                 "",
                 "truth: files/cards/wiki/issues/code are source; SQLite is only cache/index",
@@ -622,6 +634,38 @@ def open_cmd(args: argparse.Namespace) -> int:
     excerpt = "\n".join(body.splitlines()[:80])
     print("body_excerpt:")
     print(excerpt)
+    return 0
+
+
+def gain_cmd(args: argparse.Namespace) -> int:
+    gain_cmd_name = args.gain_cmd or "show"
+    if gain_cmd_name == "confirm":
+        row = record_gain_confirmation(
+            "confirmed",
+            args.query,
+            note=args.note,
+            task=args.task,
+            actual_tokens_saved=args.actual_tokens_saved,
+            bug_prevented=args.bug_prevented,
+        )
+        if args.json:
+            print(json.dumps(row, ensure_ascii=False, indent=2))
+        else:
+            print(f"gain confirmed: {args.query}")
+        return 0
+    if gain_cmd_name == "reject":
+        row = record_gain_confirmation("rejected", args.query, note=args.note, task=args.task)
+        if args.json:
+            print(json.dumps(row, ensure_ascii=False, indent=2))
+        else:
+            print(f"gain rejected: {args.query}")
+        return 0
+    data = summarize_gain(limit=args.limit)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        use_color = sys.stdout.isatty() and not args.no_color and not os.environ.get("NO_COLOR")
+        print(format_gain_dashboard(data, color=use_color))
     return 0
 
 

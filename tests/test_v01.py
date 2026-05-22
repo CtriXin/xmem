@@ -177,6 +177,55 @@ def test_gain_distinguishes_lookup_from_context_savings(tmp_path: Path):
     assert context_gain["estimated_tokens_saved"] > 0
 
 
+def test_gain_confirm_and_hook_outcome_calibrate_dashboard(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+    run([str(XMEM), "context", "ad lazyload"], repo, env)
+    confirmed = json.loads(
+        run(
+            [
+                str(XMEM),
+                "gain",
+                "confirm",
+                "ad lazyload",
+                "--note",
+                "confirmed useful",
+                "--actual-tokens-saved",
+                "120",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+    hooked = json.loads(
+        run(
+            [
+                str(XMEM),
+                "hook",
+                "finish",
+                "ad lazyload outcome verified",
+                "--verified",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+
+    gain = json.loads(run([str(XMEM), "gain", "--json"], repo, env).stdout)
+    text_gain = run([str(XMEM), "gain"], repo, env).stdout
+
+    assert confirmed["event"] == "gain.confirmed"
+    assert hooked["outcome"]["event"] == "outcome.finish"
+    assert gain["calibration"]["status"] == "partially_calibrated"
+    assert gain["calibration"]["confirmed"] == 1
+    assert gain["calibration"]["confirmed_actual_tokens_saved"] == 120
+    assert gain["actual_tokens_saved"] == 120
+    assert gain["calibration"]["outcomes"] == 1
+    assert "outcomes=1" in text_gain
+
+
 def test_context_next_reads_include_relation_cards(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)

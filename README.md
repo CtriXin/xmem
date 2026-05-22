@@ -29,6 +29,7 @@ xmem new
 xmem check --sources
 xmem fix
 xmem gain
+xmem gain confirm "ads lazyload"
 ```
 
 Truth files live with the project:
@@ -194,6 +195,8 @@ If a query hits a correction card, xmem expands the canonical alias as an extra 
 
 The gain dashboard self-calibrates its own confidence labels. It reports whether the current data is only telemetry/proxy or partially calibrated, surfaces high rough estimates that need review, and records future match quality fields such as `top_score`, `top_status`, and `top_why`.
 
+Outcome signals improve gain calibration over time. `xmem hook finish|fix|bug --verified` appends an `outcome.*` row to `gain.jsonl`, and `xmem gain confirm <query>` / `xmem gain reject <query>` can record explicit human calibration. These signals still do not turn rough token estimates into billing truth, but they let the dashboard distinguish pure proxy data from partially calibrated outcomes.
+
 ## Useful commands
 
 ```bash
@@ -209,6 +212,8 @@ xmem new                    # create/register .xmem for this folder
 xmem why <query>            # explain matches
 xmem open <card-id-or-query>
 xmem fix                    # record alias correction/dispute
+xmem gain confirm <query>   # confirm a useful xmem hit/outcome
+xmem gain reject <query>    # mark a rough gain estimate as overestimated/wrong
 ```
 
 `xmem status` should show the stable registry at `/Users/xin/.xmem` on this machine. In isolated agent sessions, xmem detects the real user home so agents do not accidentally create an empty per-session registry.
