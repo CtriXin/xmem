@@ -197,6 +197,8 @@ The gain dashboard self-calibrates its own confidence labels. It reports whether
 
 Outcome signals improve gain calibration over time. `xmem hook finish|fix|bug --verified` appends an `outcome.*` row to `gain.jsonl`, and `xmem gain confirm <query>` / `xmem gain reject <query>` can record explicit human calibration. These signals still do not turn rough token estimates into billing truth, but they let the dashboard distinguish pure proxy data from partially calibrated outcomes.
 
+Confirmed/rejected gain outcomes also create review outbox items under `~/.xmem/outbox/gain-feedback`. Confirmed outcomes queue a Project Wiki review request; rejected or bug-prevented outcomes queue an Issue Record seed. This keeps upstream truth human-reviewed instead of silently mutating Project Wiki or issue records.
+
 ## Useful commands
 
 ```bash

@@ -192,6 +192,7 @@ def test_gain_confirm_and_hook_outcome_calibrate_dashboard(tmp_path: Path):
                 "confirmed useful",
                 "--actual-tokens-saved",
                 "120",
+                "--bug-prevented",
                 "--json",
             ],
             repo,
@@ -217,13 +218,18 @@ def test_gain_confirm_and_hook_outcome_calibrate_dashboard(tmp_path: Path):
     text_gain = run([str(XMEM), "gain"], repo, env).stdout
 
     assert confirmed["event"] == "gain.confirmed"
+    assert {item["target"] for item in confirmed["feedback"]} == {"gain-feedback", "project-wiki", "issue-tracking"}
     assert hooked["outcome"]["event"] == "outcome.finish"
+    assert hooked["outcome"]["feedback"][0]["target"] == "gain-feedback"
     assert gain["calibration"]["status"] == "partially_calibrated"
     assert gain["calibration"]["confirmed"] == 1
     assert gain["calibration"]["confirmed_actual_tokens_saved"] == 120
     assert gain["actual_tokens_saved"] == 120
     assert gain["calibration"]["outcomes"] == 1
     assert "outcomes=1" in text_gain
+    assert list((Path(env["XMEM_HOME"]) / "outbox" / "gain-feedback").glob("*.json"))
+    assert list((Path(env["XMEM_HOME"]) / "outbox" / "project-wiki").glob("*.json"))
+    assert list((Path(env["XMEM_HOME"]) / "outbox" / "issue-tracking").glob("gain_*.md"))
 
 
 def test_context_next_reads_include_relation_cards(tmp_path: Path):

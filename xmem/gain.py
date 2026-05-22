@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from collections import Counter
+import hashlib
+import os
+from pathlib import Path
 import shutil
 import unicodedata
 from typing import Any, Dict, List, Optional
 
-from .util import append_jsonl, home_dir, load_jsonl, utc_now
+from .util import append_jsonl, home_dir, load_jsonl, slugify, utc_now, write_json
 
 
 def summarize_gain(limit: Optional[int] = None) -> Dict[str, object]:
@@ -183,6 +186,7 @@ def record_gain_confirmation(
         "estimated_bug_prevented": 1 if bug_prevented else 0,
         "estimate_kind": "human_confirmed_outcome" if action == "confirmed" else "human_rejected_outcome",
     }
+    row["feedback"] = write_gain_feedback(row)
     append_jsonl(home_dir() / "gain.jsonl", row)
     return row
 
@@ -208,8 +212,89 @@ def record_task_outcome(
         "estimate_kind": "task_outcome_signal_not_proof",
         "verified": bool(verified),
     }
+    row["feedback"] = write_gain_feedback(row, internal_only=True)
     append_jsonl(home_dir() / "gain.jsonl", row)
     return row
+
+
+def write_gain_feedback(row: Dict[str, object], *, internal_only: bool = False) -> List[Dict[str, str]]:
+    feedback: List[Dict[str, str]] = []
+    feedback.append(write_gain_feedback_json(row))
+    event = str(row.get("event") or "")
+    if not internal_only and event == "gain.confirmed":
+        feedback.append(write_project_wiki_gain_request(row))
+    if not internal_only and (event == "gain.rejected" or int(row.get("estimated_bug_prevented") or 0) > 0):
+        feedback.append(write_issue_gain_seed(row))
+    return feedback
+
+
+def write_gain_feedback_json(row: Dict[str, object]) -> Dict[str, str]:
+    fid = gain_feedback_id(row)
+    out = home_dir() / "outbox" / "gain-feedback" / f"{fid}.json"
+    write_json(out, {"status": "pending_review", "kind": "xmem_gain_feedback", "row": row, "createdAt": utc_now()})
+    return {"target": "gain-feedback", "status": "outbox", "path": str(out), "id": fid}
+
+
+def write_project_wiki_gain_request(row: Dict[str, object]) -> Dict[str, str]:
+    fid = gain_feedback_id(row)
+    request = {
+        "status": "pending",
+        "risk": "low",
+        "actor": "xmem-gain",
+        "action": "review_xmem_gain_outcome",
+        "targetEntityId": "unknown",
+        "payload": {
+            "type": "xmem_gain_outcome",
+            "query": row.get("query", ""),
+            "task": row.get("task", ""),
+            "note": row.get("note", ""),
+            "actualTokensSaved": row.get("actual_tokens_saved", 0),
+            "source": "xmem gain confirm",
+        },
+        "validation": [{"label": "human/outcome signal captured", "ok": True, "detail": str(row.get("event", ""))}],
+        "evidenceIds": [f"xmem-gain:{fid}"],
+        "receivedAt": utc_now(),
+        "id": "wr_gain_" + fid,
+    }
+    inbox = Path(os.environ.get("XMEM_PROJECT_WIKI", "/Users/xin/project-wiki")).expanduser() / "data" / "agent-inbox.jsonl"
+    if inbox.parent.exists():
+        append_jsonl(inbox, request)
+        return {"target": "project-wiki", "status": "queued", "path": str(inbox), "id": request["id"]}
+    out = home_dir() / "outbox" / "project-wiki" / f"{request['id']}.json"
+    write_json(out, request)
+    return {"target": "project-wiki", "status": "outbox", "path": str(out), "id": request["id"]}
+
+
+def write_issue_gain_seed(row: Dict[str, object]) -> Dict[str, str]:
+    fid = gain_feedback_id(row)
+    out = home_dir() / "outbox" / "issue-tracking" / f"gain_{fid}.md"
+    body = "\n".join(
+        [
+            "# XMEM Gain Feedback",
+            "",
+            f"- Issue: gain_{fid}",
+            "- Source: xmem gain outcome",
+            f"- Event: {row.get('event', '')}",
+            f"- Query: {row.get('query', '')}",
+            f"- Task: {row.get('task', '')}",
+            f"- Actual tokens saved: {row.get('actual_tokens_saved', 0)}",
+            f"- Bug prevented hint: {row.get('estimated_bug_prevented', 0)}",
+            "",
+            "## Note",
+            str(row.get("note", "")),
+            "",
+            "## Review",
+            "- Decide whether this should become an Issue Record bug-pattern, regression guard, or rejected gain calibration.",
+        ]
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(body + "\n", encoding="utf-8")
+    return {"target": "issue-tracking", "status": "outbox", "path": str(out), "id": f"gain_{fid}"}
+
+
+def gain_feedback_id(row: Dict[str, object]) -> str:
+    raw = "|".join(str(row.get(key, "")) for key in ("event", "query", "task", "note", "ts"))
+    return f"{slugify(str(row.get('query') or row.get('event') or 'gain'), 'gain')[:48]}-{hashlib.sha1(raw.encode()).hexdigest()[:10]}"
 
 
 def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width: Optional[int] = None) -> str:
