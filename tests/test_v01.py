@@ -102,6 +102,38 @@ def test_check_uses_registry_invariant_cards(tmp_path: Path):
     assert data["matched_cards"] >= 1
 
 
+def test_check_honors_guard_path_scope_before_terms(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    card_dir = repo / ".xmem" / "cards"
+    card_dir.mkdir(parents=True, exist_ok=True)
+    (card_dir / "ads-scope.yaml").write_text(
+        "\n".join(
+            [
+                "id: ads.scope",
+                "type: invariant",
+                "title: Scoped ad guard",
+                "scope:",
+                "  paths:",
+                "    - \"**/*Ad*\"",
+                "diff_guard:",
+                "  warn_if_removed:",
+                "    - observe",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (repo / "notes.md").write_text("observe\n", encoding="utf-8")
+    run(["git", "add", "."], repo, env)
+    run(["git", "commit", "-q", "-m", "add scoped guard"], repo, env)
+    (repo / "notes.md").write_text("done\n", encoding="utf-8")
+
+    data = json.loads(run([str(XMEM), "check", "--json"], repo, env).stdout)
+
+    assert data["warnings"] == []
+    assert data["matched_cards"] == 0
+
+
 def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
@@ -118,8 +150,24 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     assert gain["recent_queries"][0]["top_card"]
     assert gain["recent_guardrails"]
     assert "XMEM Gain (Global Scope)" in text_gain
-    assert "Confidence note:" in text_gain
+    assert "Accounting basis:" in text_gain
     assert "By Event" in text_gain
+
+
+def test_gain_distinguishes_lookup_from_context_savings(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+    run([str(XMEM), "find", "ad lazyload"], repo, env)
+
+    lookup_gain = json.loads(run([str(XMEM), "gain", "--json"], repo, env).stdout)
+    assert lookup_gain["observed"]["context_queries"] == 0
+    assert lookup_gain["estimated_tokens_saved"] == 0
+    assert any(item["event"] == "find.hit" for item in lookup_gain["by_event"])
+
+    run([str(XMEM), "context", "ad lazyload"], repo, env)
+    context_gain = json.loads(run([str(XMEM), "gain", "--json"], repo, env).stdout)
+    assert context_gain["observed"]["context_hits"] == 1
+    assert context_gain["estimated_tokens_saved"] > 0
 
 
 def test_context_next_reads_include_relation_cards(tmp_path: Path):

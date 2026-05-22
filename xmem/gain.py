@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any, Dict, List
+import shutil
+import unicodedata
+from typing import Any, Dict, List, Optional
 
 from .util import home_dir, load_jsonl
 
@@ -16,6 +18,10 @@ def summarize_gain(limit: int = 500) -> Dict[str, object]:
     event_rows = aggregate_events(rows)
     query_rows = aggregate_queries(rows)
     context_total = events.get("context.hit", 0) + events.get("context.miss", 0)
+    preflight_total = events.get("preflight.hit", 0) + events.get("preflight.miss", 0)
+    retrieval_hits = sum(value for key, value in events.items() if str(key).endswith(".hit"))
+    retrieval_misses = sum(value for key, value in events.items() if str(key).endswith(".miss"))
+    retrieval_total = retrieval_hits + retrieval_misses
     hit_rate = round(events.get("context.hit", 0) / context_total * 100, 1) if context_total else 0.0
     guardrails = [
         {
@@ -48,10 +54,16 @@ def summarize_gain(limit: int = 500) -> Dict[str, object]:
         "rows": len(rows),
         "observed": {
             "logged_rows": len(rows),
+            "retrieval_calls": retrieval_total,
+            "retrieval_hits": retrieval_hits,
+            "retrieval_misses": retrieval_misses,
             "context_queries": context_total,
             "context_hits": events.get("context.hit", 0),
             "context_misses": events.get("context.miss", 0),
             "context_hit_rate": hit_rate,
+            "preflight_queries": preflight_total,
+            "preflight_hits": events.get("preflight.hit", 0),
+            "preflight_misses": events.get("preflight.miss", 0),
             "guardrail_checks": sum(value for key, value in events.items() if str(key).startswith(("check.", "rule."))),
             "guardrail_prevented": events.get("rule.prevented", 0),
         },
@@ -92,7 +104,7 @@ def aggregate_queries(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return sorted(out.values(), key=lambda item: (int(item["estimated_tokens_saved"]), int(item["count"])), reverse=True)[:10]
 
 
-def format_gain_dashboard(data: Dict[str, object], *, color: bool = False) -> str:
+def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width: Optional[int] = None) -> str:
     observed = data.get("observed") if isinstance(data.get("observed"), dict) else {}
     by_event = data.get("by_event") if isinstance(data.get("by_event"), list) else []
     top_queries = data.get("top_queries") if isinstance(data.get("top_queries"), list) else []
@@ -100,18 +112,35 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False) -> st
     hit_rate = float(observed.get("context_hit_rate", 0) or 0)
     max_event_saved = max([int(item.get("estimated_tokens_saved") or 0) for item in by_event] or [0])
     max_query_saved = max([int(item.get("estimated_tokens_saved") or 0) for item in top_queries] or [0])
+    terminal_width = width or shutil.get_terminal_size((96, 24)).columns
+    dashboard_width = min(104, max(72, terminal_width))
+    impact_width = 10 if dashboard_width < 96 else 12
+    event_width = min(22, max(16, dashboard_width - impact_width - 37))
+    query_width = max(24, dashboard_width - impact_width - 32)
     title = paint("XMEM Gain (Global Scope)", "green", color)
-    rule = paint("=" * 88, "dim", color)
-    thin = paint("-" * 88, "dim", color)
+    rule = paint("=" * dashboard_width, "dim", color)
+    thin = paint("-" * dashboard_width, "dim", color)
     lines = [
         title,
         rule,
         "",
         metric("Observed log rows", int(data.get("rows") or 0), color),
         metric(
+            "Retrieval calls",
+            f"{int(observed.get('retrieval_calls') or 0)} "
+            f"(hit {int(observed.get('retrieval_hits') or 0)} / miss {int(observed.get('retrieval_misses') or 0)})",
+            color,
+        ),
+        metric(
             "Context queries",
             f"{int(observed.get('context_queries') or 0)} "
             f"(hit {int(observed.get('context_hits') or 0)} / miss {int(observed.get('context_misses') or 0)})",
+            color,
+        ),
+        metric(
+            "Preflight queries",
+            f"{int(observed.get('preflight_queries') or 0)} "
+            f"(hit {int(observed.get('preflight_hits') or 0)} / miss {int(observed.get('preflight_misses') or 0)})",
             color,
         ),
         metric("Context hit rate", f"{hit_rate:.1f}%", color, value_style=rate_style(hit_rate)),
@@ -120,24 +149,25 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False) -> st
         metric("Rule prevented events", int(observed.get("guardrail_prevented") or 0), color, value_style="yellow"),
         metric("Est. tokens saved", human_number(int(data.get("estimated_tokens_saved") or 0)), color, value_style="green"),
         metric("Est. bugs prevented", int(data.get("estimated_bug_prevented") or 0), color, value_style="yellow"),
-        metric("Confidence note", "events observed; token/bug savings estimated", color, value_style="dim"),
+        metric("Accounting basis", "hit/miss/check logged; savings estimated", color, value_style="dim"),
+        metric("Token formula", "context/preflight matches * 1200", color, value_style="dim"),
         metric("Efficiency meter", f"{bar(hit_rate, color=color)} {paint(f'{hit_rate:.1f}%', rate_style(hit_rate), color)}", color),
         "",
         paint("By Event", "green", color),
         thin,
-        f"{'#':>3}  {'Event':<22} {'Count':>7} {'EstSaved':>10} {'Matches':>8} {'Bugs':>5}  {'Impact':<18}",
+        f"{'#':>3}  {pad_display('Event', event_width)} {'Count':>6} {'EstSaved':>9} {'Matches':>7} {'Bug':>4}  {pad_display('Impact', impact_width)}",
     ]
     for idx, item in enumerate(by_event[:10], 1):
         saved = int(item.get("estimated_tokens_saved") or 0)
         bugs = int(item.get("estimated_bug_prevented") or 0)
-        event = compact_cell(item.get("event", ""), 22)
+        event = compact_cell(item.get("event", ""), event_width)
         lines.append(
-            f"{idx:>3}. {cell(event, 22, 'cyan', color)} "
-            f"{int(item.get('count') or 0):>7} "
-            f"{paint(f'{human_number(saved):>10}', 'green' if saved else 'dim', color)} "
-            f"{int(item.get('matches') or 0):>8} "
-            f"{paint(f'{bugs:>5}', 'yellow' if bugs else 'dim', color)}  "
-            f"{impact_bar(saved, max_event_saved, color=color)}"
+            f"{idx:>3}. {cell(event, event_width, 'cyan', color)} "
+            f"{int(item.get('count') or 0):>6} "
+            f"{paint(f'{human_number(saved):>9}', 'green' if saved else 'dim', color)} "
+            f"{int(item.get('matches') or 0):>7} "
+            f"{paint(f'{bugs:>4}', 'yellow' if bugs else 'dim', color)}  "
+            f"{impact_bar(saved, max_event_saved, impact_width, color=color)}"
         )
     if not by_event:
         lines.append("  - no gain events logged yet")
@@ -145,17 +175,17 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False) -> st
         "",
         paint("Top Queries", "green", color),
         thin,
-        f"{'#':>3}  {'Query':<42} {'Count':>7} {'EstSaved':>10} {'Matches':>8}  {'Impact':<18}",
+        f"{'#':>3}  {pad_display('Query', query_width)} {'Count':>6} {'EstSaved':>9} {'Matches':>7}  {pad_display('Impact', impact_width)}",
     ])
     for idx, item in enumerate(top_queries[:10], 1):
-        query = compact_cell(item.get("query", ""), 42)
+        query = compact_cell(item.get("query", ""), query_width)
         saved = int(item.get("estimated_tokens_saved") or 0)
         lines.append(
-            f"{idx:>3}. {cell(query, 42, 'cyan', color)} "
-            f"{int(item.get('count') or 0):>7} "
-            f"{paint(f'{human_number(saved):>10}', 'green' if saved else 'dim', color)} "
-            f"{int(item.get('matches') or 0):>8}  "
-            f"{impact_bar(saved, max_query_saved, color=color)}"
+            f"{idx:>3}. {cell(query, query_width, 'cyan', color)} "
+            f"{int(item.get('count') or 0):>6} "
+            f"{paint(f'{human_number(saved):>9}', 'green' if saved else 'dim', color)} "
+            f"{int(item.get('matches') or 0):>7}  "
+            f"{impact_bar(saved, max_query_saved, impact_width, color=color)}"
         )
     if not top_queries:
         lines.append("  - no query events logged yet")
@@ -184,7 +214,46 @@ def human_number(value: int) -> str:
 
 def compact_cell(value: object, width: int) -> str:
     text = " ".join(str(value or "").split())
-    return text if len(text) <= width else text[: max(0, width - 3)] + "..."
+    return truncate_display(text, width)
+
+
+def display_width(value: object) -> int:
+    width = 0
+    for char in str(value):
+        if unicodedata.combining(char):
+            continue
+        width += 2 if unicodedata.east_asian_width(char) in {"F", "W"} else 1
+    return width
+
+
+def truncate_display(value: object, width: int) -> str:
+    text = str(value or "")
+    if width <= 0:
+        return ""
+    if display_width(text) <= width:
+        return text
+    ellipsis = "..."
+    ellipsis_width = display_width(ellipsis)
+    if width <= ellipsis_width:
+        return "." * width
+    out = []
+    used = 0
+    target = width - ellipsis_width
+    for char in text:
+        char_width = display_width(char)
+        if used + char_width > target:
+            break
+        out.append(char)
+        used += char_width
+    return "".join(out) + ellipsis
+
+
+def pad_display(value: object, width: int, align: str = "left") -> str:
+    text = truncate_display(value, width)
+    padding = max(0, width - display_width(text))
+    if align == "right":
+        return " " * padding + text
+    return text + " " * padding
 
 
 def bar(percent: float, width: int = 28, *, color: bool = False) -> str:
@@ -200,7 +269,7 @@ def impact_bar(value: int, max_value: int, width: int = 18, *, color: bool = Fal
     filled = max(1, min(width, round(width * value / max_value)))
     if not color:
         return "#" * filled + "." * (width - filled)
-    return paint(" " * filled, "bg_cyan", color) + paint(" " * (width - filled), "bg_dim", color)
+    return paint("#" * filled, "cyan", color) + paint("." * (width - filled), "dim", color)
 
 
 def metric(label: str, value: object, color: bool, *, value_style: str = "plain") -> str:
@@ -236,5 +305,4 @@ def paint(value: object, style: str, enabled: bool) -> str:
 
 
 def cell(value: object, width: int, style: str, color: bool) -> str:
-    text = str(value)
-    return paint(f"{text:<{width}}", style, color)
+    return paint(pad_display(value, width), style, color)

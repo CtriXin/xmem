@@ -182,7 +182,7 @@ If a query hits a correction card, xmem expands the canonical alias as an extra 
 
 `xmem check` inspects the current git diff against local and indexed `invariant` / `rule` / `guard` cards. It is intentionally lightweight: it looks for explicit `diff_guard.warn_if_removed`, `warn_if_added`, and `forbid` terms and exits non-zero for human-visible warnings.
 
-`xmem gain` summarizes recent `context` and `check` events, including top queries, recent guardrail checks, rough tokens saved, and estimated prevented regressions.
+`xmem gain` summarizes recent lookup, `context`, `preflight`, and `check` events. Hit/miss/pass/prevented counts come from `~/.xmem/gain.jsonl`; token savings are rough estimates for context/preflight matches only, and prevented regressions are estimated from rule warnings.
 
 ## Useful commands
 

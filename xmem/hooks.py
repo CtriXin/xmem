@@ -96,7 +96,7 @@ def infer_destinations(event: str, text: str, destinations: Iterable[str]) -> Li
 
 def explain_matches(text: str) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
-    for card in search_cards(text, 5):
+    for card in search_cards(text, 5, gain_event="hook"):
         out.append(
             {
                 "id": card.get("card_id", ""),

@@ -172,7 +172,7 @@ def main(argv: List[str] | None = None) -> int:
             print(json.dumps(import_bug_patterns(Path(args.path)), ensure_ascii=False, indent=2))
         return 0
     if args.cmd == "find":
-        cards = search_cards(args.query, args.limit)
+        cards = search_cards(args.query, args.limit, gain_event="find")
         if args.json:
             print(json.dumps(cards, ensure_ascii=False, indent=2))
         else:
@@ -189,7 +189,7 @@ def main(argv: List[str] | None = None) -> int:
             current = detect_project(root)
         except Exception:
             pass
-        cards = search_cards(args.query, max(args.limit * 4, 20))
+        cards = search_cards(args.query, max(args.limit * 4, 20), gain_event="context")
         for expanded_query in canonical_queries_from_corrections(args.query, cards):
             cards = merge_cards(cards, search_cards(expanded_query, max(args.limit * 2, 10), record_gain=False))
         events = latest_events(3)
@@ -207,7 +207,7 @@ def main(argv: List[str] | None = None) -> int:
             current = detect_project(root)
         except Exception:
             pass
-        cards = search_cards(args.query, max(args.limit * 4, 20))
+        cards = search_cards(args.query, max(args.limit * 4, 20), gain_event="preflight")
         for expanded_query in canonical_queries_from_corrections(args.query, cards):
             cards = merge_cards(cards, search_cards(expanded_query, max(args.limit * 2, 10), record_gain=False))
         events = latest_events(3)
@@ -439,7 +439,7 @@ def status_cmd(args: argparse.Namespace) -> int:
 
 
 def why_cmd(args: argparse.Namespace) -> int:
-    cards = search_cards(args.query, 5)
+    cards = search_cards(args.query, 5, gain_event="why")
     data = {"query": args.query, "matches": explain_cards(cards)}
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2))
@@ -570,7 +570,7 @@ def hook_cmd(args: argparse.Namespace) -> int:
 def open_cmd(args: argparse.Namespace) -> int:
     with connect() as conn:
         found = rows(conn, "SELECT * FROM cards WHERE card_id = ?", (args.id_or_query,))
-    matches = [] if found else search_cards(args.id_or_query, 1)
+    matches = [] if found else search_cards(args.id_or_query, 1, gain_event="open")
     card = found[0] if found else (matches[0] if matches else None)
     if not card:
         raise SystemExit(f"card not found: {args.id_or_query}")

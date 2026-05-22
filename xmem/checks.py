@@ -42,6 +42,8 @@ def check_diff(path: Path) -> Dict[str, object]:
         "ts": utc_now(), "event": event, "warnings": len(warnings),
         "checked_cards": len(cards), "matched_cards": relevant,
         "estimated_bug_prevented": 1 if warnings else 0,
+        "changed_files": changed_files[:20],
+        "warning_cards": [item.get("card", "") for item in warnings[:20]],
     })
     return {"root": str(root), "warnings": warnings, "checked_cards": len(cards), "matched_cards": relevant, "changed_files": changed_files}
 
@@ -71,6 +73,14 @@ def collect_rule_cards(root: Path) -> List[Dict[str, Any]]:
 
 def card_relevant_to_diff(card: Dict[str, Any], changed_files: List[str], diff: str) -> bool:
     body = str(card.get("body") or "")
+    paths = list_after_key(body, "paths")
+    if paths:
+        if not changed_files:
+            return False
+        for pattern in paths:
+            if any(matches_path_scope(path, str(pattern or "")) for path in changed_files):
+                return True
+        return False
     guard_terms = (
         list_after_key(body, "warn_if_removed")
         + list_after_key(body, "warn_if_added")
@@ -78,13 +88,6 @@ def card_relevant_to_diff(card: Dict[str, Any], changed_files: List[str], diff: 
     )
     if any(term and contains_term(diff, term) for term in guard_terms):
         return True
-    paths = list_after_key(body, "paths")
-    if paths and changed_files:
-        for pattern in paths:
-            cleaned = str(pattern or "").strip().strip('"')
-            if any(fnmatch.fnmatch(path, cleaned) or fnmatch.fnmatch(Path(path).name, cleaned) for path in changed_files):
-                return True
-        return False
     if not changed_files:
         return True
     haystack = normalize_text("\n".join(changed_files) + "\n" + diff[:12000])
@@ -96,6 +99,15 @@ def card_relevant_to_diff(card: Dict[str, Any], changed_files: List[str], diff: 
         aliases = []
     probes = [card.get("title", ""), card.get("card_id", ""), *aliases]
     return any(normalize_text(probe) and normalize_text(probe) in haystack for probe in probes)
+
+
+def matches_path_scope(path: str, pattern: str) -> bool:
+    cleaned = pattern.strip().strip('"')
+    variants = [cleaned]
+    if cleaned.startswith("**/"):
+        variants.append(cleaned[3:])
+    name = Path(path).name
+    return any(fnmatch.fnmatch(path, item) or fnmatch.fnmatch(name, item) for item in variants if item)
 
 
 def contains_term(text: str, term: str) -> bool:

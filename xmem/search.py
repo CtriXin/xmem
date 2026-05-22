@@ -7,7 +7,10 @@ from .store import connect, rows
 from .util import append_jsonl, home_dir, normalize_text, query_terms, query_variants, utc_now
 
 
-def search_cards(query: str, limit: int = 10, *, record_gain: bool = True) -> List[Dict[str, Any]]:
+TOKEN_SAVING_EVENTS = {"context", "preflight"}
+
+
+def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_event: str = "search") -> List[Dict[str, Any]]:
     terms = query_terms(query)
     variants = query_variants(query)
     with connect() as conn:
@@ -87,13 +90,17 @@ def search_cards(query: str, limit: int = 10, *, record_gain: bool = True) -> Li
     result = scored[:limit]
     if record_gain:
         top = result[0] if result else {}
+        safe_event = gain_event if gain_event.replace("_", "").replace("-", "").isalnum() else "search"
+        estimated_tokens_saved = len(result) * 1200 if safe_event in TOKEN_SAVING_EVENTS else 0
         append_jsonl(home_dir() / "gain.jsonl", {
             "ts": utc_now(),
-            "event": "context.hit" if result else "context.miss",
+            "event": f"{safe_event}.hit" if result else f"{safe_event}.miss",
+            "source": safe_event,
             "query": query,
             "matches": len(result),
             "cards_considered": len(cards),
-            "estimated_tokens_saved": len(result) * 1200,
+            "estimated_tokens_saved": estimated_tokens_saved,
+            "estimate_formula": "matches * 1200" if estimated_tokens_saved else "",
             "top_card": top.get("card_id", ""),
             "top_score": top.get("score", 0),
             "sources": sorted({str(card.get("source") or "") for card in result if card.get("source")})[:6],
