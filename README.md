@@ -80,7 +80,7 @@ These project-memory adapters are source routers, not workflow dependencies. xme
 
 `xmem-export.cards.jsonl` is the preferred bridge format for other truth systems. Project Wiki can export entity cards, and Issue Record can export verified bug-pattern/rule cards; xmem imports them as generated index rows while keeping the source files as truth.
 
-Use `xmem check --sources` to validate export shape before or after another tool generates it. Missing exports are reported as optional_missing; malformed rows, invalid truth status, duplicate ids, and bad confidence values are errors. It also reports local `.xmem/cards` portability warnings so ignored/untracked knowledge cards are visible before another machine or agent misses them.
+Use `xmem check --sources` to validate export shape before or after another tool generates it. Missing exports are reported as optional_missing; malformed rows, invalid truth status, duplicate ids, and bad confidence values are errors. It also reports local `.xmem/cards` portability warnings so ignored/untracked knowledge cards are visible before another machine or agent misses them. Use `xmem check --sources --strict` when an agent gate should fail on warnings, not only errors.
 
 Registry rebuilds are atomic: `xmem sync` builds a temporary SQLite index and swaps it into place at the end, so concurrent `xmem context` readers should not see a half-empty registry during sync.
 

@@ -139,6 +139,7 @@ def build_parser() -> argparse.ArgumentParser:
     chk = sub.add_parser("check", help="用本地/索引 invariant 检查当前 diff")
     chk.add_argument("path", nargs="?", default=".")
     chk.add_argument("--sources", action="store_true", help="校验 Project Wiki / Issue Record xmem exports")
+    chk.add_argument("--strict", action="store_true", help="把 warning 也作为失败退出")
     chk.add_argument("--json", action="store_true", help="输出 JSON")
 
     gain = sub.add_parser("gain", help="查看 xmem telemetry / 收益口径 / guardrail 统计")
@@ -300,7 +301,7 @@ def main(argv: List[str] | None = None) -> int:
                 print(json.dumps(result, ensure_ascii=False, indent=2))
             else:
                 print("\n".join(compact_source_health(result)))
-            return 2 if result.get("errors") else 0
+            return 2 if result.get("errors") or (args.strict and result.get("warnings")) else 0
         result = check_diff(Path(args.path))
         if args.json:
             print(json.dumps(result, ensure_ascii=False, indent=2))
