@@ -58,6 +58,15 @@ def llm_packet(packet: Dict[str, Any]) -> str:
         lines.append("  current:")
         for key in ("project_id", "root", "branch", "git_sha", "tech_stack"):
             lines.append(f"    {key}: {quote_scalar(current.get(key, ''))}")
+    freshness = packet.get("source_freshness") or {}
+    if freshness:
+        lines.append("  source_freshness:")
+        for key in ("status", "stale_exports", "registry"):
+            lines.append(f"    {key}: {quote_scalar(freshness.get(key, ''))}")
+        stale = freshness.get("stale") or []
+        lines.append(f"    stale[{len(stale)}]:")
+        for item in stale[:5]:
+            lines.append(f"      - kind: {quote_scalar(item.get('kind', ''))}; path: {quote_scalar(item.get('path', ''))}")
     suggested_queries = packet.get("suggested_queries") or []
     lines.append(f"  suggested_queries[{len(suggested_queries)}]:")
     for query in suggested_queries:

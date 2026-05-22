@@ -415,7 +415,8 @@ def status_cmd(args: argparse.Namespace) -> int:
             f"{source_exports.get('status', 'unknown')} "
             f"errors={source_exports.get('errors', 0)} "
             f"warnings={source_exports.get('warnings', 0)} "
-            f"optional_missing={source_exports.get('optional_missing', 0)}"
+            f"optional_missing={source_exports.get('optional_missing', 0)} "
+            f"stale_exports={source_exports.get('stale_exports', 0)}"
         )
         counts = data.get("counts", {})
         if counts:

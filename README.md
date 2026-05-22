@@ -71,6 +71,16 @@ Use `xmem check --sources` to validate export shape before or after another tool
 
 Registry rebuilds are atomic: `xmem sync` builds a temporary SQLite index and swaps it into place at the end, so concurrent `xmem context` readers should not see a half-empty registry during sync.
 
+## Control Plane Contract
+
+xmem is the single agent entry and control plane:
+
+- Project Wiki owns entity truth: service, repo, domain, branch, deploy target, owner, business name, and oral aliases.
+- Issue Record owns bug truth: symptom, root cause, fix pattern, verification, regression guard, and evidence paths.
+- xmem owns compact cross-project memory: method, invariant, relation, correction, source freshness, and generated registry/cache.
+
+Agents should route new durable facts to the owning source, run `xmem check --sources`, then `xmem sync`. `xmem context` includes `source_freshness`; if it is not `fresh`, sync before relying on the packet.
+
 ## New folders
 
 `xmem new` creates `.xmem/` for the current folder and registers that folder in `~/.xmem/sources.json`, so future `xmem sync` can index it from any other project.

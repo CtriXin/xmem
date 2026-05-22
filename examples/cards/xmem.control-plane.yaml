@@ -1,0 +1,52 @@
+id: xmem.control-plane
+type: rule
+title: xmem control plane for Project Wiki and Issue Record
+scope:
+  system: xmem
+aliases:
+  - xmem 总控
+  - xmem control plane
+  - Project Wiki Issue Record xmem
+  - source of truth routing
+  - 记录怎么更新
+  - issue 怎么记
+truth:
+  status: verified
+  confidence: 0.95
+  basis:
+    - implementation_contract
+    - user_confirmed_direction
+  last_checked_at: 2026-05-22T00:00:00Z
+summary: xmem is the single agent entry and control plane. Project Wiki owns entity truth; Issue Record owns bug truth; xmem owns compact memory, routing, checks, and freshness warnings.
+must_include:
+  - Query xmem context before broad traversal or project selection.
+  - Route service/repo/domain/branch/deploy/alias facts to Project Wiki export.
+  - Route bug symptom/root cause/fix/verification/regression guard to Issue Record bug-pattern export.
+  - Keep durable cross-project methods/invariants as small xmem cards with evidence pointers.
+  - Run xmem sync after source exports change; status/context must show fresh source_freshness before relying on registry.
+  - Use verified cards as guardrails; treat partial/inferred/stale/disputed cards as hints requiring source readback.
+forbid:
+  - Do not duplicate full truth into xmem when Project Wiki or Issue Record owns it.
+  - Do not promote guessed or oral-name-only data to verified.
+  - Do not close bugfix/release work without issue evidence and verification path.
+  - Do not rely on registry if source_freshness is stale; sync first.
+checks:
+  - xmem status
+  - xmem check --sources
+  - xmem context "<task>"
+  - xmem check
+relations:
+  - source: /Users/xin/project-wiki/data/xmem-export.cards.jsonl
+    target: project entities
+    kind: entity_truth_export
+  - source: /Users/xin/issue-tracking/index/bug-patterns.jsonl
+    target: bug patterns
+    kind: bug_truth_export
+  - source: /Users/xin/.xmem/registry.sqlite
+    target: generated search index
+    kind: cache_not_truth
+evidence:
+  - kind: repo
+    path: /Users/xin/auto-skills/CtriXin-repo/xmem
+  - kind: skill
+    path: /Users/xin/auto-skills/shared-skills/xmem/SKILL.md

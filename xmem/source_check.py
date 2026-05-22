@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 from .importers import bug_pattern_to_export_card, iter_jsonl, looks_like_bug_pattern, normalize_status
+from .store import db_path
 
 VALID_STATUSES = {"verified", "inferred", "partial", "stale", "disputed", "unknown"}
 
@@ -21,10 +22,12 @@ def default_source_paths() -> List[Dict[str, str]]:
 
 
 def check_source_exports(paths: Iterable[Dict[str, str]] | None = None) -> Dict[str, Any]:
+    source_paths = list(paths or default_source_paths())
+    freshness = source_freshness(source_paths)
     entries: List[Dict[str, Any]] = []
     seen_ids: Dict[str, str] = {}
     duplicate_ids: List[Dict[str, str]] = []
-    for item in paths or default_source_paths():
+    for item in source_paths:
         kind = item["kind"]
         path = Path(item["path"]).expanduser()
         result = check_one_export(path, kind)
@@ -40,12 +43,39 @@ def check_source_exports(paths: Iterable[Dict[str, str]] | None = None) -> Dict[
     total_warnings = sum(len(x.get("warnings", [])) for x in entries)
     optional_missing = sum(1 for x in entries if x.get("optional_missing"))
     return {
-        "status": "error" if total_errors else ("warn" if total_warnings else "ok"),
+        "status": "error" if total_errors else ("stale" if freshness["stale_exports"] else ("warn" if total_warnings else "ok")),
         "errors": total_errors,
         "warnings": total_warnings,
         "optional_missing": optional_missing,
+        "freshness": freshness,
+        "stale_exports": freshness["stale_exports"],
         "duplicate_ids": duplicate_ids,
         "exports": entries,
+    }
+
+
+def source_freshness(paths: Iterable[Dict[str, str]] | None = None) -> Dict[str, Any]:
+    source_paths = list(paths or default_source_paths())
+    registry = db_path()
+    registry_mtime = registry.stat().st_mtime if registry.exists() else 0.0
+    checked: List[Dict[str, Any]] = []
+    stale: List[Dict[str, Any]] = []
+    for item in source_paths:
+        path = Path(item["path"]).expanduser()
+        exists = path.exists()
+        mtime = path.stat().st_mtime if exists else 0.0
+        row = {"kind": item["kind"], "path": str(path), "exists": exists, "mtime": mtime}
+        checked.append(row)
+        if exists and (not registry.exists() or mtime > registry_mtime + 1.0):
+            stale.append(row)
+    return {
+        "status": "missing_registry" if not registry.exists() else ("stale" if stale else "fresh"),
+        "registry": str(registry),
+        "registry_exists": registry.exists(),
+        "registry_mtime": registry_mtime,
+        "stale_exports": len(stale),
+        "stale": stale,
+        "checked": checked,
     }
 
 
@@ -124,7 +154,8 @@ def validate_card_shape(item: Dict[str, Any], line_no: int, result: Dict[str, An
 def compact_source_health(data: Dict[str, Any]) -> List[str]:
     lines = [
         f"source_exports: {data['status']} errors={data['errors']} "
-        f"warnings={data['warnings']} optional_missing={data.get('optional_missing', 0)}"
+        f"warnings={data['warnings']} optional_missing={data.get('optional_missing', 0)} "
+        f"stale_exports={data.get('stale_exports', 0)}"
     ]
     for item in data.get("exports", []):
         marker = "ok" if item.get("exists") and not item.get("errors") else ("missing" if not item.get("exists") else "error")

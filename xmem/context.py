@@ -4,6 +4,7 @@ import json
 from typing import Any, Dict, List
 
 from .toon import compact
+from .source_check import source_freshness
 from .util import list_after_key, normalize_text
 
 
@@ -63,6 +64,9 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         warnings.append("query matched a correction/dispute overlay; prefer canonical aliases and verify before editing")
     if any(c.get("status") in {"inferred", "partial", "stale", "unknown", "disputed"} for c in cards[:5]):
         warnings.append("some top cards are not verified; use as hints only")
+    freshness = source_freshness()
+    if freshness.get("status") != "fresh":
+        warnings.append("source exports are newer than registry or registry is missing; run xmem sync before relying on this packet")
 
     next_reads = unique_paths(registry[:4] + rules[:3] + methods[:3] + relations[:3] + memories[:3] + evidence[:3])
     packet = {
@@ -85,6 +89,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "memories": [card_brief(c, i + 1) for i, c in enumerate(memories[:5])],
         "relations": [card_brief(c, i + 1) for i, c in enumerate(relations[:5])],
         "evidence": [card_brief(c, i + 1) for i, c in enumerate(evidence[:6])],
+        "source_freshness": freshness_brief(freshness),
         "warnings": warnings,
         "next_reads": next_reads[:10],
         "latest_events": event_briefs(events),
@@ -213,6 +218,18 @@ def supporting_card_brief(card: Dict[str, Any]) -> Dict[str, Any]:
         "source_ref": card.get("source_ref", ""),
         "source_path": card.get("path", ""),
         "title": compact(card.get("title", ""), 96),
+    }
+
+
+def freshness_brief(data: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "status": data.get("status", ""),
+        "stale_exports": data.get("stale_exports", 0),
+        "registry": data.get("registry", ""),
+        "stale": [
+            {"kind": item.get("kind", ""), "path": item.get("path", "")}
+            for item in (data.get("stale") or [])[:5]
+        ],
     }
 
 

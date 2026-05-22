@@ -26,11 +26,12 @@ xmem gain
 
 ## Workflow
 
-1. Run `xmem context "<task>"` before broad repo traversal.
-2. Trust only cards marked `verified`; treat `inferred`, `partial`, `stale`, `unknown`, and `disputed` as hints.
-3. For edits that hit a feature with invariant cards, run `xmem check` before final response.
-4. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
-5. Use `xmem gain` when asked what xmem saved.
+1. Run `xmem context "<task>"` before broad repo traversal or project selection.
+2. If `source_freshness.status` is not `fresh`, run `xmem sync` before relying on the packet.
+3. Trust only cards marked `verified`; treat `inferred`, `partial`, `stale`, `unknown`, and `disputed` as hints.
+4. For edits that hit a feature with invariant cards, run `xmem check` before final response.
+5. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
+6. Use `xmem gain` when asked what xmem saved.
 
 `xmem context` is LLM-first: use `resolution.status`, `suggested_queries`, `correction_guidance`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true. Duplicate cards may be fused; read `supporting_cards` for alternate sources behind the primary card.
 
@@ -64,6 +65,14 @@ These exports are bridge/index inputs only; Project Wiki and Issue Record remain
 Use `xmem check --sources` when Project Wiki or Issue Record changes its export. Missing optional exports are reported as optional_missing; malformed JSONL rows, duplicate ids, invalid truth status, or invalid confidence are errors.
 
 `xmem sync` rebuilds the generated SQLite registry atomically through a temp file and final swap, so concurrent agents should keep reading the previous complete registry until the new one is ready.
+
+## Source Routing
+
+- Project/entity truth goes to Project Wiki: service, repo, domain, branch, deploy target, owner, business name, oral alias.
+- Bug truth goes to Issue Record: symptom, root cause, fix pattern, verification, regression guard, evidence paths.
+- xmem truth stays compact: cross-project method/invariant/relation cards with source pointers only.
+- Do not duplicate full Project Wiki or Issue Record truth into xmem; xmem is the control plane and generated index consumer.
+- When source exports change, require `xmem check --sources` and `xmem sync`; context should be treated as stale until `source_freshness.status` is `fresh`.
 
 ## New folders and corrections
 

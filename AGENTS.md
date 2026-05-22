@@ -8,3 +8,5 @@
 - Keep generated data in `.xmem/` or `~/.xmem/`; do not commit generated SQLite unless requested.
 - Use `./bin/xmem` for local smoke tests.
 - Optimize `context` output for LLM correctness, not terminal prettiness: include resolution status, why, truth state, evidence path, and next reads.
+- xmem is the control plane only: route entity truth to Project Wiki exports, bug truth to Issue Record exports, and keep xmem cards compact with source pointers.
+- Treat stale source exports as a blocker for reliable context; run `xmem check --sources` and `xmem sync` before relying on changed source exports.

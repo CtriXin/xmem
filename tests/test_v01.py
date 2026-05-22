@@ -269,3 +269,39 @@ def test_context_fuses_duplicate_cards_by_title(tmp_path: Path):
     assert matches[0]["id"] == "rule.dupe.verified"
     assert matches[0]["supporting_count"] == 1
     assert matches[0]["supporting_cards"][0]["id"] == "rule.dupe.partial"
+
+
+def test_context_warns_when_source_export_is_newer_than_registry(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    export = tmp_path / "project-wiki" / "data" / "xmem-export.cards.jsonl"
+    export.parent.mkdir(parents=True)
+    export.write_text(
+        json.dumps(
+            {
+                "id": "project-wiki.service.freshness",
+                "type": "wiki.service",
+                "title": "freshness-service",
+                "truth": {"status": "verified", "confidence": 0.9},
+                "summary": "freshness test",
+                "evidence": [{"kind": "test", "ref": "initial"}],
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    run([str(XMEM), "sync", "--json"], repo, env)
+    export.write_text(export.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    registry = Path(env["XMEM_HOME"]) / "registry.sqlite"
+    newer_than_registry = registry.stat().st_mtime + 2
+    os.utime(export, (newer_than_registry, newer_than_registry))
+
+    packet = json.loads(run([str(XMEM), "context", "freshness-service", "--json"], repo, env).stdout)
+
+    assert packet["source_freshness"]["status"] == "stale"
+    assert packet["source_freshness"]["stale_exports"] >= 1
+    assert any("run xmem sync" in warning for warning in packet["warnings"])
+
+    text_packet = run([str(XMEM), "context", "freshness-service"], repo, env).stdout
+    assert "source_freshness:" in text_packet
+    assert "stale_exports:" in text_packet
