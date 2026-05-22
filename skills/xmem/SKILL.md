@@ -43,6 +43,8 @@ When acting as an agent, use xmem hooks without asking the user to remember comm
 
 Hook rule: xmem may create `.xmem/cards/hook.*.yaml`, append a Project Wiki write request, or create an issue seed. It must not silently rewrite Project Wiki Markdown or promote guessed data to a final issue record.
 
+MMS sessions normally inject this skill and run the xmem session-start hook automatically. Do not ask the user to install or remember hook commands inside MMS-launched Codex/Claude/OpenCode/agy sessions.
+
 ## Sync
 
 Use `xmem sync` as the default refresh. It rebuilds `~/.xmem/registry.sqlite` from Project Wiki, issue-tracking, built-in cards, `~/.xmem/cards`, and known local folders in `~/.xmem/sources.json`.
