@@ -466,7 +466,7 @@ def registry_status() -> dict[str, Any]:
         with connect() as conn:
             for table in ("projects", "cards", "evidence", "aliases", "events"):
                 counts[table] = rows(conn, f"SELECT COUNT(*) AS count FROM {table}")[0]["count"]
-    return {
+    data = {
         "xmem_home": str(home_dir()),
         "registry": str(db),
         "registry_exists": db.exists(),
@@ -478,6 +478,29 @@ def registry_status() -> dict[str, Any]:
         "outbox": outbox_counts(),
         "counts": counts,
     }
+    data["next_actions"] = status_next_actions(data)
+    return data
+
+
+def status_next_actions(data: dict[str, Any]) -> list[str]:
+    actions: list[str] = []
+    counts = data.get("counts") or {}
+    source_exports = data.get("source_exports") or {}
+    audit = data.get("local_source_audit") or {}
+    outbox = data.get("outbox") or {}
+    if not data.get("registry_exists") or int(counts.get("cards") or 0) == 0:
+        actions.append("run xmem sync to rebuild the generated registry")
+    if source_exports.get("errors"):
+        actions.append("fix Project Wiki / Issue Record export errors before relying on context")
+    elif source_exports.get("stale_exports"):
+        actions.append("run xmem sync because source exports are newer than registry")
+    if audit.get("local_only_knowledge_cards"):
+        actions.append("decide whether local-only .xmem/cards should be tracked by git or exported by their source project")
+    if int(outbox.get("project_wiki") or 0) or int(outbox.get("issue_tracking") or 0):
+        actions.append("review xmem outbox and promote accepted Project Wiki / Issue Record writes")
+    if not actions:
+        actions.append("no blocking xmem maintenance action")
+    return actions
 
 
 def status_cmd(args: argparse.Namespace) -> int:
@@ -523,6 +546,11 @@ def status_cmd(args: argparse.Namespace) -> int:
             print("counts:")
             for key, value in counts.items():
                 print(f"- {key}: {value}")
+        actions = data.get("next_actions") or []
+        if actions:
+            print("next_actions:")
+            for action in actions:
+                print(f"- {action}")
     return 0
 
 

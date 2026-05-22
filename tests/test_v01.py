@@ -512,9 +512,11 @@ def test_status_reports_local_only_non_identity_cards(tmp_path: Path):
 
     assert audit["local_only_knowledge_cards"] >= 1
     assert detail["ignored_knowledge_cards"] >= 1
+    assert any("local-only .xmem/cards" in action for action in data["next_actions"])
     assert ".xmem/cards/local.rule.yaml" in detail["sample_local_only"]
     assert "local_card_warning" in text
     assert "local_only_knowledge=" in text
+    assert "next_actions:" in text
 
     sources = json.loads(run([str(XMEM), "check", "--sources", "--json"], repo, env).stdout)
     sources_text = run([str(XMEM), "check", "--sources"], repo, env).stdout
