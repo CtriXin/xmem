@@ -5,6 +5,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from xmem.util import query_terms
+
 
 ROOT = Path(__file__).resolve().parents[1]
 XMEM = ROOT / "bin" / "xmem"
@@ -72,6 +74,16 @@ def test_context_expands_wrong_alias_to_canonical_project(tmp_path: Path):
     assert packet["resolution"]["do_not_assume_single_project"] is True
 
 
+def test_multi_word_query_terms_keep_project_and_ads_tokens():
+    terms = query_terms("ptc-intention-information ads.txt group_N adstxt")
+
+    assert "ptc-intention-information" in terms
+    assert "ads.txt" in terms
+    assert "group_n" in terms
+    assert "adstxt" in terms
+    assert "ptc-intention-informationads.txtgroup_nadstxt" not in terms
+
+
 def test_check_uses_registry_invariant_cards(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
@@ -97,3 +109,12 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     assert gain["top_queries"][0]["query"] == "ad lazyload"
     assert gain["recent_queries"][0]["top_card"]
     assert gain["recent_guardrails"]
+
+
+def test_context_next_reads_include_relation_cards(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(run([str(XMEM), "context", "xmem shared skill", "--json"], repo, env).stdout)
+
+    assert any("xmem.installation.yaml" in path for path in packet["next_reads"])

@@ -53,7 +53,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     if any(c.get("status") in {"inferred", "partial", "stale", "unknown", "disputed"} for c in cards[:5]):
         warnings.append("some top cards are not verified; use as hints only")
 
-    next_reads = unique_paths(registry[:4] + rules[:3] + methods[:3] + memories[:3] + evidence[:3])
+    next_reads = unique_paths(registry[:4] + rules[:3] + methods[:3] + relations[:3] + memories[:3] + evidence[:3])
     packet = {
         "schema": "xmem.context.v1",
         "truth_policy": "files/code/runtime are truth; sqlite is generated index/cache",

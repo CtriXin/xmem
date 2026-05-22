@@ -180,15 +180,22 @@ def list_after_key(text: str, key: str) -> List[str]:
 
 
 def query_terms(query: str) -> List[str]:
-    raw = re.findall(r"[A-Za-z0-9_.:-]+|[\u4e00-\u9fff]+", normalize_text(query, loose=False))
+    # Tokenize before compact normalization. normalize_text intentionally removes
+    # whitespace for alias matching; using it here would turn multi-word queries
+    # into one unmatchable token, e.g. "project ads.txt group_n".
+    text = str(query or "").lower().translate(_CN_DIGITS).replace("模版", "模板")
+    raw = re.findall(r"[A-Za-z0-9_.:-]+|[\u4e00-\u9fff]+", text)
     terms: List[str] = []
     for term in raw:
-        if term not in terms:
-            terms.append(term)
-        if re.fullmatch(r"[\u4e00-\u9fff]+", term) and len(term) > 2:
+        variants = [term, normalize_text(term, loose=False), normalize_text(term, loose=True)]
+        for variant in variants:
+            if variant and variant not in terms:
+                terms.append(variant)
+        normalized_term = normalize_text(term, loose=False)
+        if re.fullmatch(r"[\u4e00-\u9fff]+", normalized_term) and len(normalized_term) > 2:
             for size in (2, 3):
-                for i in range(0, len(term) - size + 1):
-                    gram = term[i:i + size]
+                for i in range(0, len(normalized_term) - size + 1):
+                    gram = normalized_term[i:i + size]
                     if gram not in terms:
                         terms.append(gram)
     return terms or [query.lower().strip()]
