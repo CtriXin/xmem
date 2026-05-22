@@ -117,46 +117,48 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width
     impact_width = 10 if dashboard_width < 96 else 12
     event_width = min(22, max(16, dashboard_width - impact_width - 37))
     query_width = max(24, dashboard_width - impact_width - 32)
-    title = paint("XMEM Gain (Global Scope)", "green", color)
+    title = paint("XMEM Gain 收益面板 (Global Scope)", "green", color)
     rule = paint("=" * dashboard_width, "dim", color)
     thin = paint("-" * dashboard_width, "dim", color)
     lines = [
         title,
         rule,
         "",
-        metric("Observed log rows", int(data.get("rows") or 0), color),
+        metric("日志行数", int(data.get("rows") or 0), color),
         metric(
-            "Retrieval calls",
+            "检索调用",
             f"{int(observed.get('retrieval_calls') or 0)} "
             f"(hit {int(observed.get('retrieval_hits') or 0)} / miss {int(observed.get('retrieval_misses') or 0)})",
             color,
         ),
         metric(
-            "Context queries",
+            "context 查询",
             f"{int(observed.get('context_queries') or 0)} "
             f"(hit {int(observed.get('context_hits') or 0)} / miss {int(observed.get('context_misses') or 0)})",
             color,
         ),
         metric(
-            "Preflight queries",
+            "preflight 预检",
             f"{int(observed.get('preflight_queries') or 0)} "
             f"(hit {int(observed.get('preflight_hits') or 0)} / miss {int(observed.get('preflight_misses') or 0)})",
             color,
         ),
-        metric("Context hit rate", f"{hit_rate:.1f}%", color, value_style=rate_style(hit_rate)),
-        metric("Matches returned", int(data.get("matches") or 0), color),
-        metric("Guardrail checks", int(observed.get("guardrail_checks") or 0), color),
-        metric("Rule prevented events", int(observed.get("guardrail_prevented") or 0), color, value_style="yellow"),
-        metric("Est. tokens saved", human_number(int(data.get("estimated_tokens_saved") or 0)), color, value_style="green"),
-        metric("Est. bugs prevented", int(data.get("estimated_bug_prevented") or 0), color, value_style="yellow"),
-        metric("Real fields", "rows/hit/miss/check/matches from logs", color, value_style="dim"),
-        metric("Est. fields", "tokens saved and bugs prevented", color, value_style="dim"),
-        metric("Token formula", "context/preflight matches * 1200", color, value_style="dim"),
-        metric("Efficiency meter", f"{bar(hit_rate, color=color)} {paint(f'{hit_rate:.1f}%', rate_style(hit_rate), color)}", color),
+        metric("context 命中率", f"{hit_rate:.1f}%", color, value_style=rate_style(hit_rate)),
+        metric("返回 matches", int(data.get("matches") or 0), color),
+        metric("guardrail 检查", int(observed.get("guardrail_checks") or 0), color),
+        metric("规则拦截", int(observed.get("guardrail_prevented") or 0), color, value_style="yellow"),
+        metric("估算省 tokens", human_number(int(data.get("estimated_tokens_saved") or 0)), color, value_style="green"),
+        metric("估算避 bug", int(data.get("estimated_bug_prevented") or 0), color, value_style="yellow"),
+        metric("真实字段", "rows / hit / miss / check / matches 来自日志", color, value_style="dim"),
+        metric("估算字段", "tokens saved 和 bugs prevented", color, value_style="dim"),
+        metric("token 估算公式", "context/preflight matches * 1200", color, value_style="dim"),
+        metric("命中率进度", f"{bar(hit_rate, color=color)} {paint(f'{hit_rate:.1f}%', rate_style(hit_rate), color)}", color),
         "",
-        paint("By Event", "green", color),
+        paint("按事件", "green", color),
         thin,
-        f"{'#':>3}  {pad_display('Event', event_width)} {'Count':>6} {'EstSaved':>9} {'Matches':>7} {'Bug':>4}  {pad_display('Impact', impact_width)}",
+        f"{'#':>3}  {pad_display('事件', event_width)} {pad_display('次数', 6, 'right')} "
+        f"{pad_display('估省Token', 9, 'right')} {pad_display('Matches', 7, 'right')} "
+        f"{pad_display('Bug', 4, 'right')}  {pad_display('影响', impact_width)}",
     ]
     for idx, item in enumerate(by_event[:10], 1):
         saved = int(item.get("estimated_tokens_saved") or 0)
@@ -171,12 +173,14 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width
             f"{impact_bar(saved, max_event_saved, impact_width, color=color)}"
         )
     if not by_event:
-        lines.append("  - no gain events logged yet")
+        lines.append("  - 暂无 gain event 日志")
     lines.extend([
         "",
-        paint("Top Queries", "green", color),
+        paint("Top 查询", "green", color),
         thin,
-        f"{'#':>3}  {pad_display('Query', query_width)} {'Count':>6} {'EstSaved':>9} {'Matches':>7}  {pad_display('Impact', impact_width)}",
+        f"{'#':>3}  {pad_display('查询', query_width)} {pad_display('次数', 6, 'right')} "
+        f"{pad_display('估省Token', 9, 'right')} {pad_display('Matches', 7, 'right')}  "
+        f"{pad_display('影响', impact_width)}",
     ])
     for idx, item in enumerate(top_queries[:10], 1):
         query = compact_cell(item.get("query", ""), query_width)
@@ -189,8 +193,8 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width
             f"{impact_bar(saved, max_query_saved, impact_width, color=color)}"
         )
     if not top_queries:
-        lines.append("  - no query events logged yet")
-    lines.extend(["", paint("Recent Guardrails", "green", color), thin])
+        lines.append("  - 暂无 query event 日志")
+    lines.extend(["", paint("最近 guardrail", "green", color), thin])
     if guardrails:
         for item in guardrails[-5:]:
             warnings = int(item.get("warnings") or 0)
@@ -200,7 +204,7 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width
                 f"matched_cards={int(item.get('matched_cards') or 0)}"
             )
     else:
-        lines.append("- no guardrail checks logged yet")
+        lines.append("- 暂无 guardrail check 日志")
     return "\n".join(lines)
 
 
@@ -274,7 +278,7 @@ def impact_bar(value: int, max_value: int, width: int = 18, *, color: bool = Fal
 
 
 def metric(label: str, value: object, color: bool, *, value_style: str = "plain") -> str:
-    return f"{label + ':':<24} {paint(value, value_style, color)}"
+    return f"{pad_display(label + ':', 24)} {paint(value, value_style, color)}"
 
 
 def rate_style(percent: float) -> str:
