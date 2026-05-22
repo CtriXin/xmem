@@ -149,7 +149,8 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width
         metric("Rule prevented events", int(observed.get("guardrail_prevented") or 0), color, value_style="yellow"),
         metric("Est. tokens saved", human_number(int(data.get("estimated_tokens_saved") or 0)), color, value_style="green"),
         metric("Est. bugs prevented", int(data.get("estimated_bug_prevented") or 0), color, value_style="yellow"),
-        metric("Accounting basis", "hit/miss/check logged; savings estimated", color, value_style="dim"),
+        metric("Real fields", "rows/hit/miss/check/matches from logs", color, value_style="dim"),
+        metric("Est. fields", "tokens saved and bugs prevented", color, value_style="dim"),
         metric("Token formula", "context/preflight matches * 1200", color, value_style="dim"),
         metric("Efficiency meter", f"{bar(hit_rate, color=color)} {paint(f'{hit_rate:.1f}%', rate_style(hit_rate), color)}", color),
         "",
@@ -260,7 +261,7 @@ def bar(percent: float, width: int = 28, *, color: bool = False) -> str:
     filled = max(0, min(width, round(width * percent / 100)))
     if not color:
         return "[" + "#" * filled + "." * (width - filled) + "]"
-    return "[" + paint("#" * filled, rate_style(percent), color) + paint("." * (width - filled), "dim", color) + "]"
+    return "[" + paint(" " * filled, f"bg_{rate_style(percent)}", color) + paint(" " * (width - filled), "bg_dim", color) + "]"
 
 
 def impact_bar(value: int, max_value: int, width: int = 18, *, color: bool = False) -> str:
@@ -291,6 +292,9 @@ ANSI = {
     "cyan": "\033[96m",
     "yellow": "\033[93m",
     "red": "\033[91m",
+    "bg_green": "\033[48;5;71m",
+    "bg_yellow": "\033[48;5;179m",
+    "bg_red": "\033[48;5;167m",
     "bg_cyan": "\033[48;5;73m",
     "bg_dim": "\033[48;5;238m",
 }

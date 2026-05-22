@@ -150,7 +150,7 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     assert gain["recent_queries"][0]["top_card"]
     assert gain["recent_guardrails"]
     assert "XMEM Gain (Global Scope)" in text_gain
-    assert "Accounting basis:" in text_gain
+    assert "Real fields:" in text_gain
     assert "By Event" in text_gain
 
 
