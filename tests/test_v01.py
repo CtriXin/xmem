@@ -147,12 +147,17 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     assert gain["top_queries"][0]["query"] == "ad lazyload"
     assert gain["top_queries"][0]["estimated_tokens_saved"] > 0
     assert gain["observed"]["context_hits"] == 1
+    assert gain["calibration"]["status"] == "proxy_only"
+    assert gain["calibration"]["confidence"] == "low"
+    assert gain["calibration"]["needs_review"]
     assert gain["recent_queries"][0]["top_card"]
     assert gain["recent_guardrails"]
     assert "XMEM Gain 收益面板" in text_gain
     assert "日志计数字段:" in text_gain
     assert "命中口径:" in text_gain
     assert "收益口径:" in text_gain
+    assert "自校准状态:" in text_gain
+    assert "待校准高估项" in text_gain
     assert "按事件" in text_gain
 
 

@@ -18,6 +18,7 @@ def summarize_gain(limit: Optional[int] = None) -> Dict[str, object]:
     matches = sum(int(row.get("matches") or 0) for row in rows)
     event_rows = aggregate_events(rows)
     query_rows = aggregate_queries(rows)
+    calibration = build_calibration(rows, query_rows)
     context_total = events.get("context.hit", 0) + events.get("context.miss", 0)
     preflight_total = events.get("preflight.hit", 0) + events.get("preflight.miss", 0)
     retrieval_hits = sum(value for key, value in events.items() if str(key).endswith(".hit"))
@@ -72,6 +73,7 @@ def summarize_gain(limit: Optional[int] = None) -> Dict[str, object]:
             "guardrail_checks": sum(value for key, value in events.items() if str(key).startswith(("check.", "rule."))),
             "guardrail_prevented": events.get("rule.prevented", 0),
         },
+        "calibration": calibration,
         "by_event": event_rows,
         "top_queries": query_rows or [{"query": query, "count": count} for query, count in queries.most_common(10)],
         "recent_queries": recent_queries,
@@ -109,11 +111,56 @@ def aggregate_queries(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return sorted(out.values(), key=lambda item: (int(item["estimated_tokens_saved"]), int(item["count"])), reverse=True)[:10]
 
 
+def build_calibration(rows: List[Dict[str, Any]], top_queries: List[Dict[str, Any]]) -> Dict[str, object]:
+    retrieval_rows = [row for row in rows if row.get("query")]
+    estimated_rows = [row for row in rows if int(row.get("estimated_tokens_saved") or 0) or int(row.get("estimated_bug_prevented") or 0)]
+    confirmed = [row for row in rows if str(row.get("event") or "") == "gain.confirmed"]
+    rejected = [row for row in rows if str(row.get("event") or "") == "gain.rejected"]
+    score_rows = [row for row in retrieval_rows if float(row.get("top_score") or 0) > 0]
+    verified_rows = [row for row in retrieval_rows if str(row.get("top_status") or "") == "verified"]
+    avg_score = round(sum(float(row.get("top_score") or 0) for row in score_rows) / len(score_rows), 2) if score_rows else 0.0
+    status = "telemetry_only"
+    confidence = "low"
+    if confirmed or rejected:
+        status = "partially_calibrated"
+        confidence = "medium"
+    elif score_rows:
+        status = "proxy_only"
+    needs_review = []
+    for item in top_queries[:5]:
+        saved = int(item.get("estimated_tokens_saved") or 0)
+        if saved <= 0:
+            continue
+        needs_review.append(
+            {
+                "query": item.get("query", ""),
+                "count": int(item.get("count") or 0),
+                "matches": int(item.get("matches") or 0),
+                "rough_tokens": saved,
+                "reason": "high rough estimate without confirmed outcome",
+            }
+        )
+    return {
+        "status": status,
+        "confidence": confidence,
+        "confirmed": len(confirmed),
+        "rejected": len(rejected),
+        "retrieval_rows": len(retrieval_rows),
+        "estimated_rows": len(estimated_rows),
+        "scored_rows": len(score_rows),
+        "verified_top_rows": len(verified_rows),
+        "avg_top_score": avg_score,
+        "needs_review": needs_review,
+        "truth_statement": "telemetry/proxy only; cannot prove actual token savings or avoided production bugs without confirmation",
+    }
+
+
 def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width: Optional[int] = None) -> str:
     observed = data.get("observed") if isinstance(data.get("observed"), dict) else {}
     by_event = data.get("by_event") if isinstance(data.get("by_event"), list) else []
     top_queries = data.get("top_queries") if isinstance(data.get("top_queries"), list) else []
     guardrails = data.get("recent_guardrails") if isinstance(data.get("recent_guardrails"), list) else []
+    calibration = data.get("calibration") if isinstance(data.get("calibration"), dict) else {}
     hit_rate = float(observed.get("context_hit_rate", 0) or 0)
     max_event_saved = max([int(item.get("estimated_tokens_saved") or 0) for item in by_event] or [0])
     max_query_saved = max([int(item.get("estimated_tokens_saved") or 0) for item in top_queries] or [0])
@@ -165,6 +212,12 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width
         metric("命中口径", "hit=搜到候选，不代表人工确认正确", color, value_style="dim"),
         metric("收益口径", "未校准，只能看趋势，不能证明立竿见影", color, value_style="dim"),
         metric("token 估算公式", "context/preflight matches * 1200", color, value_style="dim"),
+        metric(
+            "自校准状态",
+            f"{calibration_status_text(calibration)}；avg top_score={float(calibration.get('avg_top_score') or 0):.2f}",
+            color,
+            value_style="yellow" if calibration.get("confidence") == "low" else "green",
+        ),
         metric("命中率进度", f"{bar(hit_rate, color=color)} {paint(f'{hit_rate:.1f}%', rate_style(hit_rate), color)}", color),
         "",
         paint("按事件", "green", color),
@@ -207,6 +260,17 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width
         )
     if not top_queries:
         lines.append("  - 暂无 query event 日志")
+    review_items = calibration.get("needs_review") if isinstance(calibration.get("needs_review"), list) else []
+    lines.extend(["", paint("待校准高估项", "green", color), thin])
+    if review_items:
+        for item in review_items[:5]:
+            lines.append(
+                f"- {compact_cell(item.get('query', ''), max(24, query_width - 10))}: "
+                f"粗估={human_number(int(item.get('rough_tokens') or 0))} "
+                f"count={int(item.get('count') or 0)} matches={int(item.get('matches') or 0)}"
+            )
+    else:
+        lines.append("- 暂无需要校准的高估项")
     lines.extend(["", paint("最近 guardrail", "green", color), thin])
     if guardrails:
         for item in guardrails[-5:]:
@@ -235,6 +299,18 @@ def gain_scope_text(data: Dict[str, object]) -> str:
         return "全部 gain 日志（含 agent 自测）"
     limit = data.get("limit")
     return f"最近 {int(limit or 0)} 条 gain 日志（含 agent 自测）"
+
+
+def calibration_status_text(calibration: Dict[str, object]) -> str:
+    status = str(calibration.get("status") or "telemetry_only")
+    confidence = str(calibration.get("confidence") or "low")
+    if status == "partially_calibrated":
+        label = "部分校准"
+    elif status == "proxy_only":
+        label = "只有 proxy"
+    else:
+        label = "只有 telemetry"
+    return f"{label} / {confidence}"
 
 
 def compact_cell(value: object, width: int) -> str:

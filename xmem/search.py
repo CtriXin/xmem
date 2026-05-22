@@ -104,6 +104,9 @@ def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_
             "estimate_kind": "rough_upper_bound_not_billing" if estimated_tokens_saved else "",
             "top_card": top.get("card_id", ""),
             "top_score": top.get("score", 0),
+            "top_status": top.get("status", ""),
+            "top_confidence": top.get("confidence", 0),
+            "top_why": top.get("why", ""),
             "sources": sorted({str(card.get("source") or "") for card in result if card.get("source")})[:6],
         })
     return result
