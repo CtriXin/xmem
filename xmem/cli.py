@@ -99,6 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
     gain = sub.add_parser("gain", help="Show xmem savings/guardrail stats")
     gain.add_argument("--json", action="store_true")
     gain.add_argument("--no-color", action="store_true", help="Disable ANSI colors in dashboard output")
+    gain.add_argument("--limit", type=int, default=None, help="Only read the latest N gain log rows; default reads all rows")
 
     tail = sub.add_parser("tail", help="Show recent registry events")
     tail.add_argument("--limit", type=int, default=10)
@@ -241,7 +242,7 @@ def main(argv: List[str] | None = None) -> int:
             print("ok")
         return 0
     if args.cmd == "gain":
-        data = summarize_gain()
+        data = summarize_gain(limit=args.limit)
         if args.json:
             print(json.dumps(data, ensure_ascii=False, indent=2))
         else:
@@ -296,7 +297,7 @@ def help_cmd() -> int:
                 "- xmem open <id|words>     # card/evidence excerpt",
                 "- xmem new                 # create/register .xmem for this folder",
                 "- xmem fix                 # prompted alias correction/dispute",
-                "- xmem gain                # savings stats",
+                "- xmem gain                # telemetry + rough savings hints",
                 "- agent hooks              # auto-managed: start/finish/fix -> xmem/wiki/issue queues",
                 "",
                 "truth: files/cards/wiki/issues/code are source; SQLite is only cache/index",

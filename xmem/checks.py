@@ -42,6 +42,7 @@ def check_diff(path: Path) -> Dict[str, object]:
         "ts": utc_now(), "event": event, "warnings": len(warnings),
         "checked_cards": len(cards), "matched_cards": relevant,
         "estimated_bug_prevented": 1 if warnings else 0,
+        "estimate_kind": "risk_hint_not_actual_bug" if warnings else "",
         "changed_files": changed_files[:20],
         "warning_cards": [item.get("card", "") for item in warnings[:20]],
     })

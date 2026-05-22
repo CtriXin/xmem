@@ -152,6 +152,7 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     assert "XMEM Gain 收益面板" in text_gain
     assert "日志计数字段:" in text_gain
     assert "命中口径:" in text_gain
+    assert "收益口径:" in text_gain
     assert "按事件" in text_gain
 
 

@@ -12,7 +12,7 @@ Current package version: `0.1.6`.
 - Import read-only sources such as Project Wiki and issue-tracking.
 - Return compact agent context with freshness and evidence status.
 - Return development preflight packets that surface historical bug patterns before edits.
-- Track rough token savings and prevented regressions with `xmem gain`.
+- Track xmem telemetry and rough, uncalibrated savings hints with `xmem gain`.
 
 ## Quick start
 
@@ -182,7 +182,7 @@ If a query hits a correction card, xmem expands the canonical alias as an extra 
 
 `xmem check` inspects the current git diff against local and indexed `invariant` / `rule` / `guard` cards. It is intentionally lightweight: it looks for explicit `diff_guard.warn_if_removed`, `warn_if_added`, and `forbid` terms and exits non-zero for human-visible warnings.
 
-`xmem gain` summarizes recent lookup, `context`, `preflight`, and `check` events. Hit/miss/pass/prevented counts come from `~/.xmem/gain.jsonl`; token savings are rough estimates for context/preflight matches only, and prevented regressions are estimated from rule warnings.
+`xmem gain` summarizes lookup, `context`, `preflight`, and `check` telemetry from `~/.xmem/gain.jsonl`. Hit/miss/pass/prevented are log counts; `hit` only means candidates were returned. Token savings are rough, uncalibrated estimates for context/preflight matches only, not billing truth. Risk hints come from rule warnings, not confirmed production bugs. By default, `xmem gain` reads all gain rows; use `--limit N` only when you want a recent slice.
 
 ## Useful commands
 

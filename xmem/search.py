@@ -101,6 +101,7 @@ def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_
             "cards_considered": len(cards),
             "estimated_tokens_saved": estimated_tokens_saved,
             "estimate_formula": "matches * 1200" if estimated_tokens_saved else "",
+            "estimate_kind": "rough_upper_bound_not_billing" if estimated_tokens_saved else "",
             "top_card": top.get("card_id", ""),
             "top_score": top.get("score", 0),
             "sources": sorted({str(card.get("source") or "") for card in result if card.get("source")})[:6],

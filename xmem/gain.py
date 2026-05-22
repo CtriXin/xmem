@@ -8,10 +8,11 @@ from typing import Any, Dict, List, Optional
 from .util import home_dir, load_jsonl
 
 
-def summarize_gain(limit: int = 500) -> Dict[str, object]:
+def summarize_gain(limit: Optional[int] = None) -> Dict[str, object]:
     rows = load_jsonl(home_dir() / "gain.jsonl", limit=limit)
     events = Counter(row.get("event", "unknown") for row in rows)
     queries = Counter(str(row.get("query") or "") for row in rows if row.get("query"))
+    top_cards = {str(row.get("top_card") or "") for row in rows if row.get("top_card")}
     tokens = sum(int(row.get("estimated_tokens_saved") or 0) for row in rows)
     bugs = sum(int(row.get("estimated_bug_prevented") or 0) for row in rows)
     matches = sum(int(row.get("matches") or 0) for row in rows)
@@ -49,12 +50,15 @@ def summarize_gain(limit: int = 500) -> Dict[str, object]:
     return {
         "events": dict(events),
         "limit": limit,
+        "scope": "all" if limit is None else "latest",
         "estimated_tokens_saved": tokens,
         "estimated_bug_prevented": bugs,
         "matches": matches,
         "rows": len(rows),
         "observed": {
             "logged_rows": len(rows),
+            "unique_queries": len(queries),
+            "unique_top_cards": len(top_cards),
             "retrieval_calls": retrieval_total,
             "retrieval_hits": retrieval_hits,
             "retrieval_misses": retrieval_misses,
@@ -125,8 +129,13 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width
         title,
         rule,
         "",
-        metric("统计范围", f"最近 {int(data.get('limit') or 500)} 条 gain 日志（含 agent 自测）", color, value_style="dim"),
+        metric("统计范围", gain_scope_text(data), color, value_style="dim"),
         metric("读取日志行数", int(data.get("rows") or 0), color),
+        metric(
+            "去重查询/card",
+            f"{int(observed.get('unique_queries') or 0)} queries / {int(observed.get('unique_top_cards') or 0)} top cards",
+            color,
+        ),
         metric(
             "检索调用",
             f"{int(observed.get('retrieval_calls') or 0)} "
@@ -149,19 +158,20 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width
         metric("返回候选累计", int(data.get("matches") or 0), color),
         metric("check 运行次数", int(observed.get("guardrail_checks") or 0), color),
         metric("规则告警次数", int(observed.get("guardrail_prevented") or 0), color, value_style="yellow"),
-        metric("粗估省 tokens", human_number(int(data.get("estimated_tokens_saved") or 0)), color, value_style="green"),
-        metric("粗估风险提示", int(data.get("estimated_bug_prevented") or 0), color, value_style="yellow"),
+        metric("理论少读 tokens", human_number(int(data.get("estimated_tokens_saved") or 0)), color, value_style="green"),
+        metric("风险提示次数", int(data.get("estimated_bug_prevented") or 0), color, value_style="yellow"),
         metric("日志计数字段", "rows / hit / miss / check / matches", color, value_style="dim"),
-        metric("估算字段(非事实)", "tokens saved 和 risk hints", color, value_style="dim"),
+        metric("估算字段(非事实)", "理论少读 tokens；不是账单/真实省量", color, value_style="dim"),
         metric("命中口径", "hit=搜到候选，不代表人工确认正确", color, value_style="dim"),
+        metric("收益口径", "未校准，只能看趋势，不能证明立竿见影", color, value_style="dim"),
         metric("token 估算公式", "context/preflight matches * 1200", color, value_style="dim"),
         metric("命中率进度", f"{bar(hit_rate, color=color)} {paint(f'{hit_rate:.1f}%', rate_style(hit_rate), color)}", color),
         "",
         paint("按事件", "green", color),
         thin,
         f"{'#':>3}  {pad_display('事件', event_width)} {pad_display('次数', 6, 'right')} "
-        f"{pad_display('估省Token', 9, 'right')} {pad_display('Matches', 7, 'right')} "
-        f"{pad_display('Bug', 4, 'right')}  {pad_display('影响', impact_width)}",
+        f"{pad_display('粗估Token', 9, 'right')} {pad_display('Matches', 7, 'right')} "
+        f"{pad_display('风险', 4, 'right')}  {pad_display('影响', impact_width)}",
     ]
     for idx, item in enumerate(by_event[:10], 1):
         saved = int(item.get("estimated_tokens_saved") or 0)
@@ -182,7 +192,7 @@ def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width
         paint("Top 查询", "green", color),
         thin,
         f"{'#':>3}  {pad_display('查询', query_width)} {pad_display('次数', 6, 'right')} "
-        f"{pad_display('估省Token', 9, 'right')} {pad_display('Matches', 7, 'right')}  "
+        f"{pad_display('粗估Token', 9, 'right')} {pad_display('Matches', 7, 'right')}  "
         f"{pad_display('影响', impact_width)}",
     ])
     for idx, item in enumerate(top_queries[:10], 1):
@@ -218,6 +228,13 @@ def human_number(value: int) -> str:
     if abs_value >= 1_000:
         return f"{value / 1_000:.1f}K"
     return str(value)
+
+
+def gain_scope_text(data: Dict[str, object]) -> str:
+    if data.get("scope") == "all":
+        return "全部 gain 日志（含 agent 自测）"
+    limit = data.get("limit")
+    return f"最近 {int(limit or 0)} 条 gain 日志（含 agent 自测）"
 
 
 def compact_cell(value: object, width: int) -> str:
