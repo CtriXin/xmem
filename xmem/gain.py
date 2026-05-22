@@ -269,7 +269,7 @@ def impact_bar(value: int, max_value: int, width: int = 18, *, color: bool = Fal
     filled = max(1, min(width, round(width * value / max_value)))
     if not color:
         return "#" * filled + "." * (width - filled)
-    return paint("#" * filled, "cyan", color) + paint("." * (width - filled), "dim", color)
+    return paint(" " * filled, "bg_cyan", color) + paint(" " * (width - filled), "bg_dim", color)
 
 
 def metric(label: str, value: object, color: bool, *, value_style: str = "plain") -> str:
