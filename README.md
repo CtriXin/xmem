@@ -96,10 +96,13 @@ xmem rebuild                           # rebuild SQLite from file truth sources
 
 ## Installed local links
 
-On this machine the current working copy is linked as:
+On this machine the CLI points at this repo, while agent skill directories point at the shared skill copy:
 
 ```text
-/Users/xin/.local/bin/xmem -> bin/xmem
-/Users/xin/.codex/skills/xmem -> skills/xmem
-/Users/xin/.claude/skills/xmem -> skills/xmem
+/Users/xin/.local/bin/xmem -> /Users/xin/auto-skills/CtriXin-repo/xmem/bin/xmem
+/Users/xin/auto-skills/shared-skills/xmem
+/Users/xin/.codex/skills/xmem -> /Users/xin/auto-skills/shared-skills/xmem
+/Users/xin/.claude/skills/xmem -> /Users/xin/auto-skills/shared-skills/xmem
+/Users/xin/.opencode/skills/xmem -> /Users/xin/auto-skills/shared-skills/xmem
+/Users/xin/.agents/skills/xmem -> /Users/xin/auto-skills/shared-skills/xmem
 ```
