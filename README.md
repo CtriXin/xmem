@@ -2,6 +2,8 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
+Current package version: `0.1.6`.
+
 ## Goals
 
 - Resolve project identity across aliases, folders, services, domains, and branches.
