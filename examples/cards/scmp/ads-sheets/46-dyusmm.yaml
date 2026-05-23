@@ -1,0 +1,72 @@
+id: scmp.ads-sheet.dyusmm
+type: relation
+title: 下载站模版一 1个 0407 -> ptc-v5-download1
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: dyuSmm
+  sheet_title: 下载站模版一 1个 0407
+aliases:
+  - 下载站模版一 1个 0407
+  - Feishu sheet 下载站模版一 1个 0407
+  - 广告表 下载站模版一 1个 0407
+  - 1001广告表 下载站模版一 1个 0407
+  - ptc-v5-download1
+  - "git@gitlab.adsconflux.xyz:ptc/fe/ptc-v5-download1.git"
+  - apk.voipdictionary.com
+truth:
+  status: partial
+  confidence: 0.68
+  basis:
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: majority_service_is_routing_hint; live_verify_domain_binding_before_deploy_or_switch
+summary: Feishu sheet tab 下载站模版一 1个 0407 has one current domain resolving to ptc-v5-download1; useful alias hint, but not a majority-backed truth.
+resolution: sheet_alias=下载站模版一 1个 0407; majority_service=ptc-v5-download1; ratio=1/1; strength=single_domain_hint
+effect: Use this as a one-domain alias hint only; verify lookup/rf and ask for confirmation before promoting sheet title to project truth.
+project: ptc-v5-download1
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=dyuSmm"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: dyuSmm
+  sheet_title: 下载站模版一 1个 0407
+current_majority:
+  service: ptc-v5-download1
+  repo: "git@gitlab.adsconflux.xyz:ptc/fe/ptc-v5-download1.git"
+  repo_name: ptc-v5-download1
+  latest_branch_hint: main
+  count: 1
+  resolved_domains: 1
+  sheet_domains: 1
+  ratio: 1.0
+  status: single_domain_current
+service_counts:
+  -
+    service: ptc-v5-download1
+    count: 1
+domains:
+  - apk.voipdictionary.com => service=ptc-v5-download1; rf=match; repo=ptc-v5-download1; branch_hint=main
+lookup_rf_mismatches:
+  []
+stale_policy:
+  - The Feishu sheet is naming/context evidence, not current deployment truth by itself.
+  - Current service/repo in this card comes from the lookup/rf snapshot at last_checked_at.
+  - Domain-to-service binding, latest branch, deploy run, and traffic state must be live-verified before deploy or switch.
+  - Do not infer test-environment semantics only because a service name contains -test.
+evidence:
+  -
+    kind: feishu-sheet
+    path: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=dyuSmm"
+    ref: "TBBjs3msohDx1ctQTejcjLrXnhg:dyuSmm"
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: majority=ptc-v5-download1
+  -
+    kind: rf-getcf-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: domains=1

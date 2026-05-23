@@ -243,6 +243,37 @@ def test_context_next_reads_include_relation_cards(tmp_path: Path):
     assert any("xmem.installation.yaml" in path for path in packet["next_reads"])
 
 
+def test_verified_relation_card_can_resolve_context(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    card = tmp_path / "sheet-relation.yaml"
+    card.write_text(
+        "\n".join(
+            [
+                "id: scmp.ads-sheet.demo",
+                "type: relation",
+                "title: Demo sheet -> demo-service",
+                "aliases:",
+                "  - Demo sheet",
+                "  - demo.example.com",
+                "truth:",
+                "  status: verified",
+                "  confidence: 0.92",
+                "summary: Demo sheet resolves 10/10 domains to demo-service by current lookup/rf.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    run([str(XMEM), "import", "cards", str(card)], repo, env)
+
+    packet = json.loads(run([str(XMEM), "context", "Demo sheet demo.example.com", "--json"], repo, env).stdout)
+
+    assert packet["resolution"]["status"] == "resolved"
+    assert packet["resolution"]["do_not_assume_single_project"] is False
+    assert packet["relations"][0]["id"] == "scmp.ads-sheet.demo"
+    assert "verified relation card" in packet["resolution"]["reason"]
+
+
 def test_project_wiki_can_import_xmem_export_only(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     wiki = tmp_path / "project-wiki"

@@ -1,0 +1,83 @@
+id: scmp.ads-sheet.hsmopq
+type: relation
+title: AI prompt模版一·6个 0209 -> ptc-ai-prompt-v1
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: HSMOPq
+  sheet_title: AI prompt模版一·6个 0209
+aliases:
+  - AI prompt模版一·6个 0209
+  - Feishu sheet AI prompt模版一·6个 0209
+  - 广告表 AI prompt模版一·6个 0209
+  - 1001广告表 AI prompt模版一·6个 0209
+  - ptc-ai-prompt-v1
+  - ptc-v5-ai-prompt-v1
+  - "git@gitlab.adsconflux.xyz:ptc/fe/ptc-v5-ai-prompt-v1.git"
+  - bmccphilly.com
+  - cmshy1.com
+  - aiprompts.one
+  - aipromptcorp.com
+  - aiprompstips.com
+  - drflorimcuculi.com
+truth:
+  status: verified
+  confidence: 0.91
+  basis:
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: majority_service_is_routing_hint; live_verify_domain_binding_before_deploy_or_switch
+summary: Feishu sheet tab AI prompt模版一·6个 0209 has 6 domains; current lookup/rf resolves 6/6 (100%) to ptc-ai-prompt-v1. Treat sheet name as a majority-backed business alias for this service/repo, then live-verify before deploy or traffic switch.
+resolution: sheet_alias=AI prompt模版一·6个 0209; majority_service=ptc-ai-prompt-v1; ratio=6/6; strength=strong_majority_alias
+effect: Skip browsing all Feishu tabs or scanning issue-tracking for this sheet identity; start from current majority service/repo, then verify lookup/rf live for target domains.
+project: ptc-v5-ai-prompt-v1
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=HSMOPq"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: HSMOPq
+  sheet_title: AI prompt模版一·6个 0209
+current_majority:
+  service: ptc-ai-prompt-v1
+  repo: "git@gitlab.adsconflux.xyz:ptc/fe/ptc-v5-ai-prompt-v1.git"
+  repo_name: ptc-v5-ai-prompt-v1
+  latest_branch_hint: 1.0.1.14
+  count: 6
+  resolved_domains: 6
+  sheet_domains: 6
+  ratio: 1.0
+  status: verified_majority
+service_counts:
+  -
+    service: ptc-ai-prompt-v1
+    count: 6
+domains:
+  - bmccphilly.com => service=ptc-ai-prompt-v1; rf=match; repo=ptc-v5-ai-prompt-v1; branch_hint=1.0.1.14
+  - cmshy1.com => service=ptc-ai-prompt-v1; rf=match; repo=ptc-v5-ai-prompt-v1; branch_hint=1.0.1.14
+  - aiprompts.one => service=ptc-ai-prompt-v1; rf=match; repo=ptc-v5-ai-prompt-v1; branch_hint=1.0.1.14
+  - aipromptcorp.com => service=ptc-ai-prompt-v1; rf=match; repo=ptc-v5-ai-prompt-v1; branch_hint=1.0.1.14
+  - aiprompstips.com => service=ptc-ai-prompt-v1; rf=match; repo=ptc-v5-ai-prompt-v1; branch_hint=1.0.1.14
+  - drflorimcuculi.com => service=ptc-ai-prompt-v1; rf=match; repo=ptc-v5-ai-prompt-v1; branch_hint=1.0.1.14
+lookup_rf_mismatches:
+  []
+stale_policy:
+  - The Feishu sheet is naming/context evidence, not current deployment truth by itself.
+  - Current service/repo in this card comes from the lookup/rf snapshot at last_checked_at.
+  - Domain-to-service binding, latest branch, deploy run, and traffic state must be live-verified before deploy or switch.
+  - Do not infer test-environment semantics only because a service name contains -test.
+evidence:
+  -
+    kind: feishu-sheet
+    path: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=HSMOPq"
+    ref: "TBBjs3msohDx1ctQTejcjLrXnhg:HSMOPq"
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: majority=ptc-ai-prompt-v1
+  -
+    kind: rf-getcf-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: domains=6

@@ -1,0 +1,91 @@
+id: scmp.ads-sheet.4dtxt0
+type: relation
+title: 网文小说模版一10个 0417 -> ptc-v5-novabeats
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: 4DtXt0
+  sheet_title: 网文小说模版一10个 0417
+aliases:
+  - 网文小说模版一10个 0417
+  - Feishu sheet 网文小说模版一10个 0417
+  - 广告表 网文小说模版一10个 0417
+  - 1001广告表 网文小说模版一10个 0417
+  - ptc-v5-novabeats
+  - ai_novabeats
+  - "git@gitlab.adsconflux.xyz:ptc/fe/ai_novabeats.git"
+  - adventure.storygi.com
+  - thriller.storygi.com
+  - mystery.storygi.com
+  - drama.storygi.com
+  - romance.storygi.com
+  - fantasy.storygi.com
+  - historical.storygi.com
+  - comedy.storygi.com
+  - action.storygi.com
+  - horror.storygi.com
+truth:
+  status: verified
+  confidence: 0.93
+  basis:
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: majority_service_is_routing_hint; live_verify_domain_binding_before_deploy_or_switch
+summary: Feishu sheet tab 网文小说模版一10个 0417 has 10 domains; current lookup/rf resolves 10/10 (100%) to ptc-v5-novabeats. Treat sheet name as a majority-backed business alias for this service/repo, then live-verify before deploy or traffic switch.
+resolution: sheet_alias=网文小说模版一10个 0417; majority_service=ptc-v5-novabeats; ratio=10/10; strength=strong_majority_alias
+effect: Skip browsing all Feishu tabs or scanning issue-tracking for this sheet identity; start from current majority service/repo, then verify lookup/rf live for target domains.
+project: ai_novabeats
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=4DtXt0"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: 4DtXt0
+  sheet_title: 网文小说模版一10个 0417
+current_majority:
+  service: ptc-v5-novabeats
+  repo: "git@gitlab.adsconflux.xyz:ptc/fe/ai_novabeats.git"
+  repo_name: ai_novabeats
+  latest_branch_hint: t102748-home3-ads-20260522
+  count: 10
+  resolved_domains: 10
+  sheet_domains: 10
+  ratio: 1.0
+  status: verified_majority
+service_counts:
+  -
+    service: ptc-v5-novabeats
+    count: 10
+domains:
+  - adventure.storygi.com => service=ptc-v5-novabeats; rf=match; repo=ai_novabeats; branch_hint=t102748-home3-ads-20260522
+  - thriller.storygi.com => service=ptc-v5-novabeats; rf=match; repo=ai_novabeats; branch_hint=t102748-home3-ads-20260522
+  - mystery.storygi.com => service=ptc-v5-novabeats; rf=match; repo=ai_novabeats; branch_hint=t102748-home3-ads-20260522
+  - drama.storygi.com => service=ptc-v5-novabeats; rf=match; repo=ai_novabeats; branch_hint=t102748-home3-ads-20260522
+  - romance.storygi.com => service=ptc-v5-novabeats; rf=match; repo=ai_novabeats; branch_hint=t102748-home3-ads-20260522
+  - fantasy.storygi.com => service=ptc-v5-novabeats; rf=match; repo=ai_novabeats; branch_hint=t102748-home3-ads-20260522
+  - historical.storygi.com => service=ptc-v5-novabeats; rf=match; repo=ai_novabeats; branch_hint=t102748-home3-ads-20260522
+  - comedy.storygi.com => service=ptc-v5-novabeats; rf=match; repo=ai_novabeats; branch_hint=t102748-home3-ads-20260522
+  - action.storygi.com => service=ptc-v5-novabeats; rf=match; repo=ai_novabeats; branch_hint=t102748-home3-ads-20260522
+  - horror.storygi.com => service=ptc-v5-novabeats; rf=match; repo=ai_novabeats; branch_hint=t102748-home3-ads-20260522
+lookup_rf_mismatches:
+  []
+stale_policy:
+  - The Feishu sheet is naming/context evidence, not current deployment truth by itself.
+  - Current service/repo in this card comes from the lookup/rf snapshot at last_checked_at.
+  - Domain-to-service binding, latest branch, deploy run, and traffic state must be live-verified before deploy or switch.
+  - Do not infer test-environment semantics only because a service name contains -test.
+evidence:
+  -
+    kind: feishu-sheet
+    path: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=4DtXt0"
+    ref: "TBBjs3msohDx1ctQTejcjLrXnhg:4DtXt0"
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: majority=ptc-v5-novabeats
+  -
+    kind: rf-getcf-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: domains=10

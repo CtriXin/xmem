@@ -1,0 +1,99 @@
+id: scmp.ads-sheet.i8hh6c
+type: relation
+title: Crypto模版三 10个 0128 -> ptc-temp-crypto-v3
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: i8hh6C
+  sheet_title: Crypto模版三 10个 0128
+aliases:
+  - Crypto模版三 10个 0128
+  - Feishu sheet Crypto模版三 10个 0128
+  - 广告表 Crypto模版三 10个 0128
+  - 1001广告表 Crypto模版三 10个 0128
+  - ptc-temp-crypto-v3
+  - ptc_ssr_crypto
+  - "git@gitlab.adsconflux.xyz:ptc/fe/ptc_ssr_crypto.git"
+  - daisypixels.cc
+  - twidouga.live
+  - coinsbasement.com
+  - cryptosmarket.one
+  - cryptocapture.info
+  - crypto.coinhubgo.com
+  - cryptoinfo.coinhubgo.com
+  - market.coinhubgo.com
+  - coinbase.coinhubgo.com
+  - coinmarket.coinhubgo.com
+truth:
+  status: partial
+  confidence: 0.55
+  basis:
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: majority_service_is_routing_hint; live_verify_domain_binding_before_deploy_or_switch
+summary: "Feishu sheet tab Crypto模版三 10个 0128 is mixed: current lookup/rf majority is ptc-temp-crypto-v3 with 5/10 (50%); keep as hint-only until reviewed."
+resolution: sheet_alias=Crypto模版三 10个 0128; majority_service=ptc-temp-crypto-v3; ratio=5/10; strength=mixed_hint_only
+effect: Use majority service only as a weak routing hint; refresh lookup/rf or ask human before promotion or deployment decisions.
+project: ptc_ssr_crypto
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=i8hh6C"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: i8hh6C
+  sheet_title: Crypto模版三 10个 0128
+current_majority:
+  service: ptc-temp-crypto-v3
+  repo: "git@gitlab.adsconflux.xyz:ptc/fe/ptc_ssr_crypto.git"
+  repo_name: ptc_ssr_crypto
+  latest_branch_hint: v3-1.0.1.16
+  count: 5
+  resolved_domains: 10
+  sheet_domains: 10
+  ratio: 0.5
+  status: mixed_or_conflicting
+service_counts:
+  -
+    service: UNKNOWN
+    count: 5
+  -
+    service: ptc-temp-crypto-v3
+    count: 5
+domains:
+  - daisypixels.cc => service=ptc-temp-crypto-v3; rf=match; repo=ptc_ssr_crypto; branch_hint=v3-1.0.1.16
+  - twidouga.live => service=ptc-temp-crypto-v3; rf=match; repo=ptc_ssr_crypto; branch_hint=v3-1.0.1.16
+  - coinsbasement.com => service=ptc-temp-crypto-v3; rf=match; repo=ptc_ssr_crypto; branch_hint=v3-1.0.1.16
+  - cryptosmarket.one => service=ptc-temp-crypto-v3; rf=match; repo=ptc_ssr_crypto; branch_hint=v3-1.0.1.16
+  - cryptocapture.info => service=ptc-temp-crypto-v3; rf=match; repo=ptc_ssr_crypto; branch_hint=v3-1.0.1.16
+  - crypto.coinhubgo.com => service=UNKNOWN
+  - cryptoinfo.coinhubgo.com => service=UNKNOWN
+  - market.coinhubgo.com => service=UNKNOWN
+  - coinbase.coinhubgo.com => service=UNKNOWN
+  - coinmarket.coinhubgo.com => service=UNKNOWN
+  - crypto.coinhubgo.com => service=UNKNOWN
+  - cryptoinfo.coinhubgo.com => service=UNKNOWN
+  - market.coinhubgo.com => service=UNKNOWN
+  - coinbase.coinhubgo.com => service=UNKNOWN
+  - coinmarket.coinhubgo.com => service=UNKNOWN
+lookup_rf_mismatches:
+  []
+stale_policy:
+  - The Feishu sheet is naming/context evidence, not current deployment truth by itself.
+  - Current service/repo in this card comes from the lookup/rf snapshot at last_checked_at.
+  - Domain-to-service binding, latest branch, deploy run, and traffic state must be live-verified before deploy or switch.
+  - Do not infer test-environment semantics only because a service name contains -test.
+evidence:
+  -
+    kind: feishu-sheet
+    path: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=i8hh6C"
+    ref: "TBBjs3msohDx1ctQTejcjLrXnhg:i8hh6C"
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: majority=ptc-temp-crypto-v3
+  -
+    kind: rf-getcf-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: domains=10

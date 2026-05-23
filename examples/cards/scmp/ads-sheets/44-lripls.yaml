@@ -1,0 +1,90 @@
+id: scmp.ads-sheet.lripls
+type: relation
+title: 宜居城市模版二 10个 0402 -> ptc-livablecities2
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: lrIpls
+  sheet_title: 宜居城市模版二 10个 0402
+aliases:
+  - 宜居城市模版二 10个 0402
+  - Feishu sheet 宜居城市模版二 10个 0402
+  - 广告表 宜居城市模版二 10个 0402
+  - 1001广告表 宜居城市模版二 10个 0402
+  - ptc-livablecities2
+  - "git@gitlab.adsconflux.xyz:ptc/fe/ptc-livablecities2.git"
+  - deaab.com
+  - voipdictionary.com
+  - settledcity.com
+  - urbanjoyguide.com
+  - idealcitylab.com
+  - onemeyers.com
+  - tajedwardsville.com
+  - simplylivable.com
+  - airycity.com
+  - vasturban.com
+truth:
+  status: verified
+  confidence: 0.93
+  basis:
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: majority_service_is_routing_hint; live_verify_domain_binding_before_deploy_or_switch
+summary: Feishu sheet tab 宜居城市模版二 10个 0402 has 10 domains; current lookup/rf resolves 10/10 (100%) to ptc-livablecities2. Treat sheet name as a majority-backed business alias for this service/repo, then live-verify before deploy or traffic switch.
+resolution: sheet_alias=宜居城市模版二 10个 0402; majority_service=ptc-livablecities2; ratio=10/10; strength=strong_majority_alias
+effect: Skip browsing all Feishu tabs or scanning issue-tracking for this sheet identity; start from current majority service/repo, then verify lookup/rf live for target domains.
+project: ptc-livablecities2
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=lrIpls"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: lrIpls
+  sheet_title: 宜居城市模版二 10个 0402
+current_majority:
+  service: ptc-livablecities2
+  repo: "git@gitlab.adsconflux.xyz:ptc/fe/ptc-livablecities2.git"
+  repo_name: ptc-livablecities2
+  latest_branch_hint: 1.0.4
+  count: 10
+  resolved_domains: 10
+  sheet_domains: 10
+  ratio: 1.0
+  status: verified_majority
+service_counts:
+  -
+    service: ptc-livablecities2
+    count: 10
+domains:
+  - deaab.com => service=ptc-livablecities2; rf=match; repo=ptc-livablecities2; branch_hint=1.0.4
+  - voipdictionary.com => service=ptc-livablecities2; rf=match; repo=ptc-livablecities2; branch_hint=1.0.4
+  - settledcity.com => service=ptc-livablecities2; rf=match; repo=ptc-livablecities2; branch_hint=1.0.4
+  - urbanjoyguide.com => service=ptc-livablecities2; rf=match; repo=ptc-livablecities2; branch_hint=1.0.4
+  - idealcitylab.com => service=ptc-livablecities2; rf=match; repo=ptc-livablecities2; branch_hint=1.0.4
+  - onemeyers.com => service=ptc-livablecities2; rf=match; repo=ptc-livablecities2; branch_hint=1.0.4
+  - tajedwardsville.com => service=ptc-livablecities2; rf=match; repo=ptc-livablecities2; branch_hint=1.0.4
+  - simplylivable.com => service=ptc-livablecities2; rf=match; repo=ptc-livablecities2; branch_hint=1.0.4
+  - airycity.com => service=ptc-livablecities2; rf=match; repo=ptc-livablecities2; branch_hint=1.0.4
+  - vasturban.com => service=ptc-livablecities2; rf=match; repo=ptc-livablecities2; branch_hint=1.0.4
+lookup_rf_mismatches:
+  []
+stale_policy:
+  - The Feishu sheet is naming/context evidence, not current deployment truth by itself.
+  - Current service/repo in this card comes from the lookup/rf snapshot at last_checked_at.
+  - Domain-to-service binding, latest branch, deploy run, and traffic state must be live-verified before deploy or switch.
+  - Do not infer test-environment semantics only because a service name contains -test.
+evidence:
+  -
+    kind: feishu-sheet
+    path: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=lrIpls"
+    ref: "TBBjs3msohDx1ctQTejcjLrXnhg:lrIpls"
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: majority=ptc-livablecities2
+  -
+    kind: rf-getcf-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: domains=10

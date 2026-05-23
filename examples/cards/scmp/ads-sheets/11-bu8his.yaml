@@ -1,0 +1,83 @@
+id: scmp.ads-sheet.bu8his
+type: relation
+title: 网文小说模版二6个 0203 -> ptc-v5-novabeats1
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: Bu8hIS
+  sheet_title: 网文小说模版二6个 0203
+aliases:
+  - 网文小说模版二6个 0203
+  - Feishu sheet 网文小说模版二6个 0203
+  - 广告表 网文小说模版二6个 0203
+  - 1001广告表 网文小说模版二6个 0203
+  - ptc-v5-novabeats1
+  - ptc_v5_reading
+  - "git@gitlab.adsconflux.xyz:ptc/fe/ptc_v5_reading.git"
+  - talesfast.com
+  - talesbest.com
+  - ficbest.com
+  - goficbest.com
+  - liketalehub.com
+  - ficbest.online
+truth:
+  status: verified
+  confidence: 0.91
+  basis:
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: majority_service_is_routing_hint; live_verify_domain_binding_before_deploy_or_switch
+summary: Feishu sheet tab 网文小说模版二6个 0203 has 6 domains; current lookup/rf resolves 6/6 (100%) to ptc-v5-novabeats1. Treat sheet name as a majority-backed business alias for this service/repo, then live-verify before deploy or traffic switch.
+resolution: sheet_alias=网文小说模版二6个 0203; majority_service=ptc-v5-novabeats1; ratio=6/6; strength=strong_majority_alias
+effect: Skip browsing all Feishu tabs or scanning issue-tracking for this sheet identity; start from current majority service/repo, then verify lookup/rf live for target domains.
+project: ptc_v5_reading
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=Bu8hIS"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: Bu8hIS
+  sheet_title: 网文小说模版二6个 0203
+current_majority:
+  service: ptc-v5-novabeats1
+  repo: "git@gitlab.adsconflux.xyz:ptc/fe/ptc_v5_reading.git"
+  repo_name: ptc_v5_reading
+  latest_branch_hint: t102748-home3-ads-20260522
+  count: 6
+  resolved_domains: 6
+  sheet_domains: 6
+  ratio: 1.0
+  status: verified_majority
+service_counts:
+  -
+    service: ptc-v5-novabeats1
+    count: 6
+domains:
+  - talesfast.com => service=ptc-v5-novabeats1; rf=match; repo=ptc_v5_reading; branch_hint=t102748-home3-ads-20260522
+  - talesbest.com => service=ptc-v5-novabeats1; rf=match; repo=ptc_v5_reading; branch_hint=t102748-home3-ads-20260522
+  - ficbest.com => service=ptc-v5-novabeats1; rf=match; repo=ptc_v5_reading; branch_hint=t102748-home3-ads-20260522
+  - goficbest.com => service=ptc-v5-novabeats1; rf=match; repo=ptc_v5_reading; branch_hint=t102748-home3-ads-20260522
+  - liketalehub.com => service=ptc-v5-novabeats1; rf=match; repo=ptc_v5_reading; branch_hint=t102748-home3-ads-20260522
+  - ficbest.online => service=ptc-v5-novabeats1; rf=match; repo=ptc_v5_reading; branch_hint=t102748-home3-ads-20260522
+lookup_rf_mismatches:
+  []
+stale_policy:
+  - The Feishu sheet is naming/context evidence, not current deployment truth by itself.
+  - Current service/repo in this card comes from the lookup/rf snapshot at last_checked_at.
+  - Domain-to-service binding, latest branch, deploy run, and traffic state must be live-verified before deploy or switch.
+  - Do not infer test-environment semantics only because a service name contains -test.
+evidence:
+  -
+    kind: feishu-sheet
+    path: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=Bu8hIS"
+    ref: "TBBjs3msohDx1ctQTejcjLrXnhg:Bu8hIS"
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: majority=ptc-v5-novabeats1
+  -
+    kind: rf-getcf-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: domains=6

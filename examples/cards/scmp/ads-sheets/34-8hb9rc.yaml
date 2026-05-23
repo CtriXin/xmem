@@ -1,0 +1,90 @@
+id: scmp.ads-sheet.8hb9rc
+type: relation
+title: 情感测试模版二10个 0323 -> ptc-emotional-test2
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: 8HB9Rc
+  sheet_title: 情感测试模版二10个 0323
+aliases:
+  - 情感测试模版二10个 0323
+  - Feishu sheet 情感测试模版二10个 0323
+  - 广告表 情感测试模版二10个 0323
+  - 1001广告表 情感测试模版二10个 0323
+  - ptc-emotional-test2
+  - "git@gitlab.adsconflux.xyz:ptc/fe/ptc-emotional-test2.git"
+  - baravani.com
+  - disccloud.com
+  - vidioio.com
+  - clarivovo.com
+  - mentioio.com
+  - xdollah.com
+  - almoged.com
+  - oravioio.com
+  - veltioio.com
+  - playorara.com
+truth:
+  status: verified
+  confidence: 0.93
+  basis:
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: majority_service_is_routing_hint; live_verify_domain_binding_before_deploy_or_switch
+summary: Feishu sheet tab 情感测试模版二10个 0323 has 10 domains; current lookup/rf resolves 10/10 (100%) to ptc-emotional-test2. Treat sheet name as a majority-backed business alias for this service/repo, then live-verify before deploy or traffic switch.
+resolution: sheet_alias=情感测试模版二10个 0323; majority_service=ptc-emotional-test2; ratio=10/10; strength=strong_majority_alias
+effect: Skip browsing all Feishu tabs or scanning issue-tracking for this sheet identity; start from current majority service/repo, then verify lookup/rf live for target domains.
+project: ptc-emotional-test2
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=8HB9Rc"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: 8HB9Rc
+  sheet_title: 情感测试模版二10个 0323
+current_majority:
+  service: ptc-emotional-test2
+  repo: "git@gitlab.adsconflux.xyz:ptc/fe/ptc-emotional-test2.git"
+  repo_name: ptc-emotional-test2
+  latest_branch_hint: 1.0.0
+  count: 10
+  resolved_domains: 10
+  sheet_domains: 10
+  ratio: 1.0
+  status: verified_majority
+service_counts:
+  -
+    service: ptc-emotional-test2
+    count: 10
+domains:
+  - baravani.com => service=ptc-emotional-test2; rf=match; repo=ptc-emotional-test2; branch_hint=1.0.0
+  - disccloud.com => service=ptc-emotional-test2; rf=match; repo=ptc-emotional-test2; branch_hint=1.0.0
+  - vidioio.com => service=ptc-emotional-test2; rf=match; repo=ptc-emotional-test2; branch_hint=1.0.0
+  - clarivovo.com => service=ptc-emotional-test2; rf=match; repo=ptc-emotional-test2; branch_hint=1.0.0
+  - mentioio.com => service=ptc-emotional-test2; rf=match; repo=ptc-emotional-test2; branch_hint=1.0.0
+  - xdollah.com => service=ptc-emotional-test2; rf=match; repo=ptc-emotional-test2; branch_hint=1.0.0
+  - almoged.com => service=ptc-emotional-test2; rf=match; repo=ptc-emotional-test2; branch_hint=1.0.0
+  - oravioio.com => service=ptc-emotional-test2; rf=match; repo=ptc-emotional-test2; branch_hint=1.0.0
+  - veltioio.com => service=ptc-emotional-test2; rf=match; repo=ptc-emotional-test2; branch_hint=1.0.0
+  - playorara.com => service=ptc-emotional-test2; rf=match
+lookup_rf_mismatches:
+  []
+stale_policy:
+  - The Feishu sheet is naming/context evidence, not current deployment truth by itself.
+  - Current service/repo in this card comes from the lookup/rf snapshot at last_checked_at.
+  - Domain-to-service binding, latest branch, deploy run, and traffic state must be live-verified before deploy or switch.
+  - Do not infer test-environment semantics only because a service name contains -test.
+evidence:
+  -
+    kind: feishu-sheet
+    path: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=8HB9Rc"
+    ref: "TBBjs3msohDx1ctQTejcjLrXnhg:8HB9Rc"
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: majority=ptc-emotional-test2
+  -
+    kind: rf-getcf-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: domains=10

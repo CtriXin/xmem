@@ -61,10 +61,11 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     specs = [c for c in cards if c.get("type") in SPEC_TYPES]
     code_indexes = [c for c in cards if c.get("type") in CODE_TYPES]
     traffic = compact_traffic_switches([c for c in cards if c.get("type") in TRAFFIC_TYPES])
-    strong_alias = [c for c in alias_cards if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
+    strong_alias = [c for c in alias_cards if is_strong_identity_match(c, query, min_score=8)]
+    strong_relation = [c for c in relations if is_strong_identity_match(c, query, min_score=12)]
     strong_correction = [c for c in corrections if c.get("status") in {"verified", "disputed"} and float(c.get("score") or 0) >= 8]
-    strong_registry = [c for c in registry if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
-    strong_traffic = [c for c in traffic if c.get("status") == "verified" and float(c.get("score") or 0) >= 6]
+    strong_registry = [c for c in registry if is_strong_identity_match(c, query, min_score=8)]
+    strong_traffic = [c for c in traffic if is_strong_identity_match(c, query, min_score=8)]
     correction_guidance_items = correction_guidance(query, corrections)
     suggested_queries = canonical_queries_from_corrections(query, corrections)
     allow_high_signal_hints = looks_like_specific_service_or_domain(query)
@@ -81,6 +82,10 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         resolution = "resolved"
     elif len(strong_traffic) > 1:
         resolution = "ambiguous"
+    elif len(strong_relation) == 1:
+        resolution = "resolved"
+    elif len(strong_relation) > 1:
+        resolution = "ambiguous"
     elif strong_alias:
         resolution = "guided_by_alias_card"
     else:
@@ -91,7 +96,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         warnings.append("multiple verified registry candidates matched; do not assume a single project")
     if correction_guidance_items:
         warnings.append("query matched a correction/dispute overlay; prefer canonical aliases and verify before editing")
-    if any(c.get("status") in {"inferred", "partial", "stale", "unknown", "disputed"} for c in cards[:5]) and not (strong_traffic and not allow_high_signal_hints):
+    if any(c.get("status") in {"inferred", "partial", "stale", "unknown", "disputed"} for c in cards[:5]) and not ((strong_traffic or strong_relation) and not allow_high_signal_hints):
         warnings.append("some top cards are not verified; use as hints only")
     if any(c.get("source") == "code-index-bridge" for c in cards[:8]):
         warnings.append("code index matches are generated refs; verify in source files before editing")
@@ -108,9 +113,11 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         registry,
         bool(strong_registry),
         bool(strong_traffic),
+        bool(strong_relation),
         allow_high_signal_hints=allow_high_signal_hints,
     )
-    next_reads = unique_paths(traffic[:3] + registry_for_packet[:4] + rules[:3] + methods[:3] + specs[:4] + code_indexes[:5] + relations[:3] + memories[:3] + evidence[:3])
+    relations_for_packet = compact_relation_cards(relations, strong_relation)
+    next_reads = unique_paths(traffic[:3] + relations_for_packet[:4] + registry_for_packet[:4] + rules[:3] + methods[:3] + specs[:4] + code_indexes[:5] + memories[:3] + evidence[:3])
     packet = {
         "schema": "xmem.context.v1",
         "truth_policy": "files/code/runtime are truth; sqlite is generated index/cache",
@@ -118,7 +125,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "resolution": {
             "status": resolution,
             "do_not_assume_single_project": resolution in {"ambiguous", "guided_by_alias_card", "guided_by_correction"},
-            "reason": resolution_reason(resolution, strong_registry, strong_traffic, cards, correction_guidance_items),
+            "reason": resolution_reason(resolution, strong_registry, strong_traffic, strong_relation, cards, correction_guidance_items),
         },
         "current": current_brief(current),
         "suggested_queries": suggested_queries,
@@ -133,7 +140,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "memories": [card_brief(c, i + 1) for i, c in enumerate(memories[:5])],
         "specs": [card_brief(c, i + 1) for i, c in enumerate(specs[:6])],
         "code_indexes": [card_brief(c, i + 1) for i, c in enumerate(code_indexes[:8])],
-        "relations": [card_brief(c, i + 1) for i, c in enumerate(relations[:5])],
+        "relations": [card_brief(c, i + 1) for i, c in enumerate(relations_for_packet)],
         "evidence": [card_brief(c, i + 1) for i, c in enumerate(evidence[:6])],
         "source_freshness": freshness_brief(freshness),
         "local_source_health": local_source_health,
@@ -148,11 +155,12 @@ def compact_registry_candidates(
     registry: List[Dict[str, Any]],
     has_verified_registry_anchor: bool,
     has_verified_traffic_anchor: bool = False,
+    has_verified_relation_anchor: bool = False,
     allow_high_signal_hints: bool = False,
 ) -> List[Dict[str, Any]]:
-    if has_verified_traffic_anchor and not has_verified_registry_anchor:
-        # A verified traffic-switch card is a stronger project/service anchor
-        # than weak legacy Project Wiki template matches such as "模版一".
+    if (has_verified_traffic_anchor or has_verified_relation_anchor) and not has_verified_registry_anchor:
+        # Verified traffic/relation cards are stronger task anchors than weak
+        # legacy Project Wiki template matches such as "模版一".
         verified = [c for c in registry if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
         if not allow_high_signal_hints:
             return verified[:4]
@@ -165,17 +173,62 @@ def compact_registry_candidates(
     return (verified[:6] + others[:2])[:8]
 
 
+def compact_relation_cards(relations: List[Dict[str, Any]], strong_relations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not strong_relations:
+        return relations[:5]
+    top_score = max(float(c.get("score") or 0) for c in strong_relations)
+    threshold = top_score * 0.5
+    extras = [
+        c for c in relations
+        if c not in strong_relations and float(c.get("score") or 0) >= threshold
+    ]
+    return (strong_relations[:4] + extras[:2])[:5]
+
+
 def looks_like_specific_service_or_domain(query: str) -> bool:
     text = str(query or "").strip()
     return "." in text or "-" in text or "/" in text or "_" in text
+
+
+def is_strong_identity_match(card: Dict[str, Any], query: str, *, min_score: float) -> bool:
+    if card.get("status") != "verified" or float(card.get("score") or 0) < min_score:
+        return False
+    why = str(card.get("why") or "")
+    if "exact_alias:" in why:
+        return True
+    qnorm = normalize_text(query)
+    if not qnorm:
+        return False
+    aliases: List[str] = []
+    try:
+        aliases = json.loads(card.get("aliases_json") or "[]")
+    except Exception:
+        aliases = []
+    for value in [*aliases, card.get("title", ""), card.get("card_id", "")]:
+        anorm = normalize_text(value)
+        if not (qnorm and anorm):
+            continue
+        if anorm == qnorm:
+            return True
+        if anorm in qnorm:
+            if looks_like_specific_service_or_domain(value) or len(anorm) >= 8:
+                return True
+        if qnorm in anorm:
+            if looks_like_specific_service_or_domain(query) or len(qnorm) >= max(8, int(len(anorm) * 0.75)):
+                return True
+    if "metadata_match:" in why and looks_like_specific_service_or_domain(query):
+        return True
+    return False
 
 
 def compact_traffic_switches(traffic: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     if not traffic:
         return []
     top_score = float(traffic[0].get("score") or 0)
+    if top_score < 8:
+        return []
     if top_score < 10:
-        return traffic[:4]
+        return traffic[:2]
     threshold = top_score * 0.85
     return [card for card in traffic if float(card.get("score") or 0) >= threshold][:4]
 
@@ -288,6 +341,7 @@ def resolution_reason(
     resolution: str,
     strong_registry: List[Dict[str, Any]],
     strong_traffic: List[Dict[str, Any]],
+    strong_relation: List[Dict[str, Any]],
     cards: List[Dict[str, Any]],
     guidance: List[Dict[str, Any]] | None = None,
 ) -> str:
@@ -307,11 +361,15 @@ def resolution_reason(
         return f"one verified registry candidate matched strongly: {strong_registry[0].get('card_id')}"
     if resolution == "resolved" and strong_traffic:
         return f"one verified traffic-switch card matched strongly: {strong_traffic[0].get('card_id')}"
+    if resolution == "resolved" and strong_relation:
+        return f"one verified relation card matched strongly: {strong_relation[0].get('card_id')}"
     if resolution == "ambiguous":
         if strong_registry:
             return f"{len(strong_registry)} verified registry candidates matched strongly"
         if strong_traffic:
             return f"{len(strong_traffic)} verified traffic-switch cards matched strongly"
+        if strong_relation:
+            return f"{len(strong_relation)} verified relation cards matched strongly"
     return "matched cards exist, but no single verified registry candidate is strong enough"
 
 

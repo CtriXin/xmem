@@ -1,0 +1,90 @@
+id: scmp.ads-sheet.etetsp
+type: relation
+title: 反应二-10个-0114 -> ptc-reaction-test2
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: eTeTSP
+  sheet_title: 反应二-10个-0114
+aliases:
+  - 反应二-10个-0114
+  - Feishu sheet 反应二-10个-0114
+  - 广告表 反应二-10个-0114
+  - 1001广告表 反应二-10个-0114
+  - ptc-reaction-test2
+  - "git@gitlab.adsconflux.xyz:ptc/fe/ptc-reaction-test2.git"
+  - challengetap.com
+  - quicktaplab.com
+  - clicksuitee.com
+  - chrystahooper.com
+  - tyys1.com
+  - voratest.com
+  - rivotest.com
+  - jittergym.com
+  - lixi88x.com
+  - carawayhome.co
+truth:
+  status: verified
+  confidence: 0.93
+  basis:
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: majority_service_is_routing_hint; live_verify_domain_binding_before_deploy_or_switch
+summary: Feishu sheet tab 反应二-10个-0114 has 10 domains; current lookup/rf resolves 10/10 (100%) to ptc-reaction-test2. Treat sheet name as a majority-backed business alias for this service/repo, then live-verify before deploy or traffic switch.
+resolution: sheet_alias=反应二-10个-0114; majority_service=ptc-reaction-test2; ratio=10/10; strength=strong_majority_alias
+effect: Skip browsing all Feishu tabs or scanning issue-tracking for this sheet identity; start from current majority service/repo, then verify lookup/rf live for target domains.
+project: ptc-reaction-test2
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=eTeTSP"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: eTeTSP
+  sheet_title: 反应二-10个-0114
+current_majority:
+  service: ptc-reaction-test2
+  repo: "git@gitlab.adsconflux.xyz:ptc/fe/ptc-reaction-test2.git"
+  repo_name: ptc-reaction-test2
+  latest_branch_hint: 1.0.0
+  count: 10
+  resolved_domains: 10
+  sheet_domains: 10
+  ratio: 1.0
+  status: verified_majority
+service_counts:
+  -
+    service: ptc-reaction-test2
+    count: 10
+domains:
+  - challengetap.com => service=ptc-reaction-test2; rf=match; repo=ptc-reaction-test2; branch_hint=1.0.0
+  - quicktaplab.com => service=ptc-reaction-test2; rf=match
+  - clicksuitee.com => service=ptc-reaction-test2; rf=match; repo=ptc-reaction-test2; branch_hint=1.0.0
+  - chrystahooper.com => service=ptc-reaction-test2; rf=match; repo=ptc-reaction-test2; branch_hint=1.0.0
+  - tyys1.com => service=ptc-reaction-test2; rf=match; repo=ptc-reaction-test2; branch_hint=1.0.0
+  - voratest.com => service=ptc-reaction-test2; rf=match; repo=ptc-reaction-test2; branch_hint=1.0.0
+  - rivotest.com => service=ptc-reaction-test2; rf=match; repo=ptc-reaction-test2; branch_hint=1.0.0
+  - jittergym.com => service=ptc-reaction-test2; rf=match; repo=ptc-reaction-test2; branch_hint=1.0.0
+  - lixi88x.com => service=ptc-reaction-test2; rf=match; repo=ptc-reaction-test2; branch_hint=1.0.0
+  - carawayhome.co => service=ptc-reaction-test2; rf=match; repo=ptc-reaction-test2; branch_hint=1.0.0
+lookup_rf_mismatches:
+  []
+stale_policy:
+  - The Feishu sheet is naming/context evidence, not current deployment truth by itself.
+  - Current service/repo in this card comes from the lookup/rf snapshot at last_checked_at.
+  - Domain-to-service binding, latest branch, deploy run, and traffic state must be live-verified before deploy or switch.
+  - Do not infer test-environment semantics only because a service name contains -test.
+evidence:
+  -
+    kind: feishu-sheet
+    path: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=eTeTSP"
+    ref: "TBBjs3msohDx1ctQTejcjLrXnhg:eTeTSP"
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: majority=ptc-reaction-test2
+  -
+    kind: rf-getcf-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: domains=10

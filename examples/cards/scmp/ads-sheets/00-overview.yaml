@@ -1,0 +1,118 @@
+id: scmp.ads-sheet.service-index.1001-record2
+type: relation
+title: 【1001项目】广告位信息记录2 sheet service index
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+aliases:
+  - 1001项目广告位信息记录2
+  - 广告位信息记录2
+  - 1001项目 广告表
+  - Feishu 广告表 sheet service index
+  - 【1001项目】广告位信息记录2
+truth:
+  status: partial
+  confidence: 0.72
+  basis:
+    - feishu_all_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: overview_only; per-sheet cards carry stronger truth levels
+summary: Scanned all 65 sheets in 【1001项目】广告位信息记录2; current lookup/rf produced 53 majority-backed groups, 8 single-domain hints, 2 mixed groups, 2 no-domain tabs.
+resolution: Use exact sheet tab title or target domain to hit a per-sheet scmp.ads-sheet.* card; do not treat this overview as service truth.
+effect: Skip opening every Feishu tab first; route to the matched per-sheet card, then live-verify lookup/rf.
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+status_counts:
+  no_domains: 2
+  verified_majority: 53
+  single_domain_current: 8
+  mixed_or_conflicting: 2
+sheet_groups:
+  - 00 历史 => UNKNOWN; repo=-; domains=0/0; status=no_domains
+  - 01 Shopify电子1-智能穿戴10个 0113 => shops; repo=-; domains=10/10; status=verified_majority
+  - 02 反应二-10个-0114 => ptc-reaction-test2; repo=ptc-reaction-test2; domains=10/10; status=verified_majority
+  - 03 反应二-1个-0119 => ptc-reaction-test2; repo=ptc-reaction-test2; domains=1/1; status=single_domain_current
+  - 04 反应一-10个-0121 => ptc-reaction-test; repo=ptc-reaction-test; domains=10/10; status=verified_majority
+  - 05 反应一-9个-0121 => ptc-reaction-test; repo=ptc-reaction-test; domains=9/9; status=verified_majority
+  - 06 AI旅行5个 0127 => ptc-ai-travel; repo=ai-travel; domains=5/5; status=verified_majority
+  - 07 Crypto模版三 10个 0128 => ptc-temp-crypto-v3; repo=ptc_ssr_crypto; domains=5/10; status=mixed_or_conflicting
+  - 08 AI旅行5个 0129 => ptc-ai-travel; repo=ai-travel; domains=5/5; status=verified_majority
+  - 09 AI小说模版四 5个 0130 => ptc-v5-noval-v4; repo=ptc_v5_noval_v4; domains=5/5; status=verified_majority
+  - 10 网文小说模版七10个 0202 => ptc-v5-novel7; repo=ptc-v5-novel7; domains=10/10; status=verified_majority
+  - 11 网文小说模版二6个 0203 => ptc-v5-novabeats1; repo=ptc_v5_reading; domains=6/6; status=verified_majority
+  - 12 网文小说模版三10个 0203 => ptc-v5-novabeats2; repo=ai_novabeats; domains=10/10; status=verified_majority
+  - 13 反应一5个 0203 => ptc-reaction-test; repo=ptc-reaction-test; domains=5/5; status=verified_majority
+  - 14 网文小说模版一10个 0204 => ptc-v5-novabeats; repo=ai_novabeats; domains=10/10; status=verified_majority
+  - 15 AI prompt模版一·6个 0209 => ptc-ai-prompt-v1; repo=ptc-v5-ai-prompt-v1; domains=6/6; status=verified_majority
+  - 16 AI prompt模版二· 5个 0209 => ptc-ai-prompt-v2; repo=ptc-v5-ai-prompt-v2; domains=5/5; status=verified_majority
+  - 17 AI旅行5个 0224 => ptc-ai-travel; repo=ai-travel; domains=5/5; status=verified_majority
+  - 18 AI Prompt模版二5个 0224 => ptc-ai-prompt-v2; repo=ptc-v5-ai-prompt-v2; domains=5/5; status=verified_majority
+  - 19 AI起名模版一5个 0224 => ptc-v5-named; repo=ptc_v5_named; domains=5/5; status=verified_majority
+  - 20 反应一5个 0224 => ptc-reaction-test; repo=ptc-reaction-test; domains=5/5; status=verified_majority
+  - 21 反应一10个t 0224 => ptc-reaction-test; repo=ptc-reaction-test; domains=10/10; status=verified_majority
+  - 22 反应一10个m 0224 => ptc-reaction-test; repo=ptc-reaction-test; domains=10/10; status=verified_majority
+  - 23 情感测试模版一10个 0224 => ptc-emotional-test1; repo=ptc-emotional-test1; domains=10/10; status=verified_majority
+  - 24 汽车测评模版三 => UNKNOWN; repo=-; domains=0/0; status=no_domains
+  - 25 AI名言模版一5个 0226 => ptc-v5-ai-famous; repo=ai_ptc_v5_famous; domains=5/5; status=verified_majority
+  - 26 AI Prompt模版二5个 0310 => ptc-ai-prompt-v2; repo=ptc-v5-ai-prompt-v2; domains=5/5; status=verified_majority
+  - 27 AI起名模版一5个 0310 => ptc-v5-named; repo=ptc_v5_named; domains=5/5; status=verified_majority
+  - 28 游戏模版一（内部）2个 0313 => ptc-temp-game-ads; repo=ptc_ssr_gamefull; domains=2/2; status=verified_majority
+  - 29 【竞品copy】-剧情游戏 => ptc-copy-threesoulsgame; repo=copy_immerseact; domains=1/1; status=single_domain_current
+  - 30 网文小说模版四10个 0319 => ptc-v5-novabeats; repo=ai_novabeats; domains=10/10; status=verified_majority
+  - 31 网文小说模版二10个 0320 => ptc-v5-novabeats1; repo=ptc_v5_reading; domains=10/10; status=verified_majority
+  - 32 网文小说模版二10个二级 0320 => ptc-v5-novabeats1; repo=ptc_v5_reading; domains=6/10; status=mixed_or_conflicting
+  - 33 网文小说模版一10个 0320 => ptc-v5-novabeats; repo=ai_novabeats; domains=9/10; status=verified_majority
+  - 34 情感测试模版二10个 0323 => ptc-emotional-test2; repo=ptc-emotional-test2; domains=10/10; status=verified_majority
+  - 35 下载站模版一2个 0323 => ptc-v5-download1; repo=ptc-v5-download1; domains=2/2; status=verified_majority
+  - 36 宜居城市模版一10个 0323 => ptc-v5-cities; repo=ptc_v5_citys; domains=10/10; status=verified_majority
+  - 37 网文小说模版二10个二级0325 => ptc-v5-novabeats1; repo=ptc_v5_reading; domains=10/10; status=verified_majority
+  - 38 AI名言模版一1个 0326 => ptc-v5-ai-famous; repo=ai_ptc_v5_famous; domains=1/1; status=single_domain_current
+  - 39 网文小说模版一20个 0327 => ptc-v5-novabeats; repo=ai_novabeats; domains=19/20; status=verified_majority
+  - 40 网文小说模版二10个 二级0327 => ptc-v5-novabeats1; repo=ptc_v5_reading; domains=9/10; status=verified_majority
+  - 41 AI名言模版一5个 0327 => ptc-v5-ai-famous; repo=ai_ptc_v5_famous; domains=5/5; status=verified_majority
+  - 42 意向广告模版一个 0331 => ptc-intention-information; repo=ptc-intention-information; domains=1/1; status=single_domain_current
+  - 43 计算器网站模版一 1个 0331 => ptc-copy-calculator; repo=copy_calculator; domains=1/1; status=single_domain_current
+  - 44 宜居城市模版二 10个 0402 => ptc-livablecities2; repo=ptc-livablecities2; domains=10/10; status=verified_majority
+  - 45 宜居城市模版二 5个 0402 => ptc-livablecities2; repo=ptc-livablecities2; domains=5/5; status=verified_majority
+  - 46 下载站模版一 1个 0407 => ptc-v5-download1; repo=ptc-v5-download1; domains=1/1; status=single_domain_current
+  - 47 宜居城市模版二 10个 0408 => ptc-livablecities2; repo=ptc-livablecities2; domains=10/10; status=verified_majority
+  - 48 意向广告模版一个 0413 => ptc-intention-information; repo=ptc-intention-information; domains=1/1; status=single_domain_current
+  - 49 网文小说模版一10个 0417 => ptc-v5-novabeats; repo=ai_novabeats; domains=10/10; status=verified_majority
+  - 50 网文小说模版一10个 0421 => ptc-v5-novabeats; repo=ai_novabeats; domains=10/10; status=verified_majority
+  - 51 宜居城市模版二 10个 0422 => ptc-livablecities2; repo=ptc-livablecities2; domains=10/10; status=verified_majority
+  - 52 AI名言模版一5个 0423 => ptc-v5-ai-famous; repo=ai_ptc_v5_famous; domains=5/5; status=verified_majority
+  - 53 宜居城市模版二 15个 0427 => ptc-livablecities2; repo=ptc-livablecities2; domains=15/15; status=verified_majority
+  - 54 网文小说模版二10个 0428 => ptc-v5-novabeats1; repo=ptc_v5_reading; domains=10/10; status=verified_majority
+  - 55 网文小说模版一10个 0428 => ptc-v5-novabeats; repo=ai_novabeats; domains=9/10; status=verified_majority
+  - 56 网文小说模版二10 0428 => ptc-v5-novabeats1; repo=ptc_v5_reading; domains=8/10; status=verified_majority
+  - 57 剧情游戏10个 0508 => ptc-copy-threesoulsgame; repo=copy_immerseact; domains=10/10; status=verified_majority
+  - 58 剧情游戏5个 0513 => ptc-copy-threesoulsgame; repo=copy_immerseact; domains=5/5; status=verified_majority
+  - 59 宜居城市模版一 10个 0518 => ptc-v5-cities; repo=ptc_v5_citys; domains=10/10; status=verified_majority
+  - 60 网文小说模版一10个 0518 => ptc-v5-novabeats-test; repo=ai_novabeats; domains=10/10; status=verified_majority
+  - 61 宜居城市模版二 10个 0518 => ptc-livablecities2; repo=ptc-livablecities2; domains=10/10; status=verified_majority
+  - 62 反应测试模版二 10个二级 0520 => ptc-reaction-test2; repo=ptc-reaction-test2; domains=9/10; status=verified_majority
+  - 63 剧情游戏5个二级 0520 => ptc-copy-threesoulsgame; repo=copy_immerseact; domains=5/5; status=verified_majority
+  - 64 F1赛事模版二5个 0522 => ptc-f1racing2; repo=ptc-f1racing2; domains=1/1; status=single_domain_current
+stale_policy:
+  - This overview is a routing snapshot, not a permanent current-state DB.
+  - Per-sheet majority cards are stronger than this overview; Project Wiki accepted exports are stronger than pending rows.
+  - Always live verify domain/service binding before deploy or traffic switch.
+evidence:
+  -
+    kind: feishu-sheet-list
+    path: /tmp/ads_sheet_info.json
+    ref: TBBjs3msohDx1ctQTejcjLrXnhg
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: 453 unique domains
+  -
+    kind: aggregate
+    path: /tmp/ads_sheet_service_aggregates.json
+    ref: 65 sheets

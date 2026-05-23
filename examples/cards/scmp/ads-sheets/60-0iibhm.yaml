@@ -1,0 +1,91 @@
+id: scmp.ads-sheet.0iibhm
+type: relation
+title: 网文小说模版一10个 0518 -> ptc-v5-novabeats-test
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: 0IIBHM
+  sheet_title: 网文小说模版一10个 0518
+aliases:
+  - 网文小说模版一10个 0518
+  - Feishu sheet 网文小说模版一10个 0518
+  - 广告表 网文小说模版一10个 0518
+  - 1001广告表 网文小说模版一10个 0518
+  - ptc-v5-novabeats-test
+  - ai_novabeats
+  - "git@gitlab.adsconflux.xyz:ptc/fe/ai_novabeats.git"
+  - goread.stealabrainrot-wiki.org
+  - inovel.stealabrainrot-wiki.org
+  - talehub.stealabrainrot-wiki.org
+  - newbook.stealabrainrot-wiki.org
+  - hotfiction.stealabrainrot-wiki.org
+  - hotstroy.stealabrainrot-wiki.org
+  - page.stealabrainrot-wiki.org
+  - chapter.stealabrainrot-wiki.org
+  - hotread.stealabrainrot-wiki.org
+  - newread.stealabrainrot-wiki.org
+truth:
+  status: verified
+  confidence: 0.93
+  basis:
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: majority_service_is_routing_hint; live_verify_domain_binding_before_deploy_or_switch
+summary: Feishu sheet tab 网文小说模版一10个 0518 has 10 domains; current lookup/rf resolves 10/10 (100%) to ptc-v5-novabeats-test. Treat sheet name as a majority-backed business alias for this service/repo, then live-verify before deploy or traffic switch.
+resolution: sheet_alias=网文小说模版一10个 0518; majority_service=ptc-v5-novabeats-test; ratio=10/10; strength=strong_majority_alias
+effect: Skip browsing all Feishu tabs or scanning issue-tracking for this sheet identity; start from current majority service/repo, then verify lookup/rf live for target domains.
+project: ai_novabeats
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=0IIBHM"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: 0IIBHM
+  sheet_title: 网文小说模版一10个 0518
+current_majority:
+  service: ptc-v5-novabeats-test
+  repo: "git@gitlab.adsconflux.xyz:ptc/fe/ai_novabeats.git"
+  repo_name: ai_novabeats
+  latest_branch_hint: 1.0.19.9
+  count: 10
+  resolved_domains: 10
+  sheet_domains: 10
+  ratio: 1.0
+  status: verified_majority
+service_counts:
+  -
+    service: ptc-v5-novabeats-test
+    count: 10
+domains:
+  - goread.stealabrainrot-wiki.org => service=ptc-v5-novabeats-test; rf=match; repo=ai_novabeats; branch_hint=1.0.19.9
+  - inovel.stealabrainrot-wiki.org => service=ptc-v5-novabeats-test; rf=match; repo=ai_novabeats; branch_hint=1.0.19.9
+  - talehub.stealabrainrot-wiki.org => service=ptc-v5-novabeats-test; rf=match; repo=ai_novabeats; branch_hint=1.0.19.9
+  - newbook.stealabrainrot-wiki.org => service=ptc-v5-novabeats-test; rf=match; repo=ai_novabeats; branch_hint=1.0.19.9
+  - hotfiction.stealabrainrot-wiki.org => service=ptc-v5-novabeats-test; rf=match; repo=ai_novabeats; branch_hint=1.0.19.9
+  - hotstroy.stealabrainrot-wiki.org => service=ptc-v5-novabeats-test; rf=match; repo=ai_novabeats; branch_hint=1.0.19.9
+  - page.stealabrainrot-wiki.org => service=ptc-v5-novabeats-test; rf=match; repo=ai_novabeats; branch_hint=1.0.19.9
+  - chapter.stealabrainrot-wiki.org => service=ptc-v5-novabeats-test; rf=match; repo=ai_novabeats; branch_hint=1.0.19.9
+  - hotread.stealabrainrot-wiki.org => service=ptc-v5-novabeats-test; rf=match; repo=ai_novabeats; branch_hint=1.0.19.9
+  - newread.stealabrainrot-wiki.org => service=ptc-v5-novabeats-test; rf=match; repo=ai_novabeats; branch_hint=1.0.19.9
+lookup_rf_mismatches:
+  []
+stale_policy:
+  - The Feishu sheet is naming/context evidence, not current deployment truth by itself.
+  - Current service/repo in this card comes from the lookup/rf snapshot at last_checked_at.
+  - Domain-to-service binding, latest branch, deploy run, and traffic state must be live-verified before deploy or switch.
+  - Do not infer test-environment semantics only because a service name contains -test.
+evidence:
+  -
+    kind: feishu-sheet
+    path: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=0IIBHM"
+    ref: "TBBjs3msohDx1ctQTejcjLrXnhg:0IIBHM"
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: majority=ptc-v5-novabeats-test
+  -
+    kind: rf-getcf-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: domains=10

@@ -93,7 +93,7 @@ def llm_packet(packet: Dict[str, Any]) -> str:
     lines.append(f"  gain_hints[{len(gain_hints)}]:")
     for hint in gain_hints:
         lines.append(f"    - {quote_scalar(hint)}")
-    for section in ("corrections", "alias_guidance", "registry_candidates", "rules", "methods", "memories", "specs", "code_indexes", "relations", "evidence"):
+    for section in ("corrections", "alias_guidance", "relations", "registry_candidates", "rules", "methods", "memories", "specs", "code_indexes", "evidence"):
         items = packet.get(section) or []
         lines.append(f"  {section}[{len(items)}]:")
         for item in items:

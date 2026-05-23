@@ -1,0 +1,91 @@
+id: scmp.ads-sheet.n2xh7i
+type: relation
+title: 剧情游戏10个 0508 -> ptc-copy-threesoulsgame
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: n2xH7i
+  sheet_title: 剧情游戏10个 0508
+aliases:
+  - 剧情游戏10个 0508
+  - Feishu sheet 剧情游戏10个 0508
+  - 广告表 剧情游戏10个 0508
+  - 1001广告表 剧情游戏10个 0508
+  - ptc-copy-threesoulsgame
+  - copy_immerseact
+  - "git@gitlab.adsconflux.xyz:ptc/fe/copy_immerseact.git"
+  - soulcovenantgame.com
+  - boundbysouls.com
+  - soulpactgame.com
+  - trinitypact.com
+  - trinitysoulgame.com
+  - soulbondgame.com
+  - soulcontractgame.com
+  - souloath.com
+  - echosoulgame.com
+  - soulveilgame.com
+truth:
+  status: verified
+  confidence: 0.93
+  basis:
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: majority_service_is_routing_hint; live_verify_domain_binding_before_deploy_or_switch
+summary: Feishu sheet tab 剧情游戏10个 0508 has 10 domains; current lookup/rf resolves 10/10 (100%) to ptc-copy-threesoulsgame. Treat sheet name as a majority-backed business alias for this service/repo, then live-verify before deploy or traffic switch.
+resolution: sheet_alias=剧情游戏10个 0508; majority_service=ptc-copy-threesoulsgame; ratio=10/10; strength=strong_majority_alias
+effect: Skip browsing all Feishu tabs or scanning issue-tracking for this sheet identity; start from current majority service/repo, then verify lookup/rf live for target domains.
+project: copy_immerseact
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=n2xH7i"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: n2xH7i
+  sheet_title: 剧情游戏10个 0508
+current_majority:
+  service: ptc-copy-threesoulsgame
+  repo: "git@gitlab.adsconflux.xyz:ptc/fe/copy_immerseact.git"
+  repo_name: copy_immerseact
+  latest_branch_hint: 2.0.0.12
+  count: 10
+  resolved_domains: 10
+  sheet_domains: 10
+  ratio: 1.0
+  status: verified_majority
+service_counts:
+  -
+    service: ptc-copy-threesoulsgame
+    count: 10
+domains:
+  - soulcovenantgame.com => service=ptc-copy-threesoulsgame; rf=match; repo=copy_immerseact; branch_hint=2.0.0.12
+  - boundbysouls.com => service=ptc-copy-threesoulsgame; rf=match; repo=copy_immerseact; branch_hint=2.0.0.12
+  - soulpactgame.com => service=ptc-copy-threesoulsgame; rf=match; repo=copy_immerseact; branch_hint=2.0.0.12
+  - trinitypact.com => service=ptc-copy-threesoulsgame; rf=match; repo=copy_immerseact; branch_hint=2.0.0.12
+  - trinitysoulgame.com => service=ptc-copy-threesoulsgame; rf=match; repo=copy_immerseact; branch_hint=2.0.0.12
+  - soulbondgame.com => service=ptc-copy-threesoulsgame; rf=match; repo=copy_immerseact; branch_hint=2.0.0.12
+  - soulcontractgame.com => service=ptc-copy-threesoulsgame; rf=match; repo=copy_immerseact; branch_hint=2.0.0.12
+  - souloath.com => service=ptc-copy-threesoulsgame; rf=match; repo=copy_immerseact; branch_hint=2.0.0.12
+  - echosoulgame.com => service=ptc-copy-threesoulsgame; rf=match; repo=copy_immerseact; branch_hint=2.0.0.12
+  - soulveilgame.com => service=ptc-copy-threesoulsgame; rf=match; repo=copy_immerseact; branch_hint=2.0.0.12
+lookup_rf_mismatches:
+  []
+stale_policy:
+  - The Feishu sheet is naming/context evidence, not current deployment truth by itself.
+  - Current service/repo in this card comes from the lookup/rf snapshot at last_checked_at.
+  - Domain-to-service binding, latest branch, deploy run, and traffic state must be live-verified before deploy or switch.
+  - Do not infer test-environment semantics only because a service name contains -test.
+evidence:
+  -
+    kind: feishu-sheet
+    path: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=n2xH7i"
+    ref: "TBBjs3msohDx1ctQTejcjLrXnhg:n2xH7i"
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: majority=ptc-copy-threesoulsgame
+  -
+    kind: rf-getcf-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: domains=10

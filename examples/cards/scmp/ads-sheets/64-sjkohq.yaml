@@ -1,0 +1,72 @@
+id: scmp.ads-sheet.sjkohq
+type: relation
+title: F1赛事模版二5个 0522 -> ptc-f1racing2
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: sjKoHq
+  sheet_title: F1赛事模版二5个 0522
+aliases:
+  - F1赛事模版二5个 0522
+  - Feishu sheet F1赛事模版二5个 0522
+  - 广告表 F1赛事模版二5个 0522
+  - 1001广告表 F1赛事模版二5个 0522
+  - ptc-f1racing2
+  - "git@gitlab.adsconflux.xyz:ptc/fe/ptc-f1racing2.git"
+  - laps.gamesnest.org
+truth:
+  status: partial
+  confidence: 0.68
+  basis:
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: majority_service_is_routing_hint; live_verify_domain_binding_before_deploy_or_switch
+summary: Feishu sheet tab F1赛事模版二5个 0522 has one current domain resolving to ptc-f1racing2; useful alias hint, but not a majority-backed truth.
+resolution: sheet_alias=F1赛事模版二5个 0522; majority_service=ptc-f1racing2; ratio=1/1; strength=single_domain_hint
+effect: Use this as a one-domain alias hint only; verify lookup/rf and ask for confirmation before promoting sheet title to project truth.
+project: ptc-f1racing2
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=sjKoHq"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: sjKoHq
+  sheet_title: F1赛事模版二5个 0522
+current_majority:
+  service: ptc-f1racing2
+  repo: "git@gitlab.adsconflux.xyz:ptc/fe/ptc-f1racing2.git"
+  repo_name: ptc-f1racing2
+  latest_branch_hint: 1.0.0
+  count: 1
+  resolved_domains: 1
+  sheet_domains: 1
+  ratio: 1.0
+  status: single_domain_current
+service_counts:
+  -
+    service: ptc-f1racing2
+    count: 1
+domains:
+  - laps.gamesnest.org => service=ptc-f1racing2; rf=match; repo=ptc-f1racing2; branch_hint=1.0.0
+lookup_rf_mismatches:
+  []
+stale_policy:
+  - The Feishu sheet is naming/context evidence, not current deployment truth by itself.
+  - Current service/repo in this card comes from the lookup/rf snapshot at last_checked_at.
+  - Domain-to-service binding, latest branch, deploy run, and traffic state must be live-verified before deploy or switch.
+  - Do not infer test-environment semantics only because a service name contains -test.
+evidence:
+  -
+    kind: feishu-sheet
+    path: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=sjKoHq"
+    ref: "TBBjs3msohDx1ctQTejcjLrXnhg:sjKoHq"
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: majority=ptc-f1racing2
+  -
+    kind: rf-getcf-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: domains=1

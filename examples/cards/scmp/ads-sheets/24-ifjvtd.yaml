@@ -1,0 +1,67 @@
+id: scmp.ads-sheet.ifjvtd
+type: relation
+title: 汽车测评模版三 -> UNKNOWN
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: ifJVtd
+  sheet_title: 汽车测评模版三
+aliases:
+  - 汽车测评模版三
+  - Feishu sheet 汽车测评模版三
+  - 广告表 汽车测评模版三
+  - 1001广告表 汽车测评模版三
+truth:
+  status: unknown
+  confidence: 0.2
+  basis:
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: majority_service_is_routing_hint; live_verify_domain_binding_before_deploy_or_switch
+summary: Feishu sheet tab 汽车测评模版三 has no parsed domains in the scanned range; do not infer service/repo from the tab name alone.
+resolution: sheet_alias=汽车测评模版三; majority_service=UNKNOWN; ratio=0/0; strength=no_domain_hint
+effect: This only proves the sheet tab exists in the workbook; do not infer service/repo until domains are read or confirmed.
+project: ads-sheet-index
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=ifJVtd"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: ifJVtd
+  sheet_title: 汽车测评模版三
+current_majority:
+  service: ""
+  repo: ""
+  repo_name: ""
+  latest_branch_hint: ""
+  count: 0
+  resolved_domains: 0
+  sheet_domains: 0
+  ratio: 0
+  status: no_domains
+service_counts:
+  []
+domains:
+  []
+lookup_rf_mismatches:
+  []
+stale_policy:
+  - The Feishu sheet is naming/context evidence, not current deployment truth by itself.
+  - Current service/repo in this card comes from the lookup/rf snapshot at last_checked_at.
+  - Domain-to-service binding, latest branch, deploy run, and traffic state must be live-verified before deploy or switch.
+  - Do not infer test-environment semantics only because a service name contains -test.
+evidence:
+  -
+    kind: feishu-sheet
+    path: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=ifJVtd"
+    ref: "TBBjs3msohDx1ctQTejcjLrXnhg:ifJVtd"
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: majority=UNKNOWN
+  -
+    kind: rf-getcf-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: domains=0

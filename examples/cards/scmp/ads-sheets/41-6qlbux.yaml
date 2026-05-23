@@ -1,0 +1,81 @@
+id: scmp.ads-sheet.6qlbux
+type: relation
+title: AI名言模版一5个 0327 -> ptc-v5-ai-famous
+scope:
+  spreadsheet: 【1001项目】广告位信息记录2
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: 6qlBUX
+  sheet_title: AI名言模版一5个 0327
+aliases:
+  - AI名言模版一5个 0327
+  - Feishu sheet AI名言模版一5个 0327
+  - 广告表 AI名言模版一5个 0327
+  - 1001广告表 AI名言模版一5个 0327
+  - ptc-v5-ai-famous
+  - ai_ptc_v5_famous
+  - "git@gitlab.adsconflux.xyz:ptc/fe/ai_ptc_v5_famous.git"
+  - classicquote.mewgenics.pro
+  - singerquote.mewgenics.pro
+  - gamequote.mewgenics.pro
+  - moneyquote.mewgenics.pro
+  - animequote.mewgenics.pro
+truth:
+  status: verified
+  confidence: 0.91
+  basis:
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_checked
+    - rf_getcf_reverse_checked
+  last_checked_at: "2026-05-23T15:53:48Z"
+  use_policy: majority_service_is_routing_hint; live_verify_domain_binding_before_deploy_or_switch
+summary: Feishu sheet tab AI名言模版一5个 0327 has 5 domains; current lookup/rf resolves 5/5 (100%) to ptc-v5-ai-famous. Treat sheet name as a majority-backed business alias for this service/repo, then live-verify before deploy or traffic switch.
+resolution: sheet_alias=AI名言模版一5个 0327; majority_service=ptc-v5-ai-famous; ratio=5/5; strength=strong_majority_alias
+effect: Skip browsing all Feishu tabs or scanning issue-tracking for this sheet identity; start from current majority service/repo, then verify lookup/rf live for target domains.
+project: ai_ptc_v5_famous
+source_sheet:
+  spreadsheet_title: 【1001项目】广告位信息记录2
+  wiki_url: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=6qlBUX"
+  wiki_token: TGEOwuPjXicoqXkQblmcuw7knHd
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: 6qlBUX
+  sheet_title: AI名言模版一5个 0327
+current_majority:
+  service: ptc-v5-ai-famous
+  repo: "git@gitlab.adsconflux.xyz:ptc/fe/ai_ptc_v5_famous.git"
+  repo_name: ai_ptc_v5_famous
+  latest_branch_hint: 2.0.0.12
+  count: 5
+  resolved_domains: 5
+  sheet_domains: 5
+  ratio: 1.0
+  status: verified_majority
+service_counts:
+  -
+    service: ptc-v5-ai-famous
+    count: 5
+domains:
+  - classicquote.mewgenics.pro => service=ptc-v5-ai-famous; rf=match; repo=ai_ptc_v5_famous; branch_hint=2.0.0.12
+  - singerquote.mewgenics.pro => service=ptc-v5-ai-famous; rf=match; repo=ai_ptc_v5_famous; branch_hint=2.0.0.12
+  - gamequote.mewgenics.pro => service=ptc-v5-ai-famous; rf=match; repo=ai_ptc_v5_famous; branch_hint=2.0.0.12
+  - moneyquote.mewgenics.pro => service=ptc-v5-ai-famous; rf=match; repo=ai_ptc_v5_famous; branch_hint=2.0.0.12
+  - animequote.mewgenics.pro => service=ptc-v5-ai-famous; rf=match; repo=ai_ptc_v5_famous; branch_hint=2.0.0.12
+lookup_rf_mismatches:
+  []
+stale_policy:
+  - The Feishu sheet is naming/context evidence, not current deployment truth by itself.
+  - Current service/repo in this card comes from the lookup/rf snapshot at last_checked_at.
+  - Domain-to-service binding, latest branch, deploy run, and traffic state must be live-verified before deploy or switch.
+  - Do not infer test-environment semantics only because a service name contains -test.
+evidence:
+  -
+    kind: feishu-sheet
+    path: "https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=6qlBUX"
+    ref: "TBBjs3msohDx1ctQTejcjLrXnhg:6qlBUX"
+  -
+    kind: lookup-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: majority=ptc-v5-ai-famous
+  -
+    kind: rf-getcf-live
+    path: /tmp/ads_domain_lookup_results.json
+    ref: domains=5
