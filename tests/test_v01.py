@@ -154,13 +154,15 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     assert gain["calibration"]["needs_review"]
     assert gain["recent_queries"][0]["top_card"]
     assert gain["recent_guardrails"]
-    assert "XMEM Gain 收益面板" in text_gain
-    assert "日志计数字段:" in text_gain
-    assert "命中口径:" in text_gain
+    assert "XMEM Gain 关键摘要" in text_gain
+    assert "关键结论:" in text_gain
     assert "收益口径:" in text_gain
-    assert "自校准状态:" in text_gain
-    assert "待校准高估项" in text_gain
-    assert "按事件" in text_gain
+    assert "最该看" in text_gain
+    assert "xmem gain --detail" in text_gain
+    assert "按事件" not in text_gain
+    detail_gain = run([str(XMEM), "gain", "--detail"], repo, env).stdout
+    assert "XMEM Gain 收益面板" in detail_gain
+    assert "按事件" in detail_gain
 
 
 def test_gain_distinguishes_lookup_from_context_savings(tmp_path: Path):
@@ -571,6 +573,74 @@ def test_plain_webnovel_alias_resolves_to_verified_traffic_anchor(tmp_path: Path
     assert packet["traffic_switch"][0]["id"] == "scmp.webnovel1.traffic-switch"
     assert packet["traffic_switch"][0]["project"] == "ai_novabeats"
     assert packet["registry_candidates"] == []
+
+
+def test_context_uses_verified_alias_anchor_inside_long_query(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    wiki = tmp_path / "project-wiki" / "data"
+    wiki.mkdir(parents=True)
+    rows = [
+        {
+            "id": "project-wiki.service.ptc-v5-novabeats1",
+            "type": "wiki.service",
+            "title": "ptc-v5-novabeats1",
+            "project_id": "ptc-v5-novabeats1",
+            "aliases": ["网文二", "网文2", "webnovel2", "ptc_v5_reading"],
+            "truth": {"status": "verified", "confidence": 0.96},
+            "summary": "网文二 production service.",
+        },
+        {
+            "id": "project-wiki.service.ptc-v5-novabeats1-test",
+            "type": "wiki.service",
+            "title": "ptc-v5-novabeats1-test",
+            "project_id": "ptc-v5-novabeats1-test",
+            "aliases": ["网文二 validation_service", "网文2 validation_service", "webnovel2 validation service"],
+            "truth": {"status": "verified", "confidence": 0.94},
+            "summary": "网文二 validation service; not a generic test environment.",
+            "relations": [{"kind": "uses_repo", "target": "ptc/fe/ptc_v5_reading"}],
+        },
+        {
+            "id": "project-wiki.repo.ptc-fe-ptc_v5_reading",
+            "type": "wiki.repo",
+            "title": "ptc/fe/ptc_v5_reading",
+            "project_id": "ptc_v5_reading",
+            "aliases": ["网文二 repo", "网文2 repo", "ptc_v5_reading"],
+            "truth": {"status": "verified", "confidence": 0.96},
+            "summary": "网文二 repo.",
+        },
+    ]
+    (wiki / "xmem-export.cards.jsonl").write_text(
+        "\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + "\n",
+        encoding="utf-8",
+    )
+    cards = tmp_path / "cards"
+    cards.mkdir()
+    (cards / "noisy-sheet.yaml").write_text(
+        "\n".join(
+            [
+                "id: noisy.sheet.webnovel7",
+                "type: relation",
+                "title: 网文小说模版七10个 -> noisy",
+                "aliases:",
+                "  - 网文小说模版七10个",
+                "truth:",
+                "  status: verified",
+                "  confidence: 0.9",
+                "summary: body mentions repo and 网文 but is not 网文二.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    run([str(XMEM), "import", "project-wiki", "--path", str(wiki.parent)], repo, env)
+    run([str(XMEM), "import", "cards", str(cards)], repo, env)
+
+    packet = json.loads(run([str(XMEM), "context", "网文二 repo validation_service", "--json"], repo, env).stdout)
+
+    assert packet["resolution"]["status"] == "resolved"
+    assert packet["resolution"]["do_not_assume_single_project"] is False
+    assert packet["registry_candidates"][0]["id"] == "project-wiki.service.ptc-v5-novabeats1-test"
+    assert all(item["id"] != "noisy.sheet.webnovel7" for item in packet["relations"])
 
 
 def test_feishu_sheet_title_resolves_webnovel1_domain_group(tmp_path: Path):

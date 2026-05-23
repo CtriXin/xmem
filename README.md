@@ -2,7 +2,7 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.28`.
+Current package version: `0.1.29`.
 
 ## Goals
 
@@ -222,11 +222,15 @@ When a query hits a verified `traffic.switch` card, `xmem context` surfaces a `t
 
 Traffic switch wording matters: `validation_service` is a candidate traffic target used to verify new behavior before cutover. It is not a generic test environment, even when the service name contains `-test`.
 
+When a longer query contains a verified compact alias such as `网文二 repo validation_service`, xmem first locks the verified identity family, then treats `repo` / `validation_service` as requested fields. Weak same-template relation cards are hidden once a verified identity anchor exists, so agents do not get noisy unrelated sheet candidates.
+
 ## Guardrails and gain
 
 `xmem check` inspects the current git diff against local and indexed `invariant` / `rule` / `guard` cards. It is intentionally lightweight: it looks for explicit `diff_guard.warn_if_removed`, `warn_if_added`, and `forbid` terms and exits non-zero for human-visible warnings.
 
-`xmem gain` summarizes lookup, `context`, `preflight`, and `check` telemetry from `~/.xmem/gain.jsonl`. Hit/miss/pass/prevented are log counts; `hit` only means candidates were returned. Token savings are rough, uncalibrated estimates for context/preflight matches only, not billing truth. Risk hints come from rule warnings, not confirmed production bugs. By default, `xmem gain` reads all gain rows; use `--limit N` only when you want a recent slice.
+`xmem gain` summarizes lookup, `context`, `preflight`, and `check` telemetry from `~/.xmem/gain.jsonl`. The default view is a short key summary: conclusion, confidence, hit overview, confirmed-vs-rough tokens, risk signals, and the few queries that most need review. Use `xmem gain --detail` only when you need the full event/query tables.
+
+Hit/miss/pass/prevented are log counts; `hit` only means candidates were returned. Token savings are rough, uncalibrated estimates for context/preflight matches only, not billing truth. Risk hints come from rule warnings, not confirmed production bugs. By default, `xmem gain` reads all gain rows; use `--limit N` only when you want a recent slice.
 
 The gain dashboard self-calibrates its own confidence labels. It reports whether the current data is only telemetry/proxy or partially calibrated, surfaces high rough estimates that need review, and records future match quality fields such as `top_score`, `top_status`, and `top_why`.
 
@@ -252,6 +256,8 @@ xmem new                    # create/register .xmem for this folder
 xmem why <query>            # explain matches
 xmem open <card-id-or-query>
 xmem fix                    # record alias correction/dispute
+xmem gain                   # key gain summary only
+xmem gain --detail          # full gain event/query tables
 xmem gain confirm <query>   # confirm a useful xmem hit/outcome
 xmem gain reject <query>    # mark a rough gain estimate as overestimated/wrong
 ```

@@ -24,6 +24,7 @@ xmem new
 xmem check --sources
 xmem fix
 xmem gain
+xmem gain --detail
 ```
 
 ## Workflow
@@ -37,11 +38,15 @@ xmem gain
 7. Use `xmem gain` when asked what xmem saved.
 8. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
 
+`xmem gain` is concise by default. It should show only key signal: conclusion, confidence, hit overview, confirmed-vs-rough token numbers, risk signals, and a few queries needing review. Use `xmem gain --detail` only when the full event/query tables are needed.
+
 Policy rule: when deciding whether a memory is truth, hint, or blocker, use `docs/policies/truth-level.md`, `docs/policies/preflight-severity.md`, and `docs/policies/promotion-policy.md`. In short: Project Wiki pending is hint-only, Issue patterns may be partial until repeated/reviewed, dynamic SCMP facts need live verification, and preflight blockers must stop edits/deploy.
 
 Output rule: use `docs/policies/agent-output-compactness.md` when tool output may be large. Prefer compact summaries and evidence paths; avoid pasting raw SCMP pod JSON, broad issue-tracking grep, safe-access card JSON, Feishu read-back payloads, repeated `_notice` text, or long skill docs into agent context.
 
 `xmem context` is LLM-first: use `resolution.status`, `suggested_queries`, `correction_guidance`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true. Duplicate cards may be fused; read `supporting_cards` for alternate sources behind the primary card.
+
+If a long query contains a verified compact alias such as `网文二 repo validation_service`, treat the verified identity anchor as the route and use the extra words as requested fields. Do not surface weak same-template relation cards once a verified identity family is locked.
 
 For SCMP/domain/service work, also read `traffic_switch` and `gain_hints` when present. A verified `traffic.switch` card can be used as the starting route for prod/validation service, repo, branch hints, approval group, common verification, and skipped lookup guidance. Domain/service binding and latest deploy state still need live verification; Project Wiki pending candidates remain hint-only.
 

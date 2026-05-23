@@ -153,12 +153,14 @@ def build_parser() -> argparse.ArgumentParser:
     gain = sub.add_parser("gain", help="查看 xmem telemetry / 收益口径 / guardrail 统计")
     gain.add_argument("--json", action="store_true", help="输出 JSON")
     gain.add_argument("--no-color", action="store_true", help="关闭 dashboard ANSI 颜色")
+    gain.add_argument("--detail", action="store_true", help="显示完整事件/查询表；默认只显示关键摘要")
     gain.add_argument("--limit", type=int, default=None, help="只读取最近 N 条 gain log；默认读取全部")
     gain_sub = gain.add_subparsers(dest="gain_cmd", metavar="<操作>", parser_class=XmemArgumentParser)
     gain_sub.title = "操作"
     gain_show = gain_sub.add_parser("show", help="显示 xmem telemetry 和粗估收益")
     gain_show.add_argument("--json", action="store_true", help="输出 JSON")
     gain_show.add_argument("--no-color", action="store_true", help="关闭 dashboard ANSI 颜色")
+    gain_show.add_argument("--detail", action="store_true", help="显示完整事件/查询表；默认只显示关键摘要")
     gain_show.add_argument("--limit", type=int, default=None, help="只读取最近 N 条 gain log；默认读取全部")
     gain_confirm = gain_sub.add_parser("confirm", help="确认一次 gain/outcome 信号")
     gain_confirm.add_argument("query")
@@ -841,7 +843,7 @@ def gain_cmd(args: argparse.Namespace) -> int:
         print(json.dumps(data, ensure_ascii=False, indent=2))
     else:
         use_color = sys.stdout.isatty() and not args.no_color and not os.environ.get("NO_COLOR")
-        print(format_gain_dashboard(data, color=use_color))
+        print(format_gain_dashboard(data, color=use_color, detail=getattr(args, "detail", False)))
     return 0
 
 

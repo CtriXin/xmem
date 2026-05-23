@@ -297,7 +297,122 @@ def gain_feedback_id(row: Dict[str, object]) -> str:
     return f"{slugify(str(row.get('query') or row.get('event') or 'gain'), 'gain')[:48]}-{hashlib.sha1(raw.encode()).hexdigest()[:10]}"
 
 
-def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width: Optional[int] = None) -> str:
+def format_gain_dashboard(data: Dict[str, object], *, color: bool = False, width: Optional[int] = None, detail: bool = False) -> str:
+    if detail:
+        return format_gain_detail_dashboard(data, color=color, width=width)
+    return format_gain_summary_dashboard(data, color=color, width=width)
+
+
+def format_gain_summary_dashboard(data: Dict[str, object], *, color: bool = False, width: Optional[int] = None) -> str:
+    observed = data.get("observed") if isinstance(data.get("observed"), dict) else {}
+    top_queries = data.get("top_queries") if isinstance(data.get("top_queries"), list) else []
+    recent_queries = data.get("recent_queries") if isinstance(data.get("recent_queries"), list) else []
+    calibration = data.get("calibration") if isinstance(data.get("calibration"), dict) else {}
+    review_items = calibration.get("needs_review") if isinstance(calibration.get("needs_review"), list) else []
+    hit_rate = float(observed.get("context_hit_rate", 0) or 0)
+    terminal_width = width or shutil.get_terminal_size((96, 24)).columns
+    dashboard_width = min(96, max(72, terminal_width))
+    title = paint("XMEM Gain 关键摘要", "green", color)
+    rule = paint("=" * dashboard_width, "dim", color)
+    thin = paint("-" * dashboard_width, "dim", color)
+    actual_tokens = int(data.get("actual_tokens_saved") or 0)
+    rough_tokens = int(data.get("estimated_tokens_saved") or 0)
+    retrieval_calls = int(observed.get("retrieval_calls") or 0)
+    retrieval_hits = int(observed.get("retrieval_hits") or 0)
+    retrieval_misses = int(observed.get("retrieval_misses") or 0)
+    context_hits = int(observed.get("context_hits") or 0)
+    preflight_hits = int(observed.get("preflight_hits") or 0)
+    guardrail_prevented = int(observed.get("guardrail_prevented") or 0)
+    conclusion = gain_conclusion(calibration, actual_tokens, rough_tokens, retrieval_hits)
+    lines = [
+        title,
+        rule,
+        metric("关键结论", conclusion, color, value_style="green" if actual_tokens else "yellow"),
+        metric(
+            "可信度",
+            f"{calibration_status_text(calibration)}；confirmed={int(calibration.get('confirmed') or 0)} rejected={int(calibration.get('rejected') or 0)} outcomes={int(calibration.get('outcomes') or 0)}；hit=有候选，不等于正确/真实省 token",
+            color,
+            value_style="yellow" if calibration.get("confidence") == "low" else "green",
+        ),
+        metric(
+            "命中概览",
+            f"{retrieval_calls} calls / hit {retrieval_hits} / miss {retrieval_misses}；context {context_hits}，preflight {preflight_hits}",
+            color,
+        ),
+        metric("context 命中率", f"{hit_rate:.1f}% {bar(hit_rate, width=18, color=color)}", color, value_style=rate_style(hit_rate)),
+        metric(
+            "收益口径",
+            f"confirmed={human_number(actual_tokens)} tokens；rough={human_number(rough_tokens)} tokens（非账单事实）",
+            color,
+            value_style="green" if actual_tokens else "dim",
+        ),
+        metric(
+            "风险信号",
+            f"规则拦截 {guardrail_prevented}；风险提示 {int(data.get('estimated_bug_prevented') or 0)}",
+            color,
+            value_style="yellow" if guardrail_prevented else "dim",
+        ),
+        "",
+        paint("最该看", "green", color),
+        thin,
+    ]
+    lines.extend(gain_focus_lines(top_queries, recent_queries, review_items, dashboard_width, color))
+    lines.extend([
+        "",
+        paint("口径", "green", color),
+        thin,
+        "- 默认只显示关键摘要；需要全量事件表时用 `xmem gain --detail`。",
+        "- rough token 是趋势估算；只有 confirmed/outcome 才能当较强收益信号。",
+    ])
+    return "\n".join(lines)
+
+
+def gain_focus_lines(
+    top_queries: List[Dict[str, Any]],
+    recent_queries: List[Dict[str, Any]],
+    review_items: List[Dict[str, Any]],
+    width: int,
+    color: bool,
+) -> List[str]:
+    lines: List[str] = []
+    if top_queries:
+        for item in top_queries[:3]:
+            query = compact_cell(item.get("query", ""), max(20, width - 52))
+            saved = human_number(int(item.get("estimated_tokens_saved") or 0))
+            lines.append(
+                f"- 高频命中: {paint(query, 'cyan', color)} "
+                f"count={int(item.get('count') or 0)} matches={int(item.get('matches') or 0)} rough={saved}"
+            )
+    if review_items:
+        item = review_items[0]
+        query = compact_cell(item.get("query", ""), max(20, width - 46))
+        lines.append(
+            f"- 需要校准: {paint(query, 'yellow', color)} "
+            f"rough={human_number(int(item.get('rough_tokens') or 0))}；别当真实省量"
+        )
+    if recent_queries:
+        item = recent_queries[-1]
+        query = compact_cell(item.get("query", ""), max(20, width - 46))
+        top_card = compact_cell(item.get("top_card", ""), 34)
+        lines.append(f"- 最近查询: {paint(query, 'cyan', color)} -> {top_card or 'no top card'}")
+    if not lines:
+        lines.append("- 暂无关键 gain 信号；先跑 context/preflight/check 后再看。")
+    return lines
+
+
+def gain_conclusion(calibration: Dict[str, object], actual_tokens: int, rough_tokens: int, hits: int) -> str:
+    if actual_tokens:
+        return f"有确认收益 {human_number(actual_tokens)} tokens；仍需区分 confirmed 与 rough"
+    if calibration.get("status") == "partially_calibrated":
+        return "已有人工校准/outcome 信号；看趋势可以，真实省量仍要人工确认"
+    if rough_tokens and hits:
+        return "有检索命中和粗估趋势，但目前主要是 proxy，不是已证明收益"
+    if hits:
+        return "有命中记录，但没有确认收益"
+    return "暂无可用 gain 信号"
+
+
+def format_gain_detail_dashboard(data: Dict[str, object], *, color: bool = False, width: Optional[int] = None) -> str:
     observed = data.get("observed") if isinstance(data.get("observed"), dict) else {}
     by_event = data.get("by_event") if isinstance(data.get("by_event"), list) else []
     top_queries = data.get("top_queries") if isinstance(data.get("top_queries"), list) else []

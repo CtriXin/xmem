@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List
 
 from .toon import compact
 from .source_check import source_freshness
 from .sources import audit_local_sources
-from .util import field_from_text, list_after_key, normalize_text
+from .util import field_from_text, list_after_key, normalize_text, query_terms
 
 
 REGISTRY_TYPES = {"identity", "wiki.service", "wiki.repo", "wiki.domain", "wiki.project"}
@@ -70,11 +71,13 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     suggested_queries = canonical_queries_from_corrections(query, corrections)
     allow_high_signal_hints = looks_like_specific_service_or_domain(query)
 
+    dominant_registry = dominant_strong_registry(strong_registry)
+
     if not cards:
         resolution = "missing"
     elif strong_correction:
         resolution = "guided_by_correction"
-    elif len(strong_registry) == 1:
+    elif len(strong_registry) == 1 or dominant_registry:
         resolution = "resolved"
     elif len(strong_registry) > 1:
         resolution = "ambiguous"
@@ -109,14 +112,16 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     if local_source_health.get("local_only_knowledge_cards"):
         warnings.append("some local knowledge cards are not portable through git; treat them as machine-local until tracked or exported")
 
+    registry_anchor = dominant_registry or (strong_registry[0] if len(strong_registry) == 1 else None)
     registry_for_packet = compact_registry_candidates(
         registry,
         bool(strong_registry),
         bool(strong_traffic),
         bool(strong_relation),
         allow_high_signal_hints=allow_high_signal_hints,
+        anchor=registry_anchor,
     )
-    relations_for_packet = compact_relation_cards(relations, strong_relation)
+    relations_for_packet = compact_relation_cards(relations, strong_relation, has_identity_anchor=bool(strong_registry or strong_traffic))
     next_reads = unique_paths(traffic[:3] + relations_for_packet[:4] + registry_for_packet[:4] + rules[:3] + methods[:3] + specs[:4] + code_indexes[:5] + memories[:3] + evidence[:3])
     packet = {
         "schema": "xmem.context.v1",
@@ -125,7 +130,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "resolution": {
             "status": resolution,
             "do_not_assume_single_project": resolution in {"ambiguous", "guided_by_alias_card", "guided_by_correction"},
-            "reason": resolution_reason(resolution, strong_registry, strong_traffic, strong_relation, cards, correction_guidance_items),
+            "reason": resolution_reason(resolution, [dominant_registry] if dominant_registry else strong_registry, strong_traffic, strong_relation, cards, correction_guidance_items),
         },
         "current": current_brief(current),
         "suggested_queries": suggested_queries,
@@ -157,7 +162,12 @@ def compact_registry_candidates(
     has_verified_traffic_anchor: bool = False,
     has_verified_relation_anchor: bool = False,
     allow_high_signal_hints: bool = False,
+    anchor: Dict[str, Any] | None = None,
 ) -> List[Dict[str, Any]]:
+    if anchor:
+        anchored = registry_family_candidates(anchor, registry)
+        if anchored:
+            return anchored[:8]
     if (has_verified_traffic_anchor or has_verified_relation_anchor) and not has_verified_registry_anchor:
         # Verified traffic/relation cards are stronger task anchors than weak
         # legacy Project Wiki template matches such as "模版一".
@@ -173,7 +183,68 @@ def compact_registry_candidates(
     return (verified[:6] + others[:2])[:8]
 
 
-def compact_relation_cards(relations: List[Dict[str, Any]], strong_relations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def registry_family_candidates(anchor: Dict[str, Any], registry: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    anchor_keys = identity_family_keys(anchor)
+    if not anchor_keys:
+        return [anchor]
+    verified: List[Dict[str, Any]] = []
+    hints: List[Dict[str, Any]] = []
+    for card in registry:
+        if card.get("card_id") == anchor.get("card_id"):
+            verified.append(card)
+            continue
+        if not (anchor_keys & identity_family_keys(card)):
+            continue
+        if card.get("status") == "verified":
+            verified.append(card)
+        elif float(card.get("score") or 0) >= 8:
+            hints.append(card)
+    return dedupe_cards(verified + hints[:2])
+
+
+def identity_family_keys(card: Dict[str, Any]) -> set[str]:
+    values: List[str] = [str(card.get("title", "")), str(card.get("card_id", ""))]
+    try:
+        values.extend(json.loads(card.get("aliases_json") or "[]"))
+    except Exception:
+        pass
+    keys: set[str] = set()
+    for value in values:
+        if not is_compact_identity_alias(value):
+            continue
+        norm = normalize_text(value)
+        keys.add(norm)
+        keys.update(re.findall(r"[\u4e00-\u9fff]+[0-9]+|[a-z]+[0-9]+", norm))
+        if looks_like_specific_service_or_domain(value):
+            keys.add(norm.replace("gitgitlabadsconfluxxyzptcfe", "").removesuffix("git"))
+    return {key for key in keys if is_identity_family_key(key)}
+
+
+def is_identity_family_key(key: str) -> bool:
+    if not key or key in IDENTITY_ALIAS_STOPWORDS:
+        return False
+    if any("\u4e00" <= char <= "\u9fff" for char in key):
+        return any(char.isdigit() for char in key) or len(key) >= 4
+    return len(key) >= 4
+
+
+def dedupe_cards(cards: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for card in cards:
+        cid = str(card.get("card_id") or card.get("id") or "")
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        out.append(card)
+    return out
+
+
+def compact_relation_cards(relations: List[Dict[str, Any]], strong_relations: List[Dict[str, Any]], *, has_identity_anchor: bool = False) -> List[Dict[str, Any]]:
+    if has_identity_anchor and not strong_relations:
+        # Once a verified service/repo/traffic anchor is found, weak relation
+        # cards (for example same-template ad-sheet matches) become noise.
+        return []
     if not strong_relations:
         return relations[:5]
     top_score = max(float(c.get("score") or 0) for c in strong_relations)
@@ -188,6 +259,27 @@ def compact_relation_cards(relations: List[Dict[str, Any]], strong_relations: Li
 def looks_like_specific_service_or_domain(query: str) -> bool:
     text = str(query or "").strip()
     return "." in text or "-" in text or "/" in text or "_" in text
+
+
+IDENTITY_ALIAS_STOPWORDS = {
+    "alias",
+    "aliases",
+    "repo",
+    "service",
+    "domain",
+    "deployment",
+    "branch",
+    "project",
+    "implements",
+    "uses_repo",
+    "belongs_to",
+    "deployed_as",
+    "has_branch",
+    "source_of",
+    "validation_service",
+    "production_service",
+    "prod_service",
+}
 
 
 def is_strong_identity_match(card: Dict[str, Any], query: str, *, min_score: float) -> bool:
@@ -211,14 +303,53 @@ def is_strong_identity_match(card: Dict[str, Any], query: str, *, min_score: flo
         if anorm == qnorm:
             return True
         if anorm in qnorm:
-            if looks_like_specific_service_or_domain(value) or len(anorm) >= 8:
+            if looks_like_specific_service_or_domain(value) or len(anorm) >= 8 or is_compact_identity_alias(value):
                 return True
+        if is_compact_identity_alias(value) and alias_terms_match_query(value, query):
+            return True
         if qnorm in anorm:
             if looks_like_specific_service_or_domain(query) or len(qnorm) >= max(8, int(len(anorm) * 0.75)):
                 return True
     if "metadata_match:" in why and looks_like_specific_service_or_domain(query):
         return True
     return False
+
+
+def is_compact_identity_alias(value: Any) -> bool:
+    text = str(value or "").strip()
+    norm = normalize_text(text)
+    if not norm or norm in IDENTITY_ALIAS_STOPWORDS:
+        return False
+    if len(norm) < 2:
+        return False
+    if any("\u4e00" <= char <= "\u9fff" for char in text):
+        return len(norm) >= 2
+    if any(char.isdigit() for char in norm):
+        return len(norm) >= 4
+    if any(char in text for char in "-_./"):
+        return len(norm) >= 5
+    return False
+
+
+def alias_terms_match_query(alias: Any, query: str) -> bool:
+    terms = [normalize_text(term) for term in query_terms(str(alias)) if normalize_text(term)]
+    meaningful = [term for term in terms if term not in IDENTITY_ALIAS_STOPWORDS and len(term) >= 1]
+    if len(meaningful) < 2:
+        return False
+    qnorm = normalize_text(query)
+    return all(term in qnorm for term in meaningful)
+
+
+def dominant_strong_registry(strong_registry: List[Dict[str, Any]]) -> Dict[str, Any] | None:
+    if len(strong_registry) < 2:
+        return None
+    first = strong_registry[0]
+    second = strong_registry[1]
+    first_score = float(first.get("score") or 0)
+    second_score = float(second.get("score") or 0)
+    if first_score - second_score >= 2.0:
+        return first
+    return None
 
 
 def compact_traffic_switches(traffic: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
