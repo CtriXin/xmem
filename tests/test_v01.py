@@ -290,31 +290,31 @@ def test_project_wiki_agent_inbox_pending_maps_as_partial_hint(tmp_path: Path):
         "targetEntityId": "service:ptc-v5-novabeats1",
         "payload": {
             "type": "scmp_lookup_association",
-            "summary": "action.readoxa.com resolved to webnovel template 2 service ptc-v5-novabeats1 / ptc_v5_reading.",
+            "summary": "pending-readoxa.example.com resolved to webnovel template 2 service ptc-v5-novabeats1 / ptc_v5_reading.",
             "mappingChanged": "yes",
             "project": "ptc_v5_reading",
             "displayName": "网文小说模版二",
-            "aliases": ["网文2", "action.readoxa.com"],
-            "domains": ["action.readoxa.com"],
+            "aliases": ["网文2", "pending-readoxa.example.com"],
+            "domains": ["pending-readoxa.example.com"],
             "service": "ptc-v5-novabeats1",
             "repo": "git@gitlab.adsconflux.xyz:ptc/fe/ptc_v5_reading.git",
             "localPath": "/Users/xin/ptc_v5_reading",
             "branch": "t102748-home3-ads-20260522",
             "commit": "5e6a0b7",
-            "evidence": ["/tmp/readoxa-check/action.readoxa.com.png"],
+            "evidence": ["/tmp/pending-readoxa-check/pending-readoxa.example.com.png"],
         },
         "validation": [
             {"label": "scmp association closeout", "ok": True, "detail": "mode=lookup"},
             {"label": "issue-recorder linked", "ok": False, "detail": "missing issue path/id"},
         ],
-        "evidenceIds": ["/tmp/readoxa-check/action.readoxa.com.png"],
+        "evidenceIds": ["/tmp/pending-readoxa-check/pending-readoxa.example.com.png"],
         "receivedAt": "2026-05-23T04:25:02Z",
         "id": "wr_scmp_readoxa_pending",
     }
     inbox.write_text(json.dumps(row, ensure_ascii=False) + "\n", encoding="utf-8")
 
     synced = json.loads(run([str(XMEM), "sync", "--json"], repo, env).stdout)
-    packet = json.loads(run([str(XMEM), "context", "action.readoxa.com", "--json"], repo, env).stdout)
+    packet = json.loads(run([str(XMEM), "context", "pending-readoxa.example.com", "--json"], repo, env).stdout)
     matches = [item for item in packet["registry_candidates"] if item["id"] == "project-wiki.pending.wr_scmp_readoxa_pending"]
 
     assert synced["project_wiki"]["pending_cards"] == 1
@@ -323,7 +323,7 @@ def test_project_wiki_agent_inbox_pending_maps_as_partial_hint(tmp_path: Path):
     assert matches[0]["type"] == "wiki.pending"
     assert matches[0]["source"] == "project-wiki-pending"
     assert matches[0]["confidence"] <= 0.6
-    assert "action.readoxa.com" in matches[0]["aliases"]
+    assert "pending-readoxa.example.com" in matches[0]["aliases"]
     assert packet["resolution"]["status"] == "partial"
     assert any("not verified" in warning for warning in packet["warnings"])
     assert any("agent-inbox.jsonl" in path for path in packet["next_reads"])
@@ -527,6 +527,19 @@ def test_context_returns_traffic_switch_packet_from_verified_cards(tmp_path: Pat
     assert "validation_service: ptc-v5-novabeats1-test" in text_packet
     assert "test_service:" not in text_packet
     assert "gain_hints" in text_packet
+
+
+def test_plain_webnovel_alias_resolves_to_verified_traffic_anchor(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(run([str(XMEM), "context", "网文一", "--json"], repo, env).stdout)
+
+    assert packet["resolution"]["status"] == "resolved"
+    assert packet["resolution"]["do_not_assume_single_project"] is False
+    assert packet["traffic_switch"][0]["id"] == "scmp.webnovel1.traffic-switch"
+    assert packet["traffic_switch"][0]["project"] == "ai_novabeats"
+    assert packet["registry_candidates"] == []
 
 
 def test_issue_tracking_imports_bug_patterns_as_rules(tmp_path: Path):

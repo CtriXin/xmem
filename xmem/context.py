@@ -67,17 +67,22 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     strong_traffic = [c for c in traffic if c.get("status") == "verified" and float(c.get("score") or 0) >= 6]
     correction_guidance_items = correction_guidance(query, corrections)
     suggested_queries = canonical_queries_from_corrections(query, corrections)
+    allow_high_signal_hints = looks_like_specific_service_or_domain(query)
 
     if not cards:
         resolution = "missing"
     elif strong_correction:
         resolution = "guided_by_correction"
-    elif strong_alias:
-        resolution = "guided_by_alias_card"
     elif len(strong_registry) == 1:
         resolution = "resolved"
     elif len(strong_registry) > 1:
         resolution = "ambiguous"
+    elif len(strong_traffic) == 1:
+        resolution = "resolved"
+    elif len(strong_traffic) > 1:
+        resolution = "ambiguous"
+    elif strong_alias:
+        resolution = "guided_by_alias_card"
     else:
         resolution = "partial"
 
@@ -86,7 +91,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         warnings.append("multiple verified registry candidates matched; do not assume a single project")
     if correction_guidance_items:
         warnings.append("query matched a correction/dispute overlay; prefer canonical aliases and verify before editing")
-    if any(c.get("status") in {"inferred", "partial", "stale", "unknown", "disputed"} for c in cards[:5]):
+    if any(c.get("status") in {"inferred", "partial", "stale", "unknown", "disputed"} for c in cards[:5]) and not (strong_traffic and not allow_high_signal_hints):
         warnings.append("some top cards are not verified; use as hints only")
     if any(c.get("source") == "code-index-bridge" for c in cards[:8]):
         warnings.append("code index matches are generated refs; verify in source files before editing")
@@ -99,7 +104,12 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     if local_source_health.get("local_only_knowledge_cards"):
         warnings.append("some local knowledge cards are not portable through git; treat them as machine-local until tracked or exported")
 
-    registry_for_packet = compact_registry_candidates(registry, bool(strong_registry or strong_traffic))
+    registry_for_packet = compact_registry_candidates(
+        registry,
+        bool(strong_registry),
+        bool(strong_traffic),
+        allow_high_signal_hints=allow_high_signal_hints,
+    )
     next_reads = unique_paths(traffic[:3] + registry_for_packet[:4] + rules[:3] + methods[:3] + specs[:4] + code_indexes[:5] + relations[:3] + memories[:3] + evidence[:3])
     packet = {
         "schema": "xmem.context.v1",
@@ -108,7 +118,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "resolution": {
             "status": resolution,
             "do_not_assume_single_project": resolution in {"ambiguous", "guided_by_alias_card", "guided_by_correction"},
-            "reason": resolution_reason(resolution, strong_registry, cards, correction_guidance_items),
+            "reason": resolution_reason(resolution, strong_registry, strong_traffic, cards, correction_guidance_items),
         },
         "current": current_brief(current),
         "suggested_queries": suggested_queries,
@@ -134,12 +144,30 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     return packet
 
 
-def compact_registry_candidates(registry: List[Dict[str, Any]], has_verified_anchor: bool) -> List[Dict[str, Any]]:
-    if not has_verified_anchor:
+def compact_registry_candidates(
+    registry: List[Dict[str, Any]],
+    has_verified_registry_anchor: bool,
+    has_verified_traffic_anchor: bool = False,
+    allow_high_signal_hints: bool = False,
+) -> List[Dict[str, Any]]:
+    if has_verified_traffic_anchor and not has_verified_registry_anchor:
+        # A verified traffic-switch card is a stronger project/service anchor
+        # than weak legacy Project Wiki template matches such as "模版一".
+        verified = [c for c in registry if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
+        if not allow_high_signal_hints:
+            return verified[:4]
+        high_signal_hints = [c for c in registry if c.get("status") != "verified" and float(c.get("score") or 0) >= 8]
+        return (verified[:4] + high_signal_hints[:2])[:6]
+    if not has_verified_registry_anchor:
         return registry[:8]
     verified = [c for c in registry if c.get("status") == "verified"]
     others = [c for c in registry if c.get("status") != "verified"]
     return (verified[:6] + others[:2])[:8]
+
+
+def looks_like_specific_service_or_domain(query: str) -> bool:
+    text = str(query or "").strip()
+    return "." in text or "-" in text or "/" in text or "_" in text
 
 
 def compact_traffic_switches(traffic: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -259,6 +287,7 @@ def correction_guidance(query: str, corrections: List[Dict[str, Any]]) -> List[D
 def resolution_reason(
     resolution: str,
     strong_registry: List[Dict[str, Any]],
+    strong_traffic: List[Dict[str, Any]],
     cards: List[Dict[str, Any]],
     guidance: List[Dict[str, Any]] | None = None,
 ) -> str:
@@ -274,10 +303,15 @@ def resolution_reason(
         return f"correction/dispute card matched: {strong_registry_label(strong_registry)}"
     if resolution == "guided_by_alias_card":
         return f"canonical alias guidance matched: {strong_registry_label(strong_registry)}"
-    if resolution == "resolved":
+    if resolution == "resolved" and strong_registry:
         return f"one verified registry candidate matched strongly: {strong_registry[0].get('card_id')}"
+    if resolution == "resolved" and strong_traffic:
+        return f"one verified traffic-switch card matched strongly: {strong_traffic[0].get('card_id')}"
     if resolution == "ambiguous":
-        return f"{len(strong_registry)} verified registry candidates matched strongly"
+        if strong_registry:
+            return f"{len(strong_registry)} verified registry candidates matched strongly"
+        if strong_traffic:
+            return f"{len(strong_traffic)} verified traffic-switch cards matched strongly"
     return "matched cards exist, but no single verified registry candidate is strong enough"
 
 
