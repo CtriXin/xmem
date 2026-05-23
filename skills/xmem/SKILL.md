@@ -47,7 +47,9 @@ For SCMP/domain/service work, also read `traffic_switch` and `gain_hints` when p
 
 Traffic switch wording rule: `validation_service` is a candidate traffic target for validating new behavior before cutover, not a generic test environment. Do not infer test-environment semantics only because a service name contains `-test`.
 
-`xmem preflight` is the development-start packet. Use `readiness`, `risk_level`, `known_bug_patterns`, `must_keep`, `avoid`, `known_failure_modes`, `required_checks`, and `source_refs` before editing. If `readiness` is `blocked_source_stale`, sync first; if it is `needs_disambiguation`, resolve the project/entity before changing code.
+`xmem preflight` is the development-start packet. Use `severity`, `can_proceed`, `blockers`, `required_before_edit`, `required_before_deploy`, `readiness`, `risk_level`, `known_bug_patterns`, `must_keep`, `avoid`, `known_failure_modes`, `required_checks`, and `source_refs` before editing. If `severity` is `block` or `can_proceed` is false, stop edits/deploy until blockers are resolved. If `readiness` is `blocked_source_stale`, sync first; if it is `needs_disambiguation`, resolve the project/entity before changing code.
+
+For SCMP/Feishu/issue/rg/log-heavy work, preflight may activate compact-output guardrails. Prefer compact JSON/TOON summaries, store bulky raw output as evidence files, and check current issue/progress, xmem context, Project Wiki index, and directed repo reads before broad grep.
 
 ## Agent hooks
 

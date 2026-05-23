@@ -195,7 +195,12 @@ Use `xmem why` for human/debug match reasons and `xmem context --json` for exact
 ```text
 xmem_preflight:
   readiness: ready_with_guards | needs_disambiguation | blocked_source_stale | no_prior_memory
+  severity: hint | warn | block
+  can_proceed: true | false
   risk_level: high | medium | low | unknown
+  blockers: ...
+  required_before_edit: ...
+  required_before_deploy: ...
   known_bug_patterns: ...
   invariants: ...
   must_keep: ...
@@ -205,9 +210,9 @@ xmem_preflight:
   source_refs: ...
 ```
 
-Agents should run `xmem preflight "<task>"` before implementation/bugfix work, then preserve `must_keep`, avoid known failure modes, and run `required_checks`. If source freshness is stale, sync first; if project identity is ambiguous, disambiguate before editing.
+Agents should run `xmem preflight "<task>"` before implementation/bugfix work, then obey `severity`, `can_proceed`, `blockers`, `required_before_edit`, and `required_before_deploy` before editing/deploying. Preserve `must_keep`, avoid known failure modes, and run `required_checks`. If source freshness is stale, sync first; if project identity is ambiguous, disambiguate before editing.
 
-Preflight severity policy: hints only route the next read; warnings require preserving the invariant or running the check; blockers stop edits/deploy until resolved. Blockers include stale source exports, ambiguous production target, verified invariant removal, SCMP deploy payload/path mismatch, unconverged pods, failed safe-access/live verification, and missing domain binding for traffic-switch work.
+Preflight severity policy: hints only route the next read; warnings require preserving the invariant or running the check; blockers stop edits/deploy until resolved. Blockers include stale source exports, ambiguous production target, verified invariant removal, SCMP deploy payload/path mismatch, unconverged pods, failed safe-access/live verification, and missing domain binding for traffic-switch work. SCMP/Feishu/issue/rg/log queries also activate compact-output guardrails: summarize for agents and store bulky raw output as evidence paths.
 
 `xmem context` conservatively fuses duplicate cards with the same title and type family. The best card stays in `rules` / `methods` / `relations`, and matching duplicates appear as `supporting_cards`, keeping LLM packets compact while preserving source traceability.
 

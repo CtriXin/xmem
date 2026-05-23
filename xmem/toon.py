@@ -125,6 +125,19 @@ def preflight_packet(packet: Dict[str, Any]) -> str:
     lines = ["xmem_preflight:"]
     for key in ("schema", "truth_policy", "query", "intent", "readiness", "risk_level", "action"):
         lines.append(f"  {key}: {quote_scalar(packet.get(key, ''))}")
+    lines.append(f"  severity: {quote_scalar(packet.get('severity', ''))}")
+    lines.append(f"  can_proceed: {quote_scalar(packet.get('can_proceed', ''))}")
+    blockers = packet.get("blockers") or []
+    lines.append(f"  blockers[{len(blockers)}]:")
+    for item in blockers:
+        lines.append(f"    - code: {quote_scalar(item.get('code', ''))}")
+        lines.append(f"      text: {quote_scalar(compact(item.get('text', ''), 180))}")
+        lines.append(f"      severity: {quote_scalar(item.get('severity', ''))}")
+    for section in ("required_before_edit", "required_before_deploy"):
+        items = packet.get(section) or []
+        lines.append(f"  {section}[{len(items)}]:")
+        for item in items:
+            lines.append(f"    - {quote_scalar(compact(item, 200))}")
     freshness = packet.get("source_freshness") or {}
     lines.append("  source_freshness:")
     for key in ("status", "stale_exports", "registry"):

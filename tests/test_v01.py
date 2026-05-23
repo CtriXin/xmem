@@ -709,6 +709,60 @@ def test_preflight_filters_weak_body_only_guards(tmp_path: Path):
     assert all("ads.noise" not in ref for ref in packet["source_refs"])
 
 
+def test_preflight_gate_blocks_runtime_deploy_blockers(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+
+    packet = json.loads(run([str(XMEM), "preflight", "SCMP deploy domain binding mismatch pod not converged", "--json"], repo, env).stdout)
+    text_packet = run([str(XMEM), "preflight", "SCMP deploy domain binding mismatch pod not converged"], repo, env).stdout
+
+    assert packet["severity"] == "block"
+    assert packet["can_proceed"] is False
+    codes = {item["code"] for item in packet["blockers"]}
+    assert "domain_binding_missing" in codes
+    assert "pod_not_converged" in codes
+    assert any("domain-to-service binding" in item for item in packet["required_before_deploy"])
+    assert "severity: block" in text_packet
+    assert "required_before_deploy" in text_packet
+
+
+def test_preflight_adds_compact_output_guard(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    cards = tmp_path / "cards"
+    cards.mkdir()
+    (cards / "compact-output.yaml").write_text(
+        "\n".join(
+            [
+                "id: xmem.policy.agent-output-compactness",
+                "type: rule",
+                "title: Agent-facing compact output policy",
+                "aliases:",
+                "  - no raw SCMP JSON",
+                "  - broad rg token waste",
+                "truth:",
+                "  status: verified",
+                "  confidence: 0.92",
+                "summary: Prefer compact tool summaries and evidence paths over raw JSON/logs.",
+                "forbid:",
+                "  - Pasting full SCMP pod API raw JSON when compact pod status fields are enough.",
+                "checks:",
+                "  - Prefer compact JSON or TOON-style summaries for structured tool output.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    run([str(XMEM), "import", "cards", str(cards)], repo, env)
+
+    packet = json.loads(run([str(XMEM), "preflight", "avoid raw SCMP pod JSON broad issue-tracking grep", "--json"], repo, env).stdout)
+
+    assert packet["severity"] == "warn"
+    assert packet["can_proceed"] is True
+    assert not packet["blockers"]
+    assert any("compact JSON/TOON" in item for item in packet["required_before_edit"])
+    assert any("raw JSON" in item["text"] for item in packet["avoid"])
+    assert any("compact-output guard active" in warning for warning in packet["warnings"])
+
+
 def test_check_sources_reports_export_shape_errors(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     export = tmp_path / "project-wiki" / "data" / "xmem-export.cards.jsonl"
