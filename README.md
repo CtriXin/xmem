@@ -148,6 +148,7 @@ Detailed governance lives in `docs/policies/`:
 - `docs/policies/truth-level.md`: source precedence, promotion/demotion, dynamic-fact TTL, and conflict rules.
 - `docs/policies/preflight-severity.md`: how agents interpret `xmem preflight` as `hint`, `warn`, or `block`.
 - `docs/policies/promotion-policy.md`: how Project Wiki pending rows, Issue patterns, and xmem cards are promoted, merged, or rejected.
+- `docs/policies/agent-output-compactness.md`: how agents avoid raw JSON, broad grep, long docs, repeated notices, and duplicated closeout text.
 
 Short rule cards for these policies live under `examples/cards/policy/`, so `xmem context "truth level policy"` and `xmem preflight "deploy blocker"` can surface the policy without reading long docs first.
 
@@ -227,6 +228,8 @@ The gain dashboard self-calibrates its own confidence labels. It reports whether
 Outcome signals improve gain calibration over time. `xmem hook finish|fix|bug --verified` appends an `outcome.*` row to `gain.jsonl`, and `xmem gain confirm <query>` / `xmem gain reject <query>` can record explicit human calibration. These signals still do not turn rough token estimates into billing truth, but they let the dashboard distinguish pure proxy data from partially calibrated outcomes.
 
 Confirmed/rejected gain outcomes also create review outbox items under `~/.xmem/outbox/gain-feedback`. Confirmed outcomes queue a Project Wiki review request; rejected or bug-prevented outcomes queue an Issue Record seed. This keeps upstream truth human-reviewed instead of silently mutating Project Wiki or issue records.
+
+Agent-facing output should be compact by default. Prefer compact JSON or TOON-style summaries with evidence paths over full SCMP pod JSON, broad issue-tracking grep, raw safe-access/Feishu payloads, repeated lark-cli notices, or long skill/reference dumps. Raw payloads should be redirected to files and cited by path unless the user explicitly asks to see them.
 
 ## Useful commands
 

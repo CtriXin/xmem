@@ -1,0 +1,34 @@
+id: xmem.policy.agent-output-compactness
+type: rule
+title: Agent-facing compact output policy
+scope:
+  system: xmem
+aliases:
+  - compact output policy
+  - agent-facing summary
+  - large JSON token waste
+  - broad rg token waste
+  - no raw SCMP JSON
+  - no broad issue grep
+truth:
+  status: verified
+  confidence: 0.92
+  basis:
+    - policy_doc
+    - user_confirmed_token_waste
+  last_checked_at: 2026-05-23T16:40:00Z
+summary: Prefer compact tool summaries and evidence paths over raw JSON/logs; avoid broad grep, long skill docs, repeated notices, raw pod/env payloads, and duplicated closeout text.
+forbid:
+  - Pasting full SCMP pod API raw JSON when compact pod status fields are enough.
+  - Running broad rg over /Users/xin or all issue-tracking before current issue, xmem, Project Wiki, and directed repo reads.
+  - Returning full safe-access card JSON or Feishu message raw JSON when compact status/read-back fields are enough.
+  - Repeating lark-cli _notice/version warnings in every agent context.
+  - Copying long SKILL.md/reference docs when a targeted section is enough.
+checks:
+  - Prefer compact JSON or TOON-style summaries for structured tool output.
+  - Store raw output as evidence path; cite path instead of pasting raw payload.
+  - Use current issue/progress, xmem context, Project Wiki index, and directed rg before broad search.
+  - Reuse one compact closeout card for progress, issue timeline, Project Wiki writeback, and handoff.
+evidence:
+  - kind: policy
+    path: docs/policies/agent-output-compactness.md
