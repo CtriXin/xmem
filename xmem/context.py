@@ -41,7 +41,9 @@ SOURCE_RANK = {
     "project-wiki": 70,
     "code-index-bridge": 66,
     "project-wiki-pending": 64,
+    "xmem-project-wiki-outbox": 62,
     "issue-tracking": 60,
+    "xmem-issue-outbox": 58,
 }
 
 
@@ -85,6 +87,8 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         warnings.append("some top cards are not verified; use as hints only")
     if any(c.get("source") == "code-index-bridge" for c in cards[:8]):
         warnings.append("code index matches are generated refs; verify in source files before editing")
+    if any(str(c.get("source") or "").startswith("xmem-") and "outbox" in str(c.get("source") or "") for c in cards[:8]):
+        warnings.append("xmem outbox matches are pending writebacks/seeds; verify with Project Wiki or Issue Record before treating as truth")
     freshness = source_freshness()
     if freshness.get("status") != "fresh":
         warnings.append("source exports are newer than registry or registry is missing; run xmem sync before relying on this packet")

@@ -329,6 +329,82 @@ def test_project_wiki_agent_inbox_pending_maps_as_partial_hint(tmp_path: Path):
     assert any("agent-inbox.jsonl" in path for path in packet["next_reads"])
 
 
+def test_sync_imports_xmem_outbox_as_pending_hints(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    home = Path(env["XMEM_HOME"])
+    wiki_outbox = home / "outbox" / "project-wiki"
+    issue_outbox = home / "outbox" / "issue-tracking"
+    wiki_outbox.mkdir(parents=True)
+    issue_outbox.mkdir(parents=True)
+    request = {
+        "status": "pending",
+        "risk": "needs_review",
+        "actor": "xmem-hook",
+        "action": "append_record",
+        "targetEntityId": "service:demo-outbox",
+        "payload": {
+            "type": "xmem_hook_memory",
+            "summary": "pending.example.com maps to demo-outbox service until Project Wiki accepts it.",
+            "project": "demo-outbox",
+            "displayName": "Demo Outbox",
+            "aliases": ["demo outbox", "pending.example.com"],
+            "domains": ["pending.example.com"],
+            "service": "demo-outbox-service",
+            "repo": "git@example.com:demo/outbox.git",
+            "localPath": str(repo),
+            "branch": "main",
+            "xmemCard": str(repo / ".xmem" / "cards" / "hook.demo.yaml"),
+        },
+        "validation": [{"label": "xmem hook captured", "ok": True, "detail": "unit"}],
+        "evidenceIds": ["xmem:test"],
+        "receivedAt": "2026-05-23T00:00:00Z",
+        "id": "wr_xmem_demo_outbox",
+    }
+    (wiki_outbox / "wr_xmem_demo_outbox.json").write_text(json.dumps(request, ensure_ascii=False), encoding="utf-8")
+    (issue_outbox / "issue_xmem_demo.md").write_text(
+        "\n".join(
+            [
+                "# Issue Seed",
+                "",
+                "- Project: demo-outbox",
+                f"- Repo path: {repo}",
+                "- Branch: main",
+                "- Issue: issue_xmem_demo",
+                "- Task name: pending issue outbox lazyload guard",
+                "- Work type: bug",
+                "- Status: pending",
+                "- Source: xmem hook",
+                f"- xmemCard: {repo / '.xmem' / 'cards' / 'hook.demo.yaml'}",
+                "",
+                "## Summary",
+                "pending issue seed records a lazyload regression candidate.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    synced = json.loads(run([str(XMEM), "sync", "--json"], repo, env).stdout)
+    wiki_packet = json.loads(run([str(XMEM), "context", "pending.example.com", "--json"], repo, env).stdout)
+    issue_packet = json.loads(run([str(XMEM), "context", "pending issue outbox lazyload", "--json"], repo, env).stdout)
+    status = json.loads(run([str(XMEM), "status", "--json"], repo, env).stdout)
+
+    assert synced["xmem_outbox"]["cards"] == 2
+    wiki_matches = [item for item in wiki_packet["registry_candidates"] if item["id"] == "project-wiki.pending.wr_xmem_demo_outbox"]
+    assert wiki_matches
+    assert wiki_matches[0]["source"] == "xmem-project-wiki-outbox"
+    assert wiki_matches[0]["truth"] == "partial"
+    assert any("outbox" in warning for warning in wiki_packet["warnings"])
+    assert any("wr_xmem_demo_outbox.json" in path for path in wiki_packet["next_reads"])
+    issue_matches = [item for item in issue_packet["evidence"] if item["source"] == "xmem-issue-outbox"]
+    assert issue_matches
+    assert issue_matches[0]["truth"] == "partial"
+    assert any("issue_xmem_demo.md" in path for path in issue_packet["next_reads"])
+    assert status["outbox"]["project_wiki"] == 1
+    assert status["outbox"]["issue_tracking"] == 1
+    assert status["outbox"]["total"] >= 2
+
+
 def test_imports_context_specs_and_trellis_sources(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     (repo / "CONTEXT.md").write_text(

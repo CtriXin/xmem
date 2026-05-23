@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 from .store import connect, log_event, upsert_card, upsert_evidence, upsert_project
-from .util import field_from_text, flatten_strings, read_json, slugify, utc_now
+from .util import field_from_text, flatten_strings, home_dir, read_json, slugify, utc_now
 
 VALID_STATUSES = {"verified", "inferred", "partial", "stale", "disputed", "unknown"}
 
@@ -385,6 +385,139 @@ def import_bug_patterns(path: Path, source: str = "issue-bug-patterns") -> Dict[
         log_event(conn, "import.bug-patterns", payload={"path": str(path), "source": source, "cards": cards, "evidence": evidence})
         conn.commit()
     return {"cards": cards, "evidence": evidence}
+
+
+def import_xmem_outbox(path: Path | None = None) -> Dict[str, Any]:
+    base = (path or (home_dir() / "outbox")).expanduser()
+    project_wiki = import_project_wiki_outbox(base / "project-wiki")
+    issue_tracking = import_issue_tracking_outbox(base / "issue-tracking")
+    return {
+        "path": str(base),
+        "project_wiki": project_wiki,
+        "issue_tracking": issue_tracking,
+        "cards": int(project_wiki.get("cards") or 0) + int(issue_tracking.get("cards") or 0),
+        "evidence": int(project_wiki.get("evidence") or 0) + int(issue_tracking.get("evidence") or 0),
+        "errors": int(project_wiki.get("errors") or 0) + int(issue_tracking.get("errors") or 0),
+    }
+
+
+def import_project_wiki_outbox(path: Path, source: str = "xmem-project-wiki-outbox") -> Dict[str, int]:
+    files = sorted(path.glob("*.json")) if path.exists() else []
+    cards = 0
+    evidence = 0
+    errors = 0
+    if not files:
+        return {"files": 0, "cards": 0, "evidence": 0, "errors": 0}
+    with connect() as conn:
+        for file in files:
+            try:
+                item = json.loads(file.read_text(encoding="utf-8"))
+            except Exception:
+                errors += 1
+                continue
+            if not isinstance(item, dict) or not item:
+                errors += 1
+                continue
+            if should_skip_pending_inbox_row(item):
+                continue
+            exported = pending_inbox_to_export_card(item, file, 1)
+            card = card_from_export_item(exported, file, 1, source)
+            upsert_card(conn, card)
+            cards += 1
+            for ev in evidence_from_export_item(exported, card, source):
+                upsert_evidence(conn, ev)
+                evidence += 1
+        log_event(conn, "import.xmem-project-wiki-outbox", payload={"path": str(path), "files": len(files), "cards": cards, "evidence": evidence, "errors": errors})
+        conn.commit()
+    return {"files": len(files), "cards": cards, "evidence": evidence, "errors": errors}
+
+
+def import_issue_tracking_outbox(path: Path, source: str = "xmem-issue-outbox") -> Dict[str, int]:
+    files = sorted(path.glob("*.md")) if path.exists() else []
+    cards = 0
+    evidence = 0
+    errors = 0
+    if not files:
+        return {"files": 0, "cards": 0, "evidence": 0, "errors": 0}
+    with connect() as conn:
+        for file in files:
+            try:
+                card = issue_seed_to_card(file, source)
+            except Exception:
+                errors += 1
+                continue
+            upsert_project_from_issue_seed(conn, card, source)
+            upsert_card(conn, card)
+            upsert_evidence(conn, evidence_from_issue_seed(card, source))
+            cards += 1
+            evidence += 1
+        log_event(conn, "import.xmem-issue-outbox", payload={"path": str(path), "files": len(files), "cards": cards, "evidence": evidence, "errors": errors})
+        conn.commit()
+    return {"files": len(files), "cards": cards, "evidence": evidence, "errors": errors}
+
+
+def issue_seed_to_card(file: Path, source: str) -> Dict[str, Any]:
+    text = file.read_text(encoding="utf-8", errors="ignore")
+    issue_id = field_from_text(text, "Issue") or file.stem
+    project = field_from_text(text, "Project")
+    repo = field_from_text(text, "Repo path")
+    branch = field_from_text(text, "Branch")
+    title = field_from_text(text, "Task name") or issue_id
+    status_raw = field_from_text(text, "Status")
+    work_type = field_from_text(text, "Work type")
+    xmem_card = field_from_text(text, "xmemCard")
+    verified = "verified" in status_raw.lower()
+    aliases = list(dict.fromkeys([project, issue_id, title, repo, branch, work_type, xmem_card, summarize_issue(text, 500)]))
+    return {
+        "card_id": f"xmem.issue-outbox.{slugify(issue_id, 'issue')}",
+        "project_id": slugify(project, "xmem-issue-outbox"),
+        "type": "evidence.issue",
+        "title": f"Pending Issue Record seed: {title}",
+        "path": str(file),
+        "status": "partial",
+        "confidence": 0.6 if verified else 0.45,
+        "aliases": [item for item in aliases if item][:80],
+        "body": text,
+        "updated_at": utc_now(),
+        "source": source,
+        "source_ref": str(file),
+    }
+
+
+def upsert_project_from_issue_seed(conn: Any, card: Dict[str, Any], source: str) -> None:
+    body = str(card.get("body") or "")
+    project_id = str(card.get("project_id") or "")
+    if not project_id:
+        return
+    upsert_project(conn, {
+        "project_id": project_id,
+        "name": field_from_text(body, "Project") or project_id,
+        "root": field_from_text(body, "Repo path"),
+        "remote": "",
+        "branch": field_from_text(body, "Branch"),
+        "tech_stack": "",
+        "aliases": card.get("aliases", []),
+        "status": "partial",
+        "updated_at": str(card.get("updated_at") or utc_now()),
+        "source": source,
+    })
+
+
+def evidence_from_issue_seed(card: Dict[str, Any], source: str) -> Dict[str, Any]:
+    key = str(card.get("path") or card.get("card_id") or "")
+    return {
+        "evidence_id": f"{source}.{hashlib.sha1(key.encode()).hexdigest()[:16]}",
+        "card_id": card["card_id"],
+        "project_id": card.get("project_id", ""),
+        "kind": "issue-seed",
+        "ref": field_from_text(str(card.get("body") or ""), "Issue") or card["card_id"],
+        "path": str(card.get("path") or ""),
+        "title": str(card.get("title") or ""),
+        "status": str(card.get("status") or "partial"),
+        "body": summarize_issue(str(card.get("body") or "")),
+        "updated_at": str(card.get("updated_at") or utc_now()),
+        "source": source,
+    }
 
 
 def import_context_docs(path: Path) -> Dict[str, int]:

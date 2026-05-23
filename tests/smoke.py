@@ -27,8 +27,8 @@ def main() -> None:
         run(["git", "init", "-q"], repo, env)
         run(["git", "config", "user.email", "test@example.com"], repo, env)
         run(["git", "config", "user.name", "test"], repo, env)
-        (repo / "ad.txt").write_text("lazyload\nIntersectionObserver\n", encoding="utf-8")
-        run(["git", "add", "ad.txt"], repo, env)
+        (repo / "AdBanner.tsx").write_text("lazyload\nIntersectionObserver\n", encoding="utf-8")
+        run(["git", "add", "AdBanner.tsx"], repo, env)
         run(["git", "commit", "-q", "-m", "init"], repo, env)
         run([str(XMEM), "init", "--project-id", "smoke", "--alias", "smoke ads"], repo, env)
         sources = json.loads((base / "home" / "sources.json").read_text(encoding="utf-8"))
@@ -49,7 +49,7 @@ def main() -> None:
         linked_status = run([str(shim), "status"], repo, env).stdout
         assert "registry_exists: true" in linked_status
         shutil.copy(ROOT / "examples" / "cards" / "ads.lazyload.yaml", repo / ".xmem" / "cards" / "ads.lazyload.yaml")
-        (repo / "ad.txt").write_text("lazyload\n", encoding="utf-8")
+        (repo / "AdBanner.tsx").write_text("lazyload\n", encoding="utf-8")
         proc = run([str(XMEM), "check"], repo, env, check=False)
         assert proc.returncode == 2, proc.stdout + proc.stderr
         assert "IntersectionObserver" in proc.stdout

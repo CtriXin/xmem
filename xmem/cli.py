@@ -24,6 +24,7 @@ from .importers import (
     import_project_wiki,
     import_speckit,
     import_trellis,
+    import_xmem_outbox,
     import_xmem_export,
 )
 from .project import detect_project, index_local, init_project
@@ -421,6 +422,14 @@ def sync_cmd(args: argparse.Namespace) -> int:
                 f"{code_indexes.get('cards', 0)} cards, "
                 f"errors={len(code_indexes.get('errors') or [])}"
             )
+        xmem_outbox = data.get("xmem_outbox") or {}
+        if xmem_outbox:
+            print(
+                "xmem_outbox: "
+                f"cards={xmem_outbox.get('cards', 0)} "
+                f"evidence={xmem_outbox.get('evidence', 0)} "
+                f"errors={xmem_outbox.get('errors', 0)}"
+            )
         status = data.get("status", {})
         source_exports = status.get("source_exports") or {}
         if source_exports:
@@ -538,7 +547,7 @@ def status_next_actions(data: dict[str, Any]) -> list[str]:
     backup = data.get("backup") or {}
     if backup.get("next_action"):
         actions.append(str(backup["next_action"]))
-    if int(outbox.get("project_wiki") or 0) or int(outbox.get("issue_tracking") or 0):
+    if int(outbox.get("total") or 0):
         actions.append("review xmem outbox and promote accepted Project Wiki / Issue Record writes")
     if not actions:
         actions.append("no blocking xmem maintenance action")
@@ -573,7 +582,13 @@ def status_cmd(args: argparse.Namespace) -> int:
                 for item in [d for d in audit.get("details", []) if d.get("local_only_knowledge_cards")][:3]:
                     print(f"- {item.get('root')}: {item.get('local_only_knowledge_cards')} local-only knowledge cards ({item.get('status')})")
         outbox = data.get("outbox", {})
-        print(f"outbox: project_wiki={outbox.get('project_wiki', 0)} issue_tracking={outbox.get('issue_tracking', 0)}")
+        print(
+            "outbox: "
+            f"project_wiki={outbox.get('project_wiki', 0)} "
+            f"issue_tracking={outbox.get('issue_tracking', 0)} "
+            f"gain_feedback={outbox.get('gain_feedback', 0)} "
+            f"total={outbox.get('total', 0)}"
+        )
         backup = data.get("backup") or {}
         print(
             "backup: "
@@ -759,7 +774,13 @@ def hook_cmd(args: argparse.Namespace) -> int:
                 print(f"{name}: {item.get('status')} {item.get('path')}")
         counts = data.get("outbox_counts") or data.get("outbox") or {}
         if "project_wiki" in counts or "issue_tracking" in counts:
-            print(f"outbox: project_wiki={counts.get('project_wiki', 0)} issue_tracking={counts.get('issue_tracking', 0)}")
+            print(
+                "outbox: "
+                f"project_wiki={counts.get('project_wiki', 0)} "
+                f"issue_tracking={counts.get('issue_tracking', 0)} "
+                f"gain_feedback={counts.get('gain_feedback', 0)} "
+                f"total={counts.get('total', 0)}"
+            )
         if data.get("matches"):
             print(f"matches: {len(data['matches'])}")
     return 0
@@ -849,6 +870,7 @@ def rebuild_data(args: argparse.Namespace) -> dict[str, Any]:
         if not args.skip_cards:
             result["cards"] = import_cards(Path(args.cards))
             result["global_cards"] = import_cards(home_dir() / "cards")
+        result["xmem_outbox"] = import_xmem_outbox()
         if not args.skip_project_wiki:
             pw = Path(args.project_wiki)
             has_project_wiki_source = (

@@ -246,10 +246,13 @@ def project_wiki_status() -> Dict[str, Any]:
 
 def outbox_counts() -> Dict[str, int]:
     base = home_dir() / "outbox"
-    return {
+    counts = {
         "project_wiki": count_files(base / "project-wiki"),
         "issue_tracking": count_files(base / "issue-tracking"),
+        "gain_feedback": count_files(base / "gain-feedback"),
     }
+    counts["total"] = sum(counts.values())
+    return counts
 
 
 def count_files(path: Path) -> int:

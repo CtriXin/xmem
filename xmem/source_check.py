@@ -9,6 +9,7 @@ from .health import local_card_suggestions
 from .importers import bug_pattern_to_export_card, iter_jsonl, looks_like_bug_pattern, normalize_status
 from .sources import audit_local_sources
 from .store import db_path
+from .util import home_dir
 
 VALID_STATUSES = {"verified", "inferred", "partial", "stale", "disputed", "unknown"}
 
@@ -28,7 +29,18 @@ def default_freshness_paths() -> List[Dict[str, str]]:
     return [
         *default_source_paths(),
         {"kind": "project-wiki-agent-inbox", "path": str(project_wiki / "data" / "agent-inbox.jsonl")},
+        *default_outbox_freshness_paths(),
     ]
+
+
+def default_outbox_freshness_paths() -> List[Dict[str, str]]:
+    base = home_dir() / "outbox"
+    paths: List[Dict[str, str]] = []
+    for file in sorted((base / "project-wiki").glob("*.json")) if (base / "project-wiki").exists() else []:
+        paths.append({"kind": "xmem-project-wiki-outbox", "path": str(file)})
+    for file in sorted((base / "issue-tracking").glob("*.md")) if (base / "issue-tracking").exists() else []:
+        paths.append({"kind": "xmem-issue-tracking-outbox", "path": str(file)})
+    return paths
 
 
 def check_source_exports(paths: Iterable[Dict[str, str]] | None = None) -> Dict[str, Any]:

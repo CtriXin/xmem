@@ -242,13 +242,18 @@ def build_doctor_report(status: Dict[str, Any], cwd: Path | None = None) -> Dict
         }
     )
 
-    outbox_count = int(outbox.get("project_wiki") or 0) + int(outbox.get("issue_tracking") or 0)
+    outbox_count = int(outbox.get("total") or 0)
     components.append(
         {
             "name": "outbox",
             "severity": "warn" if outbox_count else "ok",
             "status": "pending" if outbox_count else "empty",
-            "summary": f"project_wiki={outbox.get('project_wiki', 0)} issue_tracking={outbox.get('issue_tracking', 0)}",
+            "summary": (
+                f"project_wiki={outbox.get('project_wiki', 0)} "
+                f"issue_tracking={outbox.get('issue_tracking', 0)} "
+                f"gain_feedback={outbox.get('gain_feedback', 0)} "
+                f"total={outbox_count}"
+            ),
         }
     )
 
