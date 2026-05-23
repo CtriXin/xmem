@@ -20,23 +20,27 @@ summary: Compact routing card for common 网文1 domains; use it to avoid scanni
 project: ai_novabeats
 template: webnovel1
 prod_service: ptc-v5-novabeats
-test_service: ptc-v5-novabeats-test
+validation_service: ptc-v5-novabeats-test
+role_semantics:
+  - validation_service is not a generic test environment; it is a candidate service used to validate new feature behavior before traffic switch.
+  - Service names may contain -test, but agents must not infer QA/test-environment semantics from the name.
 domains:
   - adventure.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats; apex=subdomain; www=unverified; note=t102748 home_3 prod
   - mystery.bookuya.com => template=webnovel1; service=ptc-v5-novabeats; apex=subdomain; www=unverified; note=home_2 investigation baseline
-  - readprox.com => template=webnovel1; service=ptc-v5-novabeats/ptc-v5-novabeats-test pending switch evidence; apex=apex; www=unverified
-  - test.bookuya.com => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified
-  - goread.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
-  - inovel.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
-  - talehub.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
-  - newbook.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
-  - hotfiction.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
-  - hotstroy.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
-  - page.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
-  - chapter.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
-  - hotread.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
-  - newread.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - readprox.com => template=webnovel1; service=ptc-v5-novabeats; validation_service=ptc-v5-novabeats-test pending switch evidence; apex=apex; www=unverified
+  - test.bookuya.com => template=webnovel1; validation_service=ptc-v5-novabeats-test; apex=subdomain; www=unverified
+  - goread.stealabrainrot-wiki.org => template=webnovel1; validation_service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - inovel.stealabrainrot-wiki.org => template=webnovel1; validation_service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - talehub.stealabrainrot-wiki.org => template=webnovel1; validation_service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - newbook.stealabrainrot-wiki.org => template=webnovel1; validation_service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - hotfiction.stealabrainrot-wiki.org => template=webnovel1; validation_service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - hotstroy.stealabrainrot-wiki.org => template=webnovel1; validation_service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - page.stealabrainrot-wiki.org => template=webnovel1; validation_service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - chapter.stealabrainrot-wiki.org => template=webnovel1; validation_service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - hotread.stealabrainrot-wiki.org => template=webnovel1; validation_service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - newread.stealabrainrot-wiki.org => template=webnovel1; validation_service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
 stale_policy:
+  - Do not treat validation_service as a test environment; live verify it as a candidate traffic target.
   - Treat this as routing memory only; live domain binding must be checked before switch/deploy.
 evidence:
   - kind: issue

@@ -515,13 +515,17 @@ def test_context_returns_traffic_switch_packet_from_verified_cards(tmp_path: Pat
     assert traffic["truth"] == "verified"
     assert traffic["project"] == "ptc_v5_reading"
     assert traffic["prod_service"] == "ptc-v5-novabeats1"
-    assert traffic["test_service"] == "ptc-v5-novabeats1-test"
+    assert traffic["validation_service"] == "ptc-v5-novabeats1-test"
+    assert "test_service" not in traffic
+    assert any("not a generic test environment" in item for item in traffic["role_semantics"])
     assert any("action.readoxa.com" in item for item in traffic["domains"])
     assert any("live verified" in item or "live verify" in item for item in traffic["stale_policy"])
     assert any("skip broad repo/issue scan" in item for item in packet["gain_hints"])
     assert len([item for item in packet["registry_candidates"] if item["truth"] != "verified"]) <= 2
     assert "traffic_switch[" in text_packet
     assert "prod_service: ptc-v5-novabeats1" in text_packet
+    assert "validation_service: ptc-v5-novabeats1-test" in text_packet
+    assert "test_service:" not in text_packet
     assert "gain_hints" in text_packet
 
 

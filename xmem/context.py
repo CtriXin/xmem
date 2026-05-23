@@ -155,7 +155,7 @@ def compact_traffic_switches(traffic: List[Dict[str, Any]]) -> List[Dict[str, An
 def gain_hints(traffic: List[Dict[str, Any]], registry: List[Dict[str, Any]], code_indexes: List[Dict[str, Any]]) -> List[str]:
     hints: List[str] = []
     if any(c.get("status") == "verified" for c in traffic):
-        hints.append("skip broad repo/issue scan for project identity; start from traffic_switch prod/test service and repo hints")
+        hints.append("skip broad repo/issue scan for project identity; start from traffic_switch prod/validation service and repo hints")
         hints.append("read traffic_switch source_refs only when facts conflict or mapping must be promoted")
     if registry:
         hints.append("skip Project Wiki full-text search unless registry candidates are partial/conflicting")
@@ -172,12 +172,13 @@ def traffic_switch_brief(card: Dict[str, Any], rank: int) -> Dict[str, Any]:
         "template": field_from_text(body, "template"),
         "repo": field_from_text(body, "repo"),
         "prod_service": field_from_text(body, "prod_service"),
-        "test_service": field_from_text(body, "test_service"),
+        "validation_service": field_from_text(body, "validation_service"),
         "prod_pipeline_hint": field_from_text(body, "prod_pipeline_hint"),
-        "test_pipeline_hint": field_from_text(body, "test_pipeline_hint"),
+        "validation_pipeline_hint": field_from_text(body, "validation_pipeline_hint"),
         "prod_branch_hint": field_from_text(body, "prod_branch_hint"),
-        "test_branch_hint": field_from_text(body, "test_branch_hint"),
+        "validation_branch_hint": field_from_text(body, "validation_branch_hint"),
         "approval_group": field_from_text(body, "approval_group"),
+        "role_semantics": list_after_key(body, "role_semantics")[:6],
         "repo_local_hints": list_after_key(body, "repo_local_hints")[:6],
         "domains": list_after_key(body, "domains")[:20],
         "common_verification": list_after_key(body, "common_verification")[:8],

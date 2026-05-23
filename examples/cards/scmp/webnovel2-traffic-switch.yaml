@@ -22,7 +22,7 @@ truth:
     - project_wiki_pending_cross_checked
     - scmp_deploy_evidence
   last_checked_at: 2026-05-23T13:26:00Z
-summary: 网文2 stable execution chain is 网文2 -> ptc_v5_reading -> prod ptc-v5-novabeats1 -> test ptc-v5-novabeats1-test. Use this as a verified starting packet, then live-verify domain/service binding before traffic switch or deploy.
+summary: 网文2 stable execution chain is 网文2 -> ptc_v5_reading -> prod ptc-v5-novabeats1 -> validation service ptc-v5-novabeats1-test. Use this as a verified starting packet, then live-verify domain/service binding before traffic switch or deploy.
 template: webnovel2
 project: ptc_v5_reading
 repo: git@gitlab.adsconflux.xyz:ptc/fe/ptc_v5_reading.git
@@ -31,12 +31,15 @@ repo_local_hints:
   - /Users/xin/ptc_v5_reading__test_sync_home3_20260523
   - /Users/xin/ptc_v5_reading_wt_1.0.19.9
 prod_service: ptc-v5-novabeats1
-test_service: ptc-v5-novabeats1-test
+validation_service: ptc-v5-novabeats1-test
 prod_pipeline_hint: ptc-v5-novabeats1-2210
-test_pipeline_hint: ptc-v5-novabeats1-test-2440
+validation_pipeline_hint: ptc-v5-novabeats1-test-2440
 prod_branch_hint: t102748-home3-ads-20260522
-test_branch_hint: test/nuxt-cos-fallback-20260514
+validation_branch_hint: test/nuxt-cos-fallback-20260514
 approval_group: 域名自动化流程
+role_semantics:
+  - validation_service is not a generic test environment; it is a candidate service used to validate new feature behavior before traffic switch.
+  - Service names may contain -test, but agents must not infer QA/test-environment semantics from the name.
 relations:
   - source: 网文2
     target: ptc_v5_reading
@@ -46,10 +49,10 @@ relations:
     kind: prod_service
   - source: ptc_v5_reading
     target: ptc-v5-novabeats1-test
-    kind: test_service
+    kind: validation_service
   - source: ptc-v5-novabeats1
     target: ptc-v5-novabeats1-test
-    kind: traffic_switch_pair
+    kind: traffic_switch_candidate_pair
 domains:
   - biography.stealabrainrot-wiki.org
   - action.readoxa.com
@@ -65,12 +68,13 @@ common_verification:
   - lookup <domain>
   - rf getcf <domain>
   - SCMP safe-access for current service domains plus target sample domain.
-  - Direct pod Host-header check for test-only validation when public domain still points to prod.
+  - Direct pod Host-header check against the validation service while public domain still points to prod.
 can_skip:
   - Do not rg /Users/xin or scan all issue-tracking to identify project/service; start from this packet.
   - Do not infer repo from folder names; use repo and service hints here, then live verify.
   - Do not read every Project Wiki pending row; read source_refs only if facts conflict or mapping must be promoted.
 stale_policy:
+  - Do not treat validation_service as a test environment; live verify it as a candidate traffic target.
   - Domain-to-service binding and current deploy state must be live verified before deploy or traffic switch.
   - Repo-to-service relation can be used as verified starting truth for routing.
   - Branch hints are task/time scoped and must be checked against git/SCMP before release.

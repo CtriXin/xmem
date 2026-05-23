@@ -2,7 +2,7 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.24`.
+Current package version: `0.1.25`.
 
 ## Goals
 
@@ -167,7 +167,7 @@ xmem_context:
     status: resolved | ambiguous | partial | missing
     do_not_assume_single_project: true | false
   traffic_switch:
-    - prod_service / test_service / repo / branch hints / domains / stale_policy
+    - prod_service / validation_service / repo / branch hints / domains / stale_policy
   gain_hints: ...
   suggested_queries: ...
   correction_guidance: ...
@@ -202,7 +202,9 @@ Agents should run `xmem preflight "<task>"` before implementation/bugfix work, t
 
 If a query hits a correction card, xmem expands the canonical alias as an extra search internally and marks the packet as `guided_by_correction` instead of pretending the wrong alias is reliable truth.
 
-When a query hits a verified `traffic.switch` card, `xmem context` surfaces a `traffic_switch` packet before lower-confidence Project Wiki pending rows. This gives agents prod/test service, repo, branch hints, approval group, common verification, stale policy, and "what lookup can be skipped" guidance without scanning issue-tracking. Domain/service binding and latest deploy state still require live verification.
+When a query hits a verified `traffic.switch` card, `xmem context` surfaces a `traffic_switch` packet before lower-confidence Project Wiki pending rows. This gives agents prod/validation service, repo, branch hints, approval group, common verification, stale policy, and "what lookup can be skipped" guidance without scanning issue-tracking. Domain/service binding and latest deploy state still require live verification.
+
+Traffic switch wording matters: `validation_service` is a candidate traffic target used to verify new behavior before cutover. It is not a generic test environment, even when the service name contains `-test`.
 
 ## Guardrails and gain
 

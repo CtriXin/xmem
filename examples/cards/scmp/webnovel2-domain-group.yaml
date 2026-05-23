@@ -20,15 +20,19 @@ summary: Compact routing card for common 网文2 domains; use it to avoid scanni
 project: ptc_v5_reading
 template: webnovel2
 prod_service: ptc-v5-novabeats1
-test_service: ptc-v5-novabeats1-test
+validation_service: ptc-v5-novabeats1-test
+role_semantics:
+  - validation_service is not a generic test environment; it is a candidate service used to validate new feature behavior before traffic switch.
+  - Service names may contain -test, but agents must not infer QA/test-environment semantics from the name.
 domains:
   - biography.stealabrainrot-wiki.org => template=webnovel2; service=ptc-v5-novabeats1; apex=subdomain; www=unverified; note=t102748 home_3 prod
   - action.readoxa.com => template=webnovel2; service=ptc-v5-novabeats1; apex=subdomain; www=unverified; note=white-screen/debug mapping
-  - action.ficsie.com => template=webnovel2; service=ptc-v5-novabeats1-test pending/verified in issue flow; apex=subdomain; www=unverified
-  - story.stealabrainrot-wiki.org => template=webnovel2; service=ptc-v5-novabeats1/ptc-v5-novabeats1-test; apex=subdomain; www=unverified
+  - action.ficsie.com => template=webnovel2; validation_service=ptc-v5-novabeats1-test pending/verified in issue flow; apex=subdomain; www=unverified
+  - story.stealabrainrot-wiki.org => template=webnovel2; service=ptc-v5-novabeats1; validation_service=ptc-v5-novabeats1-test; apex=subdomain; www=unverified
   - readnewline.com => template=webnovel2; service=ptc-v5-novabeats1; apex=apex; www=unverified
-  - test.readnewline.com => template=webnovel2; service=ptc-v5-novabeats1-test; apex=subdomain; www=unverified
+  - test.readnewline.com => template=webnovel2; validation_service=ptc-v5-novabeats1-test; apex=subdomain; www=unverified
 stale_policy:
+  - Do not treat validation_service as a test environment; live verify it as a candidate traffic target.
   - Treat this as routing memory only; live domain binding must be checked before switch/deploy.
 evidence:
   - kind: issue

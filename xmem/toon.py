@@ -205,17 +205,17 @@ def traffic_item(item: Dict[str, Any], indent: int) -> List[str]:
         "template",
         "repo",
         "prod_service",
-        "test_service",
+        "validation_service",
         "prod_pipeline_hint",
-        "test_pipeline_hint",
+        "validation_pipeline_hint",
         "prod_branch_hint",
-        "test_branch_hint",
+        "validation_branch_hint",
         "approval_group",
     ):
         value = item.get(key, "")
         if value:
             lines.append(f"{sub}{key}: {quote_scalar(compact(value, 160))}")
-    for key in ("repo_local_hints", "domains", "common_verification", "can_skip", "stale_policy"):
+    for key in ("role_semantics", "repo_local_hints", "domains", "common_verification", "can_skip", "stale_policy"):
         values = item.get(key) or []
         if not values:
             continue
