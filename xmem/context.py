@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 from .toon import compact
 from .source_check import source_freshness
 from .sources import audit_local_sources
-from .util import list_after_key, normalize_text
+from .util import field_from_text, list_after_key, normalize_text
 
 
 REGISTRY_TYPES = {"identity", "wiki.service", "wiki.repo", "wiki.domain", "wiki.project"}
@@ -27,6 +27,7 @@ SPEC_TYPES = {
     "spec.constitution",
 }
 CODE_TYPES = {"code.index", "code.hotspot"}
+TRAFFIC_TYPES = {"traffic.switch", "traffic-switch", "scmp.traffic-switch"}
 STATUS_RANK = {"verified": 60, "partial": 40, "inferred": 30, "stale": 20, "unknown": 10, "disputed": 0}
 SOURCE_RANK = {
     "local-card": 100,
@@ -59,9 +60,11 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     memories = [c for c in cards if c.get("type") in MEMORY_TYPES]
     specs = [c for c in cards if c.get("type") in SPEC_TYPES]
     code_indexes = [c for c in cards if c.get("type") in CODE_TYPES]
+    traffic = compact_traffic_switches([c for c in cards if c.get("type") in TRAFFIC_TYPES])
     strong_alias = [c for c in alias_cards if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
     strong_correction = [c for c in corrections if c.get("status") in {"verified", "disputed"} and float(c.get("score") or 0) >= 8]
     strong_registry = [c for c in registry if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
+    strong_traffic = [c for c in traffic if c.get("status") == "verified" and float(c.get("score") or 0) >= 6]
     correction_guidance_items = correction_guidance(query, corrections)
     suggested_queries = canonical_queries_from_corrections(query, corrections)
 
@@ -96,7 +99,8 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     if local_source_health.get("local_only_knowledge_cards"):
         warnings.append("some local knowledge cards are not portable through git; treat them as machine-local until tracked or exported")
 
-    next_reads = unique_paths(registry[:4] + rules[:3] + methods[:3] + specs[:4] + code_indexes[:5] + relations[:3] + memories[:3] + evidence[:3])
+    registry_for_packet = compact_registry_candidates(registry, bool(strong_registry or strong_traffic))
+    next_reads = unique_paths(traffic[:3] + registry_for_packet[:4] + rules[:3] + methods[:3] + specs[:4] + code_indexes[:5] + relations[:3] + memories[:3] + evidence[:3])
     packet = {
         "schema": "xmem.context.v1",
         "truth_policy": "files/code/runtime are truth; sqlite is generated index/cache",
@@ -111,7 +115,9 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "correction_guidance": correction_guidance_items,
         "corrections": [card_brief(c, i + 1) for i, c in enumerate(corrections[:5])],
         "alias_guidance": [card_brief(c, i + 1) for i, c in enumerate(alias_cards[:5])],
-        "registry_candidates": [card_brief(c, i + 1) for i, c in enumerate(registry[:8])],
+        "traffic_switch": [traffic_switch_brief(c, i + 1) for i, c in enumerate(traffic[:4])],
+        "gain_hints": gain_hints(traffic, registry, code_indexes),
+        "registry_candidates": [card_brief(c, i + 1) for i, c in enumerate(registry_for_packet)],
         "rules": [card_brief(c, i + 1) for i, c in enumerate(rules[:5])],
         "methods": [card_brief(c, i + 1) for i, c in enumerate(methods[:5])],
         "memories": [card_brief(c, i + 1) for i, c in enumerate(memories[:5])],
@@ -126,6 +132,59 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "latest_events": event_briefs(events),
     }
     return packet
+
+
+def compact_registry_candidates(registry: List[Dict[str, Any]], has_verified_anchor: bool) -> List[Dict[str, Any]]:
+    if not has_verified_anchor:
+        return registry[:8]
+    verified = [c for c in registry if c.get("status") == "verified"]
+    others = [c for c in registry if c.get("status") != "verified"]
+    return (verified[:6] + others[:2])[:8]
+
+
+def compact_traffic_switches(traffic: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not traffic:
+        return []
+    top_score = float(traffic[0].get("score") or 0)
+    if top_score < 10:
+        return traffic[:4]
+    threshold = top_score * 0.85
+    return [card for card in traffic if float(card.get("score") or 0) >= threshold][:4]
+
+
+def gain_hints(traffic: List[Dict[str, Any]], registry: List[Dict[str, Any]], code_indexes: List[Dict[str, Any]]) -> List[str]:
+    hints: List[str] = []
+    if any(c.get("status") == "verified" for c in traffic):
+        hints.append("skip broad repo/issue scan for project identity; start from traffic_switch prod/test service and repo hints")
+        hints.append("read traffic_switch source_refs only when facts conflict or mapping must be promoted")
+    if registry:
+        hints.append("skip Project Wiki full-text search unless registry candidates are partial/conflicting")
+    if code_indexes:
+        hints.append("skip full repo rg first; use code_indexes/hotspots as directed entry points, then verify in source")
+    return hints[:5]
+
+
+def traffic_switch_brief(card: Dict[str, Any], rank: int) -> Dict[str, Any]:
+    body = str(card.get("body") or "")
+    brief = card_brief(card, rank)
+    brief.update({
+        "project": field_from_text(body, "project"),
+        "template": field_from_text(body, "template"),
+        "repo": field_from_text(body, "repo"),
+        "prod_service": field_from_text(body, "prod_service"),
+        "test_service": field_from_text(body, "test_service"),
+        "prod_pipeline_hint": field_from_text(body, "prod_pipeline_hint"),
+        "test_pipeline_hint": field_from_text(body, "test_pipeline_hint"),
+        "prod_branch_hint": field_from_text(body, "prod_branch_hint"),
+        "test_branch_hint": field_from_text(body, "test_branch_hint"),
+        "approval_group": field_from_text(body, "approval_group"),
+        "repo_local_hints": list_after_key(body, "repo_local_hints")[:6],
+        "domains": list_after_key(body, "domains")[:20],
+        "common_verification": list_after_key(body, "common_verification")[:8],
+        "can_skip": list_after_key(body, "can_skip")[:8],
+        "stale_policy": list_after_key(body, "stale_policy")[:8],
+    })
+    return brief
 
 
 def local_source_health_brief(audit: Dict[str, Any], cards: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -381,6 +440,8 @@ def fusion_family(card_type: str) -> str:
         return "memory"
     if card_type in SPEC_TYPES:
         return "spec"
+    if card_type in TRAFFIC_TYPES:
+        return "traffic"
     return ""
 
 

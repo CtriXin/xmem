@@ -1,0 +1,86 @@
+id: scmp.webnovel2.traffic-switch
+type: traffic.switch
+title: 网文2 traffic switch packet
+scope:
+  project: ptc_v5_reading
+  template: webnovel2
+aliases:
+  - 网文2 traffic switch
+  - 网文二 traffic switch
+  - 网文小说模版二
+  - webnovel2
+  - ptc_v5_reading
+  - ptc-v5-novabeats1
+  - ptc-v5-novabeats1-test
+  - action.readoxa.com
+  - biography.stealabrainrot-wiki.org
+truth:
+  status: verified
+  confidence: 0.94
+  basis:
+    - verified_issue_record
+    - project_wiki_pending_cross_checked
+    - scmp_deploy_evidence
+  last_checked_at: 2026-05-23T13:26:00Z
+summary: 网文2 stable execution chain is 网文2 -> ptc_v5_reading -> prod ptc-v5-novabeats1 -> test ptc-v5-novabeats1-test. Use this as a verified starting packet, then live-verify domain/service binding before traffic switch or deploy.
+template: webnovel2
+project: ptc_v5_reading
+repo: git@gitlab.adsconflux.xyz:ptc/fe/ptc_v5_reading.git
+repo_local_hints:
+  - /Users/xin/ptc_v5_reading__home3_ads_t102748
+  - /Users/xin/ptc_v5_reading__test_sync_home3_20260523
+  - /Users/xin/ptc_v5_reading_wt_1.0.19.9
+prod_service: ptc-v5-novabeats1
+test_service: ptc-v5-novabeats1-test
+prod_pipeline_hint: ptc-v5-novabeats1-2210
+test_pipeline_hint: ptc-v5-novabeats1-test-2440
+prod_branch_hint: t102748-home3-ads-20260522
+test_branch_hint: test/nuxt-cos-fallback-20260514
+approval_group: 域名自动化流程
+relations:
+  - source: 网文2
+    target: ptc_v5_reading
+    kind: canonical_project
+  - source: ptc_v5_reading
+    target: ptc-v5-novabeats1
+    kind: prod_service
+  - source: ptc_v5_reading
+    target: ptc-v5-novabeats1-test
+    kind: test_service
+  - source: ptc-v5-novabeats1
+    target: ptc-v5-novabeats1-test
+    kind: traffic_switch_pair
+domains:
+  - biography.stealabrainrot-wiki.org
+  - action.readoxa.com
+  - action.ficsie.com
+  - story.stealabrainrot-wiki.org
+  - readnewline.com
+  - test.readnewline.com
+apex_www_policy:
+  - Observed domains are apex/subdomains only; no verified www sibling is implied.
+  - Always live-verify each target with rf getcf / lookup before switch.
+common_verification:
+  - xmem preflight 网文2 <domain> traffic switch
+  - lookup <domain>
+  - rf getcf <domain>
+  - SCMP safe-access for current service domains plus target sample domain.
+  - Direct pod Host-header check for test-only validation when public domain still points to prod.
+can_skip:
+  - Do not rg /Users/xin or scan all issue-tracking to identify project/service; start from this packet.
+  - Do not infer repo from folder names; use repo and service hints here, then live verify.
+  - Do not read every Project Wiki pending row; read source_refs only if facts conflict or mapping must be promoted.
+stale_policy:
+  - Domain-to-service binding and current deploy state must be live verified before deploy or traffic switch.
+  - Repo-to-service relation can be used as verified starting truth for routing.
+  - Branch hints are task/time scoped and must be checked against git/SCMP before release.
+  - Project Wiki pending rows are hint-only unless promoted by Project Wiki export.
+evidence:
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ptc_v5_reading/sync-biography-home3-to-test-20260523/issue.md
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ptc_v5_reading/t102748-home3-ads-20260522/issue.md
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ptc_v5_reading/readnewline-mobile-nuxt-chunk-404-20260513/issue.md
+  - kind: project-wiki-pending
+    path: /Users/xin/project-wiki/data/agent-inbox.jsonl:94#wr_scmp_5312b0213cda

@@ -502,6 +502,29 @@ def test_sync_imports_generated_code_index_refs_as_hints(tmp_path: Path):
     assert "code_indexes" in text_packet
 
 
+def test_context_returns_traffic_switch_packet_from_verified_cards(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(run([str(XMEM), "context", "网文2 action.readoxa.com traffic switch", "--json"], repo, env).stdout)
+    text_packet = run([str(XMEM), "context", "网文2 action.readoxa.com traffic switch"], repo, env).stdout
+
+    assert packet["traffic_switch"]
+    traffic = packet["traffic_switch"][0]
+    assert traffic["id"] == "scmp.webnovel2.traffic-switch"
+    assert traffic["truth"] == "verified"
+    assert traffic["project"] == "ptc_v5_reading"
+    assert traffic["prod_service"] == "ptc-v5-novabeats1"
+    assert traffic["test_service"] == "ptc-v5-novabeats1-test"
+    assert any("action.readoxa.com" in item for item in traffic["domains"])
+    assert any("live verified" in item or "live verify" in item for item in traffic["stale_policy"])
+    assert any("skip broad repo/issue scan" in item for item in packet["gain_hints"])
+    assert len([item for item in packet["registry_candidates"] if item["truth"] != "verified"]) <= 2
+    assert "traffic_switch[" in text_packet
+    assert "prod_service: ptc-v5-novabeats1" in text_packet
+    assert "gain_hints" in text_packet
+
+
 def test_issue_tracking_imports_bug_patterns_as_rules(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     tracking = tmp_path / "issue-tracking"

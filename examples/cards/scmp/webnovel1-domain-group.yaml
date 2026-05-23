@@ -1,0 +1,45 @@
+id: scmp.webnovel1.domain-group
+type: relation
+title: 网文1 compact domain group
+scope:
+  project: ai_novabeats
+  template: webnovel1
+aliases:
+  - 网文1 域名组
+  - 网文一 域名组
+  - webnovel1 domains
+  - ai_novabeats domains
+truth:
+  status: verified
+  confidence: 0.9
+  basis:
+    - verified_issue_record
+    - scmp_safe_access_evidence
+  last_checked_at: 2026-05-23T13:26:00Z
+summary: Compact routing card for common 网文1 domains; use it to avoid scanning issue-tracking for domain group identity.
+project: ai_novabeats
+template: webnovel1
+prod_service: ptc-v5-novabeats
+test_service: ptc-v5-novabeats-test
+domains:
+  - adventure.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats; apex=subdomain; www=unverified; note=t102748 home_3 prod
+  - mystery.bookuya.com => template=webnovel1; service=ptc-v5-novabeats; apex=subdomain; www=unverified; note=home_2 investigation baseline
+  - readprox.com => template=webnovel1; service=ptc-v5-novabeats/ptc-v5-novabeats-test pending switch evidence; apex=apex; www=unverified
+  - test.bookuya.com => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified
+  - goread.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - inovel.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - talehub.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - newbook.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - hotfiction.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - hotstroy.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - page.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - chapter.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - hotread.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+  - newread.stealabrainrot-wiki.org => template=webnovel1; service=ptc-v5-novabeats-test; apex=subdomain; www=unverified; note=1794 group35 set
+stale_policy:
+  - Treat this as routing memory only; live domain binding must be checked before switch/deploy.
+evidence:
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ai_novabeats/sync-adventure-home3-to-test-20260523/issue.md
+  - kind: project-wiki-pending
+    path: /Users/xin/project-wiki/data/agent-inbox.jsonl:93#wr_scmp_761c1480e204

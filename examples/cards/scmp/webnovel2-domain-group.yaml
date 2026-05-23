@@ -1,0 +1,37 @@
+id: scmp.webnovel2.domain-group
+type: relation
+title: 网文2 compact domain group
+scope:
+  project: ptc_v5_reading
+  template: webnovel2
+aliases:
+  - 网文2 域名组
+  - 网文二 域名组
+  - webnovel2 domains
+  - ptc_v5_reading domains
+truth:
+  status: verified
+  confidence: 0.9
+  basis:
+    - verified_issue_record
+    - scmp_safe_access_evidence
+  last_checked_at: 2026-05-23T13:26:00Z
+summary: Compact routing card for common 网文2 domains; use it to avoid scanning issue-tracking for domain group identity.
+project: ptc_v5_reading
+template: webnovel2
+prod_service: ptc-v5-novabeats1
+test_service: ptc-v5-novabeats1-test
+domains:
+  - biography.stealabrainrot-wiki.org => template=webnovel2; service=ptc-v5-novabeats1; apex=subdomain; www=unverified; note=t102748 home_3 prod
+  - action.readoxa.com => template=webnovel2; service=ptc-v5-novabeats1; apex=subdomain; www=unverified; note=white-screen/debug mapping
+  - action.ficsie.com => template=webnovel2; service=ptc-v5-novabeats1-test pending/verified in issue flow; apex=subdomain; www=unverified
+  - story.stealabrainrot-wiki.org => template=webnovel2; service=ptc-v5-novabeats1/ptc-v5-novabeats1-test; apex=subdomain; www=unverified
+  - readnewline.com => template=webnovel2; service=ptc-v5-novabeats1; apex=apex; www=unverified
+  - test.readnewline.com => template=webnovel2; service=ptc-v5-novabeats1-test; apex=subdomain; www=unverified
+stale_policy:
+  - Treat this as routing memory only; live domain binding must be checked before switch/deploy.
+evidence:
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ptc_v5_reading/sync-biography-home3-to-test-20260523/issue.md
+  - kind: project-wiki-pending
+    path: /Users/xin/project-wiki/data/agent-inbox.jsonl:94#wr_scmp_5312b0213cda

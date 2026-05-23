@@ -1,0 +1,94 @@
+id: scmp.webnovel1.traffic-switch
+type: traffic.switch
+title: 网文1 traffic switch packet
+scope:
+  project: ai_novabeats
+  template: webnovel1
+aliases:
+  - 网文1 traffic switch
+  - 网文一 traffic switch
+  - 网文小说模版一
+  - webnovel1
+  - ai_novabeats
+  - ptc-v5-novabeats
+  - ptc-v5-novabeats-test
+  - test.bookuya.com
+  - adventure.stealabrainrot-wiki.org
+truth:
+  status: verified
+  confidence: 0.94
+  basis:
+    - verified_issue_record
+    - project_wiki_pending_cross_checked
+    - scmp_deploy_evidence
+  last_checked_at: 2026-05-23T13:26:00Z
+summary: 网文1 stable execution chain is 网文1 -> ai_novabeats -> prod ptc-v5-novabeats -> test ptc-v5-novabeats-test. Use this as a verified starting packet, then live-verify domain/service binding before traffic switch or deploy.
+template: webnovel1
+project: ai_novabeats
+repo: git@gitlab.adsconflux.xyz:ptc/fe/ai_novabeats.git
+repo_local_hints:
+  - /Users/xin/ai_novabeats__test_sync_home3_20260523
+  - /Users/xin/ai_novabeats__home3_ads_t102748
+  - /Users/xin/ai_novabeats_wt_1.0.19.8
+prod_service: ptc-v5-novabeats
+test_service: ptc-v5-novabeats-test
+prod_pipeline_hint: ptc-v5-novabeats-2209
+test_pipeline_hint: ptc-v5-novabeats-test-2444
+prod_branch_hint: t102748-home3-ads-20260522
+test_branch_hint: 1.0.19.9
+approval_group: 域名自动化流程
+relations:
+  - source: 网文1
+    target: ai_novabeats
+    kind: canonical_project
+  - source: ai_novabeats
+    target: ptc-v5-novabeats
+    kind: prod_service
+  - source: ai_novabeats
+    target: ptc-v5-novabeats-test
+    kind: test_service
+  - source: ptc-v5-novabeats
+    target: ptc-v5-novabeats-test
+    kind: traffic_switch_pair
+domains:
+  - adventure.stealabrainrot-wiki.org
+  - mystery.bookuya.com
+  - readprox.com
+  - test.bookuya.com
+  - goread.stealabrainrot-wiki.org
+  - inovel.stealabrainrot-wiki.org
+  - talehub.stealabrainrot-wiki.org
+  - newbook.stealabrainrot-wiki.org
+  - hotfiction.stealabrainrot-wiki.org
+  - hotstroy.stealabrainrot-wiki.org
+  - page.stealabrainrot-wiki.org
+  - chapter.stealabrainrot-wiki.org
+  - hotread.stealabrainrot-wiki.org
+  - newread.stealabrainrot-wiki.org
+apex_www_policy:
+  - Observed domains are apex/subdomains only; no verified www sibling is implied.
+  - Always live-verify each target with rf getcf / lookup before switch.
+common_verification:
+  - xmem preflight 网文1 <domain> traffic switch
+  - lookup <domain>
+  - rf getcf <domain>
+  - SCMP safe-access for current service domains plus target sample domain.
+  - Direct pod Host-header check for test-only validation when public domain still points to prod.
+can_skip:
+  - Do not rg /Users/xin or scan all issue-tracking to identify project/service; start from this packet.
+  - Do not infer repo from folder names; use repo and service hints here, then live verify.
+  - Do not read every Project Wiki pending row; read source_refs only if facts conflict or mapping must be promoted.
+stale_policy:
+  - Domain-to-service binding and current deploy state must be live verified before deploy or traffic switch.
+  - Repo-to-service relation can be used as verified starting truth for routing.
+  - Branch hints are task/time scoped and must be checked against git/SCMP before release.
+  - Project Wiki pending rows are hint-only unless promoted by Project Wiki export.
+evidence:
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ai_novabeats/sync-adventure-home3-to-test-20260523/issue.md
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ai_novabeats/t102748-home3-ads-20260522/issue.md
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ai_novabeats/home-2-ad-size-clickrate-webnovel2-20260518/issue.md
+  - kind: project-wiki-pending
+    path: /Users/xin/project-wiki/data/agent-inbox.jsonl:93#wr_scmp_761c1480e204

@@ -85,6 +85,14 @@ def llm_packet(packet: Dict[str, Any]) -> str:
             lines.append(f"      wrong_aliases: {quote_scalar(', '.join(map(str, item.get('wrong_aliases') or [])))}")
         if item.get("canonical_aliases"):
             lines.append(f"      canonical_aliases: {quote_scalar(', '.join(map(str, item.get('canonical_aliases') or [])))}")
+    traffic = packet.get("traffic_switch") or []
+    lines.append(f"  traffic_switch[{len(traffic)}]:")
+    for item in traffic:
+        lines.extend(traffic_item(item, 4))
+    gain_hints = packet.get("gain_hints") or []
+    lines.append(f"  gain_hints[{len(gain_hints)}]:")
+    for hint in gain_hints:
+        lines.append(f"    - {quote_scalar(hint)}")
     for section in ("corrections", "alias_guidance", "registry_candidates", "rules", "methods", "memories", "specs", "code_indexes", "relations", "evidence"):
         items = packet.get(section) or []
         lines.append(f"  {section}[{len(items)}]:")
@@ -186,6 +194,34 @@ def brief_item(item: Dict[str, Any], indent: int) -> List[str]:
         lines.append(f"{sub}hints[{len(hints)}]:")
         for hint in hints[:10]:
             lines.append(f"{sub}  - {quote_scalar(compact(hint, 160))}")
+    return lines
+
+
+def traffic_item(item: Dict[str, Any], indent: int) -> List[str]:
+    lines = brief_item(item, indent)
+    sub = " " * (indent + 2)
+    for key in (
+        "project",
+        "template",
+        "repo",
+        "prod_service",
+        "test_service",
+        "prod_pipeline_hint",
+        "test_pipeline_hint",
+        "prod_branch_hint",
+        "test_branch_hint",
+        "approval_group",
+    ):
+        value = item.get(key, "")
+        if value:
+            lines.append(f"{sub}{key}: {quote_scalar(compact(value, 160))}")
+    for key in ("repo_local_hints", "domains", "common_verification", "can_skip", "stale_policy"):
+        values = item.get(key) or []
+        if not values:
+            continue
+        lines.append(f"{sub}{key}[{len(values)}]:")
+        for value in values[:12]:
+            lines.append(f"{sub}  - {quote_scalar(compact(value, 180))}")
     return lines
 
 
