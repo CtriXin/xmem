@@ -1,0 +1,25 @@
+id: xmem.policy.truth-level
+type: rule
+title: xmem truth level and TTL policy
+scope:
+  system: xmem
+aliases:
+  - truth level policy
+  - xmem truth status
+  - verified partial stale disputed policy
+  - TTL dynamic facts policy
+truth:
+  status: verified
+  confidence: 0.92
+  basis:
+    - policy_doc
+    - human_requested_governance
+  last_checked_at: 2026-05-23T16:20:00Z
+summary: Use verified only for owner-source or evidence-backed facts; pending/generated/dynamic facts are hints with TTL and must be live-verified before action.
+must_include:
+  - Owner precedence: Project Wiki accepted export/human/runtime beats xmem card, Issue evidence, pending rows, generated indexes, and folder-name guesses.
+  - Dynamic facts like current branch, deploy run, pod image, and service binding need live verification before deploy or switch.
+  - Bug patterns stay partial until repeat evidence or high-confidence production incident plus reusable guard is reviewed.
+evidence:
+  - kind: policy
+    path: docs/policies/truth-level.md

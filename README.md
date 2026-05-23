@@ -143,6 +143,14 @@ This gives an automatic path: LLM observes work -> hook captures compact truth/e
 - `disputed`: conflicting records exist.
 - `unknown`: not enough evidence.
 
+Detailed governance lives in `docs/policies/`:
+
+- `docs/policies/truth-level.md`: source precedence, promotion/demotion, dynamic-fact TTL, and conflict rules.
+- `docs/policies/preflight-severity.md`: how agents interpret `xmem preflight` as `hint`, `warn`, or `block`.
+- `docs/policies/promotion-policy.md`: how Project Wiki pending rows, Issue patterns, and xmem cards are promoted, merged, or rejected.
+
+Short rule cards for these policies live under `examples/cards/policy/`, so `xmem context "truth level policy"` and `xmem preflight "deploy blocker"` can surface the policy without reading long docs first.
+
 ## Card types
 
 - `identity`: what this project is.
@@ -197,6 +205,8 @@ xmem_preflight:
 ```
 
 Agents should run `xmem preflight "<task>"` before implementation/bugfix work, then preserve `must_keep`, avoid known failure modes, and run `required_checks`. If source freshness is stale, sync first; if project identity is ambiguous, disambiguate before editing.
+
+Preflight severity policy: hints only route the next read; warnings require preserving the invariant or running the check; blockers stop edits/deploy until resolved. Blockers include stale source exports, ambiguous production target, verified invariant removal, SCMP deploy payload/path mismatch, unconverged pods, failed safe-access/live verification, and missing domain binding for traffic-switch work.
 
 `xmem context` conservatively fuses duplicate cards with the same title and type family. The best card stays in `rules` / `methods` / `relations`, and matching duplicates appear as `supporting_cards`, keeping LLM packets compact while preserving source traceability.
 

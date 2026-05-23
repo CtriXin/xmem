@@ -1,0 +1,26 @@
+id: xmem.policy.promotion
+type: rule
+title: xmem promotion owner and merge policy
+scope:
+  system: xmem
+aliases:
+  - promotion policy
+  - Project Wiki pending promotion
+  - Issue pattern promotion
+  - xmem owner ref policy
+  - self-improve merge policy
+truth:
+  status: verified
+  confidence: 0.92
+  basis:
+    - policy_doc
+    - human_requested_governance
+  last_checked_at: 2026-05-23T16:20:00Z
+summary: Discoveries move through owner sources: Project Wiki for stable project facts, Issue Record for bug truth, xmem for compact routing cards, runtime APIs for current state.
+must_include:
+  - Keep Project Wiki pending and xmem outbox as partial until owner source exports them.
+  - Merge duplicate bug patterns by root cause and guard; append evidence instead of creating near-duplicates.
+  - Store refs and compact summaries in xmem, not full logs, raw JSON, secrets, or long wiki prose.
+evidence:
+  - kind: policy
+    path: docs/policies/promotion-policy.md

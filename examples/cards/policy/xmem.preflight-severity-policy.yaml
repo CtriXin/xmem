@@ -1,0 +1,28 @@
+id: xmem.policy.preflight-severity
+type: rule
+title: xmem preflight hint warn block policy
+scope:
+  system: xmem
+aliases:
+  - preflight severity policy
+  - hint warn block
+  - xmem preflight blocker
+  - deploy preflight guard
+truth:
+  status: verified
+  confidence: 0.92
+  basis:
+    - policy_doc
+    - human_requested_governance
+  last_checked_at: 2026-05-23T16:20:00Z
+summary: Preflight output must be interpreted as hint, warn, or block; stale sources, ambiguous production identity, invariant removal, failed deploy gates, and missing live verification block action.
+checks:
+  - xmem sync when source_freshness is stale.
+  - Resolve ambiguous project/domain/service before edits or deploy.
+  - Run required_checks and report pass/skip reason in closeout.
+forbid:
+  - Treating run Succeeded as deploy complete before pod/live verification.
+  - Treating pending Project Wiki or generated code index as final truth.
+evidence:
+  - kind: policy
+    path: docs/policies/preflight-severity.md

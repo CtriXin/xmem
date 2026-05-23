@@ -11,3 +11,5 @@
 - Use `xmem preflight "<task>"` before implementation/bugfix work to surface bug-patterns, invariants, and required checks.
 - xmem is the control plane only: route entity truth to Project Wiki exports, bug truth to Issue Record exports, and keep xmem cards compact with source pointers.
 - Treat stale source exports as a blocker for reliable context; run `xmem check --sources` and `xmem sync` before relying on changed source exports.
+- Follow `docs/policies/truth-level.md`, `docs/policies/preflight-severity.md`, and `docs/policies/promotion-policy.md` when changing truth status, blockers, or promotion behavior.
+- Do not silently promote Project Wiki pending rows, single-incident bug patterns, generated indexes, or dynamic runtime state to `verified`.

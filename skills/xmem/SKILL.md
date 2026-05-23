@@ -37,6 +37,8 @@ xmem gain
 7. Use `xmem gain` when asked what xmem saved.
 8. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
 
+Policy rule: when deciding whether a memory is truth, hint, or blocker, use `docs/policies/truth-level.md`, `docs/policies/preflight-severity.md`, and `docs/policies/promotion-policy.md`. In short: Project Wiki pending is hint-only, Issue patterns may be partial until repeated/reviewed, dynamic SCMP facts need live verification, and preflight blockers must stop edits/deploy.
+
 `xmem context` is LLM-first: use `resolution.status`, `suggested_queries`, `correction_guidance`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true. Duplicate cards may be fused; read `supporting_cards` for alternate sources behind the primary card.
 
 For SCMP/domain/service work, also read `traffic_switch` and `gain_hints` when present. A verified `traffic.switch` card can be used as the starting route for prod/validation service, repo, branch hints, approval group, common verification, and skipped lookup guidance. Domain/service binding and latest deploy state still need live verification; Project Wiki pending candidates remain hint-only.
@@ -91,6 +93,7 @@ If registered repos already have `.ai/map/map.db` or `.codegraph/codegraph.db`, 
 - Code structure truth stays in source files plus generated `.ai/map` / `.codegraph` indexes; xmem stores only routing refs.
 - Do not duplicate full Project Wiki or Issue Record truth into xmem; xmem is the control plane and generated index consumer.
 - When source exports change, require `xmem check --sources` and `xmem sync`; context should be treated as stale until `source_freshness.status` is `fresh`.
+- Promotion rule: candidate -> owner source review -> export -> `xmem sync`; never promote pending rows, single-incident bug patterns, or dynamic runtime state silently.
 
 ## New folders and corrections
 
