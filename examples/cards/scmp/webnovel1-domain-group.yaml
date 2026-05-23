@@ -7,6 +7,8 @@ scope:
 aliases:
   - 网文1 域名组
   - 网文一 域名组
+  - 网文小说模版一10个 0518
+  - Feishu sheet 网文小说模版一10个 0518
   - webnovel1 domains
   - ai_novabeats domains
 truth:
@@ -15,12 +17,21 @@ truth:
   basis:
     - verified_issue_record
     - scmp_safe_access_evidence
-  last_checked_at: 2026-05-23T13:26:00Z
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_verified
+  last_checked_at: 2026-05-23T15:27:39Z
 summary: Compact routing card for common 网文1 domains; use it to avoid scanning issue-tracking for domain group identity.
 project: ai_novabeats
 template: webnovel1
 prod_service: ptc-v5-novabeats
 validation_service: ptc-v5-novabeats-test
+source_sheet:
+  title: 【1001项目】广告位信息记录2
+  wiki_url: https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=0IIBHM
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: 0IIBHM
+  sheet_title: 网文小说模版一10个 0518
+  role: ad-slot-domain-source
 role_semantics:
   - validation_service is not a generic test environment; it is a candidate service used to validate new feature behavior before traffic switch.
   - Service names may contain -test, but agents must not infer QA/test-environment semantics from the name.
@@ -47,3 +58,7 @@ evidence:
     path: /Users/xin/issue-tracking/issues/ai_novabeats/sync-adventure-home3-to-test-20260523/issue.md
   - kind: project-wiki-pending
     path: /Users/xin/project-wiki/data/agent-inbox.jsonl:93#wr_scmp_761c1480e204
+  - kind: feishu-sheet
+    path: https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=0IIBHM
+  - kind: lookup-live
+    path: all 10 sheet domains resolve to ptc-v5-novabeats-test / git@gitlab.adsconflux.xyz:ptc/fe/ai_novabeats.git / 1.0.19.9

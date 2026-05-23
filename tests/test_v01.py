@@ -542,6 +542,19 @@ def test_plain_webnovel_alias_resolves_to_verified_traffic_anchor(tmp_path: Path
     assert packet["registry_candidates"] == []
 
 
+def test_feishu_sheet_title_resolves_webnovel1_domain_group(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(run([str(XMEM), "context", "网文小说模版一10个 0518 goread.stealabrainrot-wiki.org", "--json"], repo, env).stdout)
+
+    assert packet["resolution"]["status"] == "resolved"
+    assert packet["traffic_switch"][0]["id"] == "scmp.webnovel1.traffic-switch"
+    assert packet["traffic_switch"][0]["project"] == "ai_novabeats"
+    assert packet["traffic_switch"][0]["validation_service"] == "ptc-v5-novabeats-test"
+    assert len(packet["traffic_switch"]) == 1
+
+
 def test_issue_tracking_imports_bug_patterns_as_rules(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     tracking = tmp_path / "issue-tracking"

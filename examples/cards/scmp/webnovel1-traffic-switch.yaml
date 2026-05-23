@@ -8,6 +8,9 @@ aliases:
   - 网文1 traffic switch
   - 网文一 traffic switch
   - 网文小说模版一
+  - 网文小说模版一10个 0518
+  - Feishu sheet 网文小说模版一10个 0518
+  - 1001项目 广告位信息记录2 网文小说模版一10个 0518
   - webnovel1
   - ai_novabeats
   - ptc-v5-novabeats
@@ -21,15 +24,23 @@ truth:
     - verified_issue_record
     - project_wiki_pending_cross_checked
     - scmp_deploy_evidence
-  last_checked_at: 2026-05-23T13:26:00Z
+    - feishu_sheet_tab_read
+    - lookup_domain_reverse_verified
+  last_checked_at: 2026-05-23T15:27:39Z
 summary: 网文1 stable execution chain is 网文1 -> ai_novabeats -> prod ptc-v5-novabeats -> validation service ptc-v5-novabeats-test. Use this as a verified starting packet, then live-verify domain/service binding before traffic switch or deploy.
 template: webnovel1
 project: ai_novabeats
 repo: git@gitlab.adsconflux.xyz:ptc/fe/ai_novabeats.git
 repo_local_hints:
+  - /Users/xin/ai_novabeats
   - /Users/xin/ai_novabeats__test_sync_home3_20260523
-  - /Users/xin/ai_novabeats__home3_ads_t102748
-  - /Users/xin/ai_novabeats_wt_1.0.19.8
+source_sheet:
+  title: 【1001项目】广告位信息记录2
+  wiki_url: https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=0IIBHM
+  spreadsheet_token: TBBjs3msohDx1ctQTejcjLrXnhg
+  sheet_id: 0IIBHM
+  sheet_title: 网文小说模版一10个 0518
+  role: ad-slot-domain-source
 prod_service: ptc-v5-novabeats
 validation_service: ptc-v5-novabeats-test
 prod_pipeline_hint: ptc-v5-novabeats-2209
@@ -96,3 +107,7 @@ evidence:
     path: /Users/xin/issue-tracking/issues/ai_novabeats/home-2-ad-size-clickrate-webnovel2-20260518/issue.md
   - kind: project-wiki-pending
     path: /Users/xin/project-wiki/data/agent-inbox.jsonl:93#wr_scmp_761c1480e204
+  - kind: feishu-sheet
+    path: https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=0IIBHM
+  - kind: lookup-live
+    path: lookup goread.stealabrainrot-wiki.org => ptc-v5-novabeats-test / git@gitlab.adsconflux.xyz:ptc/fe/ai_novabeats.git / 1.0.19.9
