@@ -2,7 +2,7 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.20`.
+Current package version: `0.1.21`.
 
 ## Goals
 
@@ -64,6 +64,7 @@ Rule: files/code/runtime are truth; SQLite is only a generated search index. If 
 - Issue records at `/Users/xin/issue-tracking`.
 - Optional compact source exports:
   - `/Users/xin/project-wiki/data/xmem-export.cards.jsonl`
+  - `/Users/xin/project-wiki/data/agent-inbox.jsonl`
   - `/Users/xin/issue-tracking/index/xmem-export.cards.jsonl`
   - `/Users/xin/issue-tracking/index/bug-patterns.jsonl`
 - Built-in reusable cards in this repo.
@@ -80,6 +81,8 @@ Imports are read-only. xmem does not silently rewrite Project Wiki or issue reco
 These project-memory adapters are source routers, not workflow dependencies. xmem reads their Markdown outputs as evidence pointers and compact cards; it does not require OpenSpec, Spec Kit, Trellis, or grill-with-docs to be installed.
 
 `xmem-export.cards.jsonl` is the preferred bridge format for other truth systems. Project Wiki can export entity cards, and Issue Record can export verified bug-pattern/rule cards; xmem imports them as generated index rows while keeping the source files as truth.
+
+Project Wiki `agent-inbox.jsonl` rows are imported only as `wiki.pending` cards with `truth.status=partial`, confidence capped at `0.6`, and `hint_only_until_project_wiki_accepts` policy. They make pending writebacks searchable, but they never override verified Project Wiki exports.
 
 Use `xmem check --sources` to validate export shape before or after another tool generates it. Missing exports are reported as optional_missing; malformed rows, invalid truth status, duplicate ids, and bad confidence values are errors. It also reports local `.xmem/cards` portability warnings so ignored/untracked knowledge cards are visible before another machine or agent misses them. Use `xmem check --sources --strict` when an agent gate should fail on warnings, not only errors.
 

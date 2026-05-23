@@ -275,6 +275,59 @@ def test_project_wiki_can_import_xmem_export_only(tmp_path: Path):
     assert any("xmem-export.cards.jsonl" in path for path in packet["next_reads"])
 
 
+def test_project_wiki_agent_inbox_pending_maps_as_partial_hint(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    wiki = tmp_path / "project-wiki"
+    data_dir = wiki / "data"
+    data_dir.mkdir(parents=True)
+    inbox = data_dir / "agent-inbox.jsonl"
+    row = {
+        "status": "pending",
+        "risk": "low",
+        "actor": "codex/gpt-5",
+        "action": "append_record",
+        "targetEntityId": "service:ptc-v5-novabeats1",
+        "payload": {
+            "type": "scmp_lookup_association",
+            "summary": "action.readoxa.com resolved to webnovel template 2 service ptc-v5-novabeats1 / ptc_v5_reading.",
+            "mappingChanged": "yes",
+            "project": "ptc_v5_reading",
+            "displayName": "网文小说模版二",
+            "aliases": ["网文2", "action.readoxa.com"],
+            "domains": ["action.readoxa.com"],
+            "service": "ptc-v5-novabeats1",
+            "repo": "git@gitlab.adsconflux.xyz:ptc/fe/ptc_v5_reading.git",
+            "localPath": "/Users/xin/ptc_v5_reading",
+            "branch": "t102748-home3-ads-20260522",
+            "commit": "5e6a0b7",
+            "evidence": ["/tmp/readoxa-check/action.readoxa.com.png"],
+        },
+        "validation": [
+            {"label": "scmp association closeout", "ok": True, "detail": "mode=lookup"},
+            {"label": "issue-recorder linked", "ok": False, "detail": "missing issue path/id"},
+        ],
+        "evidenceIds": ["/tmp/readoxa-check/action.readoxa.com.png"],
+        "receivedAt": "2026-05-23T04:25:02Z",
+        "id": "wr_scmp_readoxa_pending",
+    }
+    inbox.write_text(json.dumps(row, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    synced = json.loads(run([str(XMEM), "sync", "--json"], repo, env).stdout)
+    packet = json.loads(run([str(XMEM), "context", "action.readoxa.com", "--json"], repo, env).stdout)
+    matches = [item for item in packet["registry_candidates"] if item["id"] == "project-wiki.pending.wr_scmp_readoxa_pending"]
+
+    assert synced["project_wiki"]["pending_cards"] == 1
+    assert matches
+    assert matches[0]["truth"] == "partial"
+    assert matches[0]["type"] == "wiki.pending"
+    assert matches[0]["source"] == "project-wiki-pending"
+    assert matches[0]["confidence"] <= 0.6
+    assert "action.readoxa.com" in matches[0]["aliases"]
+    assert packet["resolution"]["status"] == "partial"
+    assert any("not verified" in warning for warning in packet["warnings"])
+    assert any("agent-inbox.jsonl" in path for path in packet["next_reads"])
+
+
 def test_imports_context_specs_and_trellis_sources(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     (repo / "CONTEXT.md").write_text(

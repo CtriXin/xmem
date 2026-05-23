@@ -16,11 +16,18 @@ def import_project_wiki(path: Path) -> Dict[str, int]:
     path = path.expanduser()
     idx = path / "data" / "project-hub.index.json"
     export = path / "data" / "xmem-export.cards.jsonl"
+    inbox = path / "data" / "agent-inbox.jsonl"
     data = read_json(idx, {})
     if not isinstance(data, dict) or "entities" not in data:
+        result = {"cards": 0, "projects": 0}
         if export.exists():
             exported = import_xmem_export(export, source="project-wiki-export")
-            return {"cards": 0, "projects": 0, "export_cards": exported["cards"], "evidence": exported["evidence"]}
+            result.update({"export_cards": exported["cards"], "evidence": exported["evidence"]})
+        if inbox.exists():
+            pending = import_project_wiki_agent_inbox(inbox)
+            result.update({"pending_cards": pending["cards"], "pending_evidence": pending["evidence"]})
+        if export.exists() or inbox.exists():
+            return result
         raise SystemExit(f"project-wiki index not found: {idx}")
     cards = 0
     projects = 0
@@ -69,7 +76,174 @@ def import_project_wiki(path: Path) -> Dict[str, int]:
         exported = import_xmem_export(export, source="project-wiki-export")
         result["export_cards"] = exported["cards"]
         result["evidence"] = exported["evidence"]
+    if inbox.exists():
+        pending = import_project_wiki_agent_inbox(inbox)
+        result["pending_cards"] = pending["cards"]
+        result["pending_evidence"] = pending["evidence"]
     return result
+
+
+def import_project_wiki_agent_inbox(path: Path, source: str = "project-wiki-pending") -> Dict[str, int]:
+    """Import Project Wiki pending writebacks as low-confidence hints.
+
+    agent-inbox rows are not Project Wiki truth yet. They are only indexed so
+    agents can discover pending mappings and then verify/promote them upstream.
+    """
+    if not path.exists():
+        return {"cards": 0, "evidence": 0, "skipped": 1}
+    cards = 0
+    evidence = 0
+    with connect() as conn:
+        for line_no, item in iter_jsonl(path):
+            if should_skip_pending_inbox_row(item):
+                continue
+            exported = pending_inbox_to_export_card(item, path, line_no)
+            card = card_from_export_item(exported, path, line_no, source)
+            upsert_card(conn, card)
+            cards += 1
+            for ev in evidence_from_export_item(exported, card, source):
+                upsert_evidence(conn, ev)
+                evidence += 1
+        log_event(conn, "import.project-wiki-agent-inbox", payload={"path": str(path), "source": source, "cards": cards, "evidence": evidence})
+        conn.commit()
+    return {"cards": cards, "evidence": evidence}
+
+
+def should_skip_pending_inbox_row(item: Dict[str, Any]) -> bool:
+    status = str(item.get("status") or "").strip().lower()
+    return status in {"rejected", "declined", "invalid", "superseded"}
+
+
+def pending_inbox_to_export_card(item: Dict[str, Any], file: Path, line_no: int) -> Dict[str, Any]:
+    payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
+    row_id = str(item.get("id") or f"{line_no}-{hashlib.sha1(json.dumps(item, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:10]}")
+    domains = string_list(payload.get("domains") or payload.get("domain"))
+    service = str(payload.get("service") or "")
+    project = str(payload.get("project") or "")
+    target = str(item.get("targetEntityId") or "")
+    title_subject = domains[0] if domains else (service or project or target or row_id)
+    target_hint = service or project or target
+    title = f"Pending Project Wiki writeback: {title_subject}"
+    if target_hint and target_hint != title_subject:
+        title += f" -> {target_hint}"
+    aliases = pending_inbox_aliases(item, payload)
+    confidence = pending_inbox_confidence(item)
+    summary = str(payload.get("summary") or item.get("summary") or title)
+    evidence = pending_inbox_evidence(item, payload, file, line_no, row_id)
+    updated_at = str(item.get("receivedAt") or payload.get("verifiedAt") or payload.get("updatedAt") or utc_now())
+    project_id = project or service or target.replace(":", ".") or (domains[0] if domains else "")
+    out = {
+        "id": f"project-wiki.pending.{slugify(row_id)}",
+        "type": "wiki.pending",
+        "title": title,
+        "project_id": slugify(project_id, "project-wiki-pending"),
+        "aliases": aliases[:120],
+        "truth": {
+            "status": "partial",
+            "confidence": confidence,
+            "basis": ["project_wiki_agent_inbox_pending_writeback"],
+            "last_checked_at": updated_at,
+            "use_policy": "hint_only_until_project_wiki_accepts",
+        },
+        "pending": {
+            "id": row_id,
+            "status": str(item.get("status") or "pending"),
+            "risk": str(item.get("risk") or ""),
+            "actor": str(item.get("actor") or ""),
+            "action": str(item.get("action") or ""),
+            "targetEntityId": target,
+        },
+        "current": {
+            "service": service,
+            "project": project,
+            "domains": domains,
+            "repo_path": str(payload.get("localPath") or ""),
+            "remote": str(payload.get("repo") or ""),
+            "branch": str(payload.get("branch") or payload.get("branchLine") or ""),
+            "commit": str(payload.get("commit") or ""),
+            "pipeline": str(payload.get("pipeline") or ""),
+            "deploy_run": str(payload.get("deployRun") or ""),
+            "version": str(payload.get("version") or ""),
+        },
+        "summary": summary,
+        "source_ref": f"{file}:{line_no}#{row_id}",
+        "evidence": evidence,
+        "raw": item,
+    }
+    return out
+
+
+def pending_inbox_confidence(item: Dict[str, Any]) -> float:
+    validation = item.get("validation")
+    checks = [row for row in validation if isinstance(row, dict)] if isinstance(validation, list) else []
+    ok = sum(1 for row in checks if row.get("ok") is True)
+    failed = sum(1 for row in checks if row.get("ok") is False)
+    risk = str(item.get("risk") or "").lower()
+    confidence = 0.45 + min(ok, 3) * 0.04 - min(failed, 2) * 0.07
+    if "low" in risk:
+        confidence += 0.03
+    if "medium" in risk:
+        confidence -= 0.03
+    if "high" in risk or "blocked" in risk:
+        confidence -= 0.08
+    return max(0.25, min(0.6, round(confidence, 2)))
+
+
+def pending_inbox_aliases(item: Dict[str, Any], payload: Dict[str, Any]) -> List[str]:
+    fields = {
+        "target": item.get("targetEntityId"),
+        "type": payload.get("type"),
+        "project": payload.get("project"),
+        "displayName": payload.get("displayName"),
+        "aliases": payload.get("aliases"),
+        "sourceNames": payload.get("sourceNames"),
+        "sourceIds": payload.get("sourceIds"),
+        "domains": payload.get("domains") or payload.get("domain"),
+        "service": payload.get("service"),
+        "repo": payload.get("repo"),
+        "repoShort": payload.get("repoShort"),
+        "localPath": payload.get("localPath"),
+        "branch": payload.get("branch"),
+        "branchLine": payload.get("branchLine"),
+        "pipeline": payload.get("pipeline"),
+        "deployRun": payload.get("deployRun"),
+        "version": payload.get("version"),
+        "issueRecorder": payload.get("issueRecorder"),
+        "issueIds": payload.get("issueIds"),
+    }
+    out = []
+    for value in flatten_values(fields):
+        text = str(value).strip()
+        if text and text not in out:
+            out.append(text)
+    return out
+
+
+def pending_inbox_evidence(item: Dict[str, Any], payload: Dict[str, Any], file: Path, line_no: int, row_id: str) -> List[Dict[str, Any]]:
+    evidence: List[Dict[str, Any]] = [
+        {
+            "kind": "project-wiki-agent-inbox",
+            "path": str(file),
+            "ref": f"{line_no}:{row_id}",
+            "status": str(item.get("status") or "pending"),
+            "title": "Project Wiki pending writeback row",
+        }
+    ]
+    for ref in string_list(item.get("evidenceIds")) + string_list(payload.get("evidence")):
+        evidence.append({"kind": "pending-evidence-ref", "ref": ref, "path": ref})
+    issue = str(payload.get("issueRecorder") or "")
+    if issue:
+        evidence.append({"kind": "issue-record", "path": issue, "ref": issue})
+    return evidence
+
+
+def string_list(value: Any) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item).strip()]
+    text = str(value).strip()
+    return [text] if text else []
 
 
 def import_issue_tracking(path: Path) -> Dict[str, int]:

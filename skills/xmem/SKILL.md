@@ -63,10 +63,12 @@ These imports are read-only. They create searchable cards and evidence pointers 
 If present, xmem also consumes compact source exports:
 
 - `project-wiki/data/xmem-export.cards.jsonl`
+- `project-wiki/data/agent-inbox.jsonl`
 - `issue-tracking/index/xmem-export.cards.jsonl`
 - `issue-tracking/index/bug-patterns.jsonl`
 
 These exports are bridge/index inputs only; Project Wiki and Issue Record remain the source truth.
+Project Wiki `agent-inbox.jsonl` rows are pending writebacks only: xmem imports them as `wiki.pending` / `partial` / hint-only cards. They must not override verified Project Wiki truth.
 
 Use `xmem check --sources` when Project Wiki or Issue Record changes its export. Missing optional exports are reported as optional_missing; malformed JSONL rows, duplicate ids, invalid truth status, or invalid confidence are errors.
 

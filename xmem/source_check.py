@@ -23,9 +23,18 @@ def default_source_paths() -> List[Dict[str, str]]:
     ]
 
 
+def default_freshness_paths() -> List[Dict[str, str]]:
+    project_wiki = Path(os.environ.get("XMEM_PROJECT_WIKI", "/Users/xin/project-wiki")).expanduser()
+    return [
+        *default_source_paths(),
+        {"kind": "project-wiki-agent-inbox", "path": str(project_wiki / "data" / "agent-inbox.jsonl")},
+    ]
+
+
 def check_source_exports(paths: Iterable[Dict[str, str]] | None = None) -> Dict[str, Any]:
     source_paths = list(paths or default_source_paths())
-    freshness = source_freshness(source_paths)
+    freshness_paths = default_freshness_paths() if paths is None else source_paths
+    freshness = source_freshness(freshness_paths)
     entries: List[Dict[str, Any]] = []
     seen_ids: Dict[str, str] = {}
     duplicate_ids: List[Dict[str, str]] = []
@@ -64,7 +73,7 @@ def check_source_exports(paths: Iterable[Dict[str, str]] | None = None) -> Dict[
 
 
 def source_freshness(paths: Iterable[Dict[str, str]] | None = None) -> Dict[str, Any]:
-    source_paths = list(paths or default_source_paths())
+    source_paths = list(paths or default_freshness_paths())
     registry = db_path()
     registry_mtime = registry.stat().st_mtime if registry.exists() else 0.0
     checked: List[Dict[str, Any]] = []

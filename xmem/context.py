@@ -38,6 +38,7 @@ SOURCE_RANK = {
     "trellis": 80,
     "project-wiki-export": 78,
     "project-wiki": 70,
+    "project-wiki-pending": 64,
     "issue-tracking": 60,
 }
 

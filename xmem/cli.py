@@ -426,8 +426,8 @@ def sync_cmd(args: argparse.Namespace) -> int:
 
 def sync_sources() -> dict[str, Any]:
     class RebuildArgs:
-        project_wiki = "/Users/xin/project-wiki"
-        issue_tracking = "/Users/xin/issue-tracking"
+        project_wiki = os.environ.get("XMEM_PROJECT_WIKI", "/Users/xin/project-wiki")
+        issue_tracking = os.environ.get("XMEM_ISSUE_TRACKING", "/Users/xin/issue-tracking")
         cards = str(default_cards_path())
         local = "."
         skip_project_wiki = False
@@ -823,7 +823,11 @@ def rebuild_data(args: argparse.Namespace) -> dict[str, Any]:
             result["global_cards"] = import_cards(home_dir() / "cards")
         if not args.skip_project_wiki:
             pw = Path(args.project_wiki)
-            has_project_wiki_source = (pw / "data" / "project-hub.index.json").exists() or (pw / "data" / "xmem-export.cards.jsonl").exists()
+            has_project_wiki_source = (
+                (pw / "data" / "project-hub.index.json").exists()
+                or (pw / "data" / "xmem-export.cards.jsonl").exists()
+                or (pw / "data" / "agent-inbox.jsonl").exists()
+            )
             result["project_wiki"] = import_project_wiki(pw) if has_project_wiki_source else {"skipped": str(pw)}
         if not args.skip_issue_tracking:
             it = Path(args.issue_tracking)
