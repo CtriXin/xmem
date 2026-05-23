@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import subprocess
 import time
 from pathlib import Path
@@ -370,6 +371,59 @@ def test_imports_context_specs_and_trellis_sources(tmp_path: Path):
     assert any(item["source"] == "speckit" for item in packet["specs"])
     assert any(item["source"] == "trellis" for item in packet["specs"])
     assert any("CONTEXT.md" in path for path in packet["next_reads"])
+
+
+def test_sync_imports_generated_code_index_refs_as_hints(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    src = repo / "src"
+    src.mkdir()
+    (src / "AdBanner.tsx").write_text("export function AdBanner() { return null }\n", encoding="utf-8")
+    map_dir = repo / ".ai" / "map"
+    map_dir.mkdir(parents=True)
+    (map_dir / "manifest.json").write_text(
+        json.dumps({"indexedAt": "2026-05-23T00:00:00Z"}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    conn = sqlite3.connect(map_dir / "map.db")
+    conn.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+    conn.execute(
+        """
+        CREATE TABLE definitions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          symbol TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          file_path TEXT NOT NULL,
+          line INTEGER NOT NULL,
+          column INTEGER NOT NULL,
+          text TEXT NOT NULL,
+          language TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute("INSERT INTO meta(key, value) VALUES('project_path', ?)", (str(repo),))
+    conn.execute("INSERT INTO meta(key, value) VALUES('project_type', 'typescript')")
+    conn.execute("INSERT INTO meta(key, value) VALUES('indexed_at', '2026-05-23T00:00:00Z')")
+    conn.execute(
+        "INSERT INTO definitions(symbol, kind, file_path, line, column, text, language) VALUES(?,?,?,?,?,?,?)",
+        ("AdBanner", "function", "src/AdBanner.tsx", 1, 1, "export function AdBanner()", "typescript"),
+    )
+    conn.commit()
+    conn.close()
+
+    synced = json.loads(run([str(XMEM), "sync", "--json"], repo, env).stdout)
+    packet = json.loads(run([str(XMEM), "context", "AdBanner", "--json"], repo, env).stdout)
+    text_packet = run([str(XMEM), "context", "AdBanner"], repo, env).stdout
+
+    assert synced["code_indexes"]["indexes"] == 1
+    assert synced["code_indexes"]["cards"] >= 2
+    assert any(item["type"] == "code.hotspot" for item in packet["code_indexes"])
+    hotspot = next(item for item in packet["code_indexes"] if item["type"] == "code.hotspot")
+    assert hotspot["truth"] == "partial"
+    assert hotspot["source"] == "code-index-bridge"
+    assert "AdBanner" in hotspot["aliases"]
+    assert any(".ai/map/map.db" in path or "src/AdBanner.tsx" in path for path in packet["next_reads"])
+    assert any("generated refs" in warning for warning in packet["warnings"])
+    assert "code_indexes" in text_packet
 
 
 def test_issue_tracking_imports_bug_patterns_as_rules(tmp_path: Path):

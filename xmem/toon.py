@@ -85,7 +85,7 @@ def llm_packet(packet: Dict[str, Any]) -> str:
             lines.append(f"      wrong_aliases: {quote_scalar(', '.join(map(str, item.get('wrong_aliases') or [])))}")
         if item.get("canonical_aliases"):
             lines.append(f"      canonical_aliases: {quote_scalar(', '.join(map(str, item.get('canonical_aliases') or [])))}")
-    for section in ("corrections", "alias_guidance", "registry_candidates", "rules", "methods", "memories", "specs", "relations", "evidence"):
+    for section in ("corrections", "alias_guidance", "registry_candidates", "rules", "methods", "memories", "specs", "code_indexes", "relations", "evidence"):
         items = packet.get(section) or []
         lines.append(f"  {section}[{len(items)}]:")
         for item in items:

@@ -219,6 +219,19 @@ def build_doctor_report(status: Dict[str, Any], cwd: Path | None = None) -> Dict
         }
     )
 
+    code_indexes = status.get("code_indexes") or {}
+    codegraph_binary = code_indexes.get("codegraph_binary") or ""
+    code_index_count = int(code_indexes.get("indexes") or 0)
+    provider_text = ",".join(f"{k}={v}" for k, v in sorted((code_indexes.get("providers") or {}).items())) or "none"
+    components.append(
+        {
+            "name": "code_index_bridge",
+            "severity": "ok" if codegraph_binary or code_index_count else "info",
+            "status": "available" if codegraph_binary else ("indexed_refs_only" if code_index_count else "not_configured"),
+            "summary": f"indexes={code_index_count} providers={provider_text} codegraph_binary={codegraph_binary or 'missing'}",
+        }
+    )
+
     local_count = int(audit.get("local_only_knowledge_cards") or 0)
     components.append(
         {

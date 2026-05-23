@@ -26,6 +26,7 @@ SPEC_TYPES = {
     "spec.task",
     "spec.constitution",
 }
+CODE_TYPES = {"code.index", "code.hotspot"}
 STATUS_RANK = {"verified": 60, "partial": 40, "inferred": 30, "stale": 20, "unknown": 10, "disputed": 0}
 SOURCE_RANK = {
     "local-card": 100,
@@ -38,6 +39,7 @@ SOURCE_RANK = {
     "trellis": 80,
     "project-wiki-export": 78,
     "project-wiki": 70,
+    "code-index-bridge": 66,
     "project-wiki-pending": 64,
     "issue-tracking": 60,
 }
@@ -54,6 +56,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     evidence = [c for c in cards if c.get("type") in EVIDENCE_TYPES]
     memories = [c for c in cards if c.get("type") in MEMORY_TYPES]
     specs = [c for c in cards if c.get("type") in SPEC_TYPES]
+    code_indexes = [c for c in cards if c.get("type") in CODE_TYPES]
     strong_alias = [c for c in alias_cards if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
     strong_correction = [c for c in corrections if c.get("status") in {"verified", "disputed"} and float(c.get("score") or 0) >= 8]
     strong_registry = [c for c in registry if c.get("status") == "verified" and float(c.get("score") or 0) >= 8]
@@ -80,6 +83,8 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         warnings.append("query matched a correction/dispute overlay; prefer canonical aliases and verify before editing")
     if any(c.get("status") in {"inferred", "partial", "stale", "unknown", "disputed"} for c in cards[:5]):
         warnings.append("some top cards are not verified; use as hints only")
+    if any(c.get("source") == "code-index-bridge" for c in cards[:8]):
+        warnings.append("code index matches are generated refs; verify in source files before editing")
     freshness = source_freshness()
     if freshness.get("status") != "fresh":
         warnings.append("source exports are newer than registry or registry is missing; run xmem sync before relying on this packet")
@@ -87,7 +92,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
     if local_source_health.get("local_only_knowledge_cards"):
         warnings.append("some local knowledge cards are not portable through git; treat them as machine-local until tracked or exported")
 
-    next_reads = unique_paths(registry[:4] + rules[:3] + methods[:3] + specs[:4] + relations[:3] + memories[:3] + evidence[:3])
+    next_reads = unique_paths(registry[:4] + rules[:3] + methods[:3] + specs[:4] + code_indexes[:5] + relations[:3] + memories[:3] + evidence[:3])
     packet = {
         "schema": "xmem.context.v1",
         "truth_policy": "files/code/runtime are truth; sqlite is generated index/cache",
@@ -107,6 +112,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "methods": [card_brief(c, i + 1) for i, c in enumerate(methods[:5])],
         "memories": [card_brief(c, i + 1) for i, c in enumerate(memories[:5])],
         "specs": [card_brief(c, i + 1) for i, c in enumerate(specs[:6])],
+        "code_indexes": [card_brief(c, i + 1) for i, c in enumerate(code_indexes[:8])],
         "relations": [card_brief(c, i + 1) for i, c in enumerate(relations[:5])],
         "evidence": [card_brief(c, i + 1) for i, c in enumerate(evidence[:6])],
         "source_freshness": freshness_brief(freshness),

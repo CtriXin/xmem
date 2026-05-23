@@ -9,6 +9,7 @@ from typing import Any, List
 
 from . import __version__
 from .checks import check_diff
+from .code_index import code_index_status, import_code_indexes
 from .context import build_context, canonical_queries_from_corrections
 from .gain import format_gain_dashboard, record_gain_confirmation, summarize_gain
 from .health import backup_health, build_doctor_report
@@ -108,6 +109,8 @@ def build_parser() -> argparse.ArgumentParser:
     trellis_imp.add_argument("path", nargs="?", default=".")
     memory_imp = imp_sub.add_parser("project-memory", help="导入已知 project memory / spec sources")
     memory_imp.add_argument("path", nargs="?", default=".")
+    code_imp = imp_sub.add_parser("code-index", help="导入 map/codegraph 生成索引的轻量 ref")
+    code_imp.add_argument("path", nargs="?", default=".")
 
     find = sub.add_parser("find", help="搜索 cards / projects / evidence")
     find.add_argument("query")
@@ -251,6 +254,8 @@ def main(argv: List[str] | None = None) -> int:
             print(json.dumps(import_trellis(Path(args.path)), ensure_ascii=False, indent=2))
         elif args.source == "project-memory":
             print(json.dumps(import_project_memory_sources(Path(args.path)), ensure_ascii=False, indent=2))
+        elif args.source == "code-index":
+            print(json.dumps(import_code_indexes([Path(args.path)]), ensure_ascii=False, indent=2))
         return 0
     if args.cmd == "find":
         cards = search_cards(args.query, args.limit, gain_event="find")
@@ -375,6 +380,8 @@ def help_cmd() -> int:
                 "- xmem new                 # 新项目/新文件夹初始化并注册",
                 "- xmem fix                 # 记录 alias 纠错或争议",
                 "",
+                "代码索引：sync 会读取已存在的 .ai/map/map.db / .codegraph/codegraph.db，只写轻量 ref；代码文件仍是真相。",
+                "",
                 "Agent 内部：hook / gain confirm / gain reject 会自动记录 outcome 或 outbox，不需要日常记。",
                 "",
                 "truth 规则：Project Wiki / Issue Record / code / files 是 source truth；SQLite 只是 index/cache。",
@@ -406,6 +413,14 @@ def sync_cmd(args: argparse.Namespace) -> int:
         local_sources = data.get("local_sources", {})
         if local_sources:
             print(f"local_sources: {local_sources.get('roots', 0)} roots, {local_sources.get('cards', 0)} cards")
+        code_indexes = data.get("code_indexes") or {}
+        if code_indexes:
+            print(
+                "code_indexes: "
+                f"{code_indexes.get('indexes', 0)} indexes, "
+                f"{code_indexes.get('cards', 0)} cards, "
+                f"errors={len(code_indexes.get('errors') or [])}"
+            )
         status = data.get("status", {})
         source_exports = status.get("source_exports") or {}
         if source_exports:
@@ -501,6 +516,7 @@ def registry_status() -> dict[str, Any]:
         "outbox": outbox_counts(),
         "counts": counts,
     }
+    data["code_indexes"] = code_index_status(registered_roots())
     data["next_actions"] = status_next_actions(data)
     return data
 
@@ -574,6 +590,16 @@ def status_cmd(args: argparse.Namespace) -> int:
             f"warnings={source_exports.get('warnings', 0)} "
             f"optional_missing={source_exports.get('optional_missing', 0)} "
             f"stale_exports={source_exports.get('stale_exports', 0)}"
+        )
+        code_indexes = data.get("code_indexes") or {}
+        providers = code_indexes.get("providers") or {}
+        provider_text = ",".join(f"{key}={value}" for key, value in sorted(providers.items())) or "none"
+        print(
+            "code_indexes: "
+            f"indexes={code_indexes.get('indexes', 0)} "
+            f"roots_checked={code_indexes.get('roots_checked', 0)} "
+            f"providers={provider_text} "
+            f"codegraph_binary={code_indexes.get('codegraph_binary') or 'missing'}"
         )
         counts = data.get("counts", {})
         if counts:
@@ -817,7 +843,9 @@ def rebuild_data(args: argparse.Namespace) -> dict[str, Any]:
                 result["local_sources"] = index_registered_sources([local_root])
             else:
                 result["local_sources"] = index_registered_sources()
-            result["project_memory"] = import_project_memory_roots(registered_roots([local_root]))
+            roots = registered_roots([local_root])
+            result["project_memory"] = import_project_memory_roots(roots)
+            result["code_indexes"] = import_code_indexes(roots)
         if not args.skip_cards:
             result["cards"] = import_cards(Path(args.cards))
             result["global_cards"] = import_cards(home_dir() / "cards")

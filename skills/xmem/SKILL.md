@@ -74,11 +74,14 @@ Use `xmem check --sources` when Project Wiki or Issue Record changes its export.
 
 `xmem sync` rebuilds the generated SQLite registry atomically through a temp file and final swap, so concurrent agents should keep reading the previous complete registry until the new one is ready.
 
+If registered repos already have `.ai/map/map.db` or `.codegraph/codegraph.db`, sync imports only compact `code.index` / `code.hotspot` refs. These refs help route an Agent to likely files/symbols, but generated DBs and source files remain truth; verify in code before editing. `map` is the primary quick code map, while `codegraph` is an optional deep-symbol tool.
+
 ## Source Routing
 
 - Project/entity truth goes to Project Wiki: service, repo, domain, branch, deploy target, owner, business name, oral alias.
 - Bug truth goes to Issue Record: symptom, root cause, fix pattern, verification, regression guard, evidence paths.
 - xmem truth stays compact: cross-project method/invariant/relation cards with source pointers only.
+- Code structure truth stays in source files plus generated `.ai/map` / `.codegraph` indexes; xmem stores only routing refs.
 - Do not duplicate full Project Wiki or Issue Record truth into xmem; xmem is the control plane and generated index consumer.
 - When source exports change, require `xmem check --sources` and `xmem sync`; context should be treated as stale until `source_freshness.status` is `fresh`.
 
