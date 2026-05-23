@@ -37,7 +37,9 @@ def main() -> None:
         assert "registry_exists: true" in status
         assert "local_sources: 1" in status
         help_text = run([str(XMEM), "help"], repo, env).stdout
-        assert "xmem sync" in help_text and "xmem fix" in help_text
+        assert "xmem sync" in help_text and "xmem fix" in help_text and "xmem doctor" in help_text
+        doctor = run([str(XMEM), "doctor"], repo, env).stdout
+        assert "xmem_doctor:" in doctor and "components:" in doctor
         root_help = run([str(XMEM), "-h"], repo, env).stdout
         assert "用法: xmem <命令> [选项]" in root_help
         assert "显示帮助并退出" in root_help

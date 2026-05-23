@@ -14,6 +14,7 @@ Truth rule: `.xmem/*.yaml`, source Markdown, code, git, runtime APIs, and human 
 ```bash
 xmem help
 xmem status
+xmem doctor
 xmem sync
 xmem preflight "query"
 xmem context "query"
@@ -34,6 +35,7 @@ xmem gain
 5. For edits that hit a feature with invariant cards, run `xmem check` before final response.
 6. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
 7. Use `xmem gain` when asked what xmem saved.
+8. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
 
 `xmem context` is LLM-first: use `resolution.status`, `suggested_queries`, `correction_guidance`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true. Duplicate cards may be fused; read `supporting_cards` for alternate sources behind the primary card.
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 from pathlib import Path
 
 from xmem.util import query_terms
@@ -523,7 +524,9 @@ def test_status_reports_local_only_non_identity_cards(tmp_path: Path):
     assert sources["status"] == "warn"
     assert sources["local_card_warnings"] >= 1
     assert sources["local_source_audit"]["local_only_knowledge_cards"] >= 1
+    assert sources["local_card_suggestions"][0]["reason"] == "ignored_by_git"
     assert "local_only_knowledge" in sources_text
+    assert "suggested_fix" in sources_text
     strict = run([str(XMEM), "check", "--sources", "--strict"], repo, env, check=False)
     assert strict.returncode == 2
     sync_text = run([str(XMEM), "sync"], repo, env).stdout
@@ -535,6 +538,49 @@ def test_status_reports_local_only_non_identity_cards(tmp_path: Path):
     assert "local_source_health:" in run([str(XMEM), "preflight", "local rule"], repo, env).stdout
     unrelated = json.loads(run([str(XMEM), "context", "definitely-no-local-card-match", "--json"], repo, env).stdout)
     assert unrelated["local_source_health"] == {}
+
+
+def test_doctor_reports_backup_health_and_local_card_suggestions(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    env = {
+        **env,
+        "XMEM_BACKUP_STATE_DIR": str(tmp_path / "backup-state"),
+        "XMEM_BACKUP_REPO": str(tmp_path / "xmem-backup"),
+    }
+    state = Path(env["XMEM_BACKUP_STATE_DIR"])
+    state.mkdir()
+    (state / "last-success-epoch").write_text(str(int(time.time())), encoding="utf-8")
+    (state / "pending-sync").write_text("network_unavailable reason=interval_21600s\n", encoding="utf-8")
+    (repo / ".gitignore").write_text(".xmem/\n", encoding="utf-8")
+    (repo / ".xmem" / "cards" / "doctor.rule.yaml").write_text(
+        "\n".join(
+            [
+                "id: doctor.rule",
+                "type: rule",
+                "title: Doctor Rule",
+                "truth:",
+                "  status: verified",
+                "  confidence: 0.9",
+                "summary: Doctor should suggest how to make this card portable.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    data = json.loads(run([str(XMEM), "doctor", "--json"], repo, env).stdout)
+    text = run([str(XMEM), "doctor"], repo, env).stdout
+    status = json.loads(run([str(XMEM), "status", "--json"], repo, env).stdout)
+
+    assert data["status"] == "warn"
+    assert data["backup"]["status"] == "pending"
+    assert data["backup"]["pending"] is True
+    assert data["current_repo"]["status"] == "registered"
+    assert data["local_card_suggestions"][0]["reason"] == "ignored_by_git"
+    assert any(".xmem/cards/doctor.rule.yaml" in item for item in data["next_actions"])
+    assert "xmem_doctor: warn" in text
+    assert "local_card_fixes:" in text
+    assert status["backup"]["status"] == "pending"
 
 
 def test_context_fuses_duplicate_cards_by_title(tmp_path: Path):

@@ -11,6 +11,7 @@ from . import __version__
 from .checks import check_diff
 from .context import build_context, canonical_queries_from_corrections
 from .gain import format_gain_dashboard, record_gain_confirmation, summarize_gain
+from .health import backup_health, build_doctor_report
 from .hooks import outbox_counts, run_hook
 from .importers import (
     import_bug_patterns,
@@ -55,7 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="xmem",
         usage="xmem <命令> [选项]",
         description="xmem：给 Agent 用的轻量跨项目 memory router / truth index。",
-        epilog="常用入口：xmem status / sync / context / preflight / check / gain / help",
+        epilog="常用入口：xmem status / doctor / sync / context / preflight / check / gain / help",
     )
     p.add_argument("--version", action="version", version=f"xmem {__version__}", help="显示版本号并退出")
     p._positionals.title = "命令"
@@ -65,6 +66,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = sub.add_parser("status", help="查看索引位置、数量和 source 状态")
     status.add_argument("--json", action="store_true", help="输出 JSON")
+
+    doctor = sub.add_parser("doctor", help="综合检查 registry、source、backup、outbox 和当前 repo")
+    doctor.add_argument("--json", action="store_true", help="输出 JSON")
 
     sync = sub.add_parser("sync", help="从文件 truth sources 刷新 SQLite index")
     sync.add_argument("--json", action="store_true", help="输出 JSON")
@@ -210,6 +214,8 @@ def main(argv: List[str] | None = None) -> int:
         return help_cmd()
     if args.cmd == "status":
         return status_cmd(args)
+    if args.cmd == "doctor":
+        return doctor_cmd(args)
     if args.cmd == "sync":
         return sync_cmd(args)
     if args.cmd == "new":
@@ -358,6 +364,7 @@ def help_cmd() -> int:
             [
                 "xmem 常用命令：",
                 "- xmem status              # 查看索引状态、source 健康度、outbox",
+                "- xmem doctor              # 综合诊断 registry / source / backup / 当前 repo",
                 "- xmem sync                # 刷新索引；从 Project Wiki / Issue Record / 本地 cards 重建",
                 "- xmem context <query>     # 查历史项目、方法、证据，返回 LLM 好读 packet",
                 "- xmem preflight <query>   # 开发/修 bug 前查历史坑、must_keep、required checks",
@@ -490,6 +497,7 @@ def registry_status() -> dict[str, Any]:
         "source_exports": check_source_exports(),
         "local_source_count": len(load_sources().get("local_roots", [])),
         "local_source_audit": audit_local_sources(),
+        "backup": backup_health(),
         "outbox": outbox_counts(),
         "counts": counts,
     }
@@ -511,6 +519,9 @@ def status_next_actions(data: dict[str, Any]) -> list[str]:
         actions.append("run xmem sync because source exports are newer than registry")
     if audit.get("local_only_knowledge_cards"):
         actions.append("decide whether local-only .xmem/cards should be tracked by git or exported by their source project")
+    backup = data.get("backup") or {}
+    if backup.get("next_action"):
+        actions.append(str(backup["next_action"]))
     if int(outbox.get("project_wiki") or 0) or int(outbox.get("issue_tracking") or 0):
         actions.append("review xmem outbox and promote accepted Project Wiki / Issue Record writes")
     if not actions:
@@ -547,6 +558,14 @@ def status_cmd(args: argparse.Namespace) -> int:
                     print(f"- {item.get('root')}: {item.get('local_only_knowledge_cards')} local-only knowledge cards ({item.get('status')})")
         outbox = data.get("outbox", {})
         print(f"outbox: project_wiki={outbox.get('project_wiki', 0)} issue_tracking={outbox.get('issue_tracking', 0)}")
+        backup = data.get("backup") or {}
+        print(
+            "backup: "
+            f"{backup.get('status', 'unknown')} "
+            f"last_success_at={backup.get('last_success_at', '') or 'none'} "
+            f"pending={str(bool(backup.get('pending'))).lower()} "
+            f"age_seconds={backup.get('age_seconds')}"
+        )
         source_exports = data.get("source_exports") or {}
         print(
             "source_exports: "
@@ -567,6 +586,29 @@ def status_cmd(args: argparse.Namespace) -> int:
             for action in actions:
                 print(f"- {action}")
     return 0
+
+
+def doctor_cmd(args: argparse.Namespace) -> int:
+    data = build_doctor_report(registry_status(), Path.cwd())
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        print(f"xmem_doctor: {data.get('status', 'unknown')}")
+        print("components:")
+        for item in data.get("components", []):
+            print(f"- {item.get('name')}: {item.get('severity')} {item.get('status')} ({item.get('summary')})")
+        suggestions = data.get("local_card_suggestions") or []
+        if suggestions:
+            print("local_card_fixes:")
+            for item in suggestions[:5]:
+                sample = ",".join(item.get("sample") or [])
+                print(f"- {item.get('root')}: {item.get('reason')} -> {item.get('suggested_fix')} sample={sample}")
+        actions = data.get("next_actions") or []
+        if actions:
+            print("next_actions:")
+            for action in actions:
+                print(f"- {action}")
+    return 2 if data.get("status") == "error" else 0
 
 
 def why_cmd(args: argparse.Namespace) -> int:

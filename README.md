@@ -2,7 +2,7 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.10`.
+Current package version: `0.1.20`.
 
 ## Goals
 
@@ -20,6 +20,7 @@ Current package version: `0.1.10`.
 ```bash
 xmem help
 xmem status
+xmem doctor
 xmem sync
 xmem preflight "ads lazyload change"
 xmem context "how did we add ads before"
@@ -84,7 +85,9 @@ Use `xmem check --sources` to validate export shape before or after another tool
 
 Registry rebuilds are atomic: `xmem sync` builds a temporary SQLite index and swaps it into place at the end, so concurrent `xmem context` readers should not see a half-empty registry during sync.
 
-`xmem status` also reports `next_actions` and audits registered local `.xmem/cards`. Generated identity cards may remain local, but non-identity rule/method/correction cards are flagged as `local_only_knowledge` when they are ignored or untracked by git. That warning means xmem can read them on this machine, but they are not portable through git until the owning project decides to track or export them. Context and preflight packets include compact `local_source_health` when matched cards come from a non-portable local source, so agents know when the evidence is machine-local without adding noise to unrelated queries.
+`xmem status` also reports `next_actions`, xmem-backup health, and registered local `.xmem/cards`. Generated identity cards may remain local, but non-identity rule/method/correction cards are flagged as `local_only_knowledge` when they are ignored or untracked by git. That warning means xmem can read them on this machine, but they are not portable through git until the owning project decides to track or export them. Context and preflight packets include compact `local_source_health` when matched cards come from a non-portable local source, so agents know when the evidence is machine-local without adding noise to unrelated queries.
+
+`xmem doctor` is the single maintenance view. It combines registry state, source export health, local-card portability, outbox counts, xmem-backup state, and current repo registration. Use it when `status` says there is a warning or before handing work to another agent.
 
 ## Control Plane Contract
 
@@ -205,6 +208,7 @@ Confirmed/rejected gain outcomes also create review outbox items under `~/.xmem/
 
 ```bash
 xmem status                 # registry health and counts
+xmem doctor                 # registry/source/backup/current repo diagnosis
 xmem sync                   # rebuild from truth sources
 xmem preflight <query>      # dev-start bug guards and required checks
 xmem check --sources        # validate Project Wiki / Issue Record exports

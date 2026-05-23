@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
+from .health import local_card_suggestions
 from .importers import bug_pattern_to_export_card, iter_jsonl, looks_like_bug_pattern, normalize_status
 from .sources import audit_local_sources
 from .store import db_path
@@ -57,6 +58,7 @@ def check_source_exports(paths: Iterable[Dict[str, str]] | None = None) -> Dict[
         "stale_exports": freshness["stale_exports"],
         "duplicate_ids": duplicate_ids,
         "local_source_audit": local_source_audit,
+        "local_card_suggestions": local_card_suggestions(local_source_audit),
         "exports": entries,
     }
 
@@ -183,4 +185,9 @@ def compact_source_health(data: Dict[str, Any]) -> List[str]:
                 f"- local_only_knowledge: {item.get('local_only_knowledge_cards')} "
                 f"root={item.get('root')} sample={','.join(item.get('sample_local_only') or [])}"
             )
+    for item in data.get("local_card_suggestions", [])[:5]:
+        lines.append(
+            f"- suggested_fix: root={item.get('root')} reason={item.get('reason')} "
+            f"action={item.get('suggested_fix')}"
+        )
     return lines
