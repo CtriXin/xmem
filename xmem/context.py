@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 from .toon import compact
 from .source_check import source_freshness
 from .sources import audit_local_sources
-from .util import field_from_text, list_after_key, normalize_text, query_terms
+from .util import field_from_text, list_after_key, normalize_text, query_hash, query_terms
 
 
 REGISTRY_TYPES = {"identity", "wiki.service", "wiki.repo", "wiki.domain", "wiki.project"}
@@ -138,6 +138,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         "schema": "xmem.context.v1",
         "truth_policy": "files/code/runtime are truth; sqlite is generated index/cache",
         "query": query,
+        "query_hash": query_hash(query),
         "symbolic_memory": symbolic_memory_brief(symbolic_sections),
         "resolution": {
             "status": resolution,
@@ -554,6 +555,7 @@ def card_brief(card: Dict[str, Any], rank: int) -> Dict[str, Any]:
         "source_ref": card.get("source_ref", ""),
         "source_path": card.get("path", ""),
         "evidence_ref": evidence_ref_for_card(card),
+        "suppressed_for_query": card.get("suppressed_for_query") or {},
         "title": compact(card.get("title", ""), 96),
         "why": card.get("why", ""),
         "hints": card_hints(card.get("body", "")),

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import pwd
@@ -68,6 +69,11 @@ def slugify(value: str, fallback: str = "project") -> str:
     value = re.sub(r"[^a-z0-9._-]+", "-", value)
     value = re.sub(r"-+", "-", value).strip("-._")
     return value or fallback
+
+
+def query_hash(value: str) -> str:
+    normalized = normalize_text(value or "")
+    return hashlib.sha1(normalized.encode("utf-8")).hexdigest()[:12]
 
 
 def read_json(path: Path, default: Any = None) -> Any:

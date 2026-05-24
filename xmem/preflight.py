@@ -40,7 +40,18 @@ RUNTIME_BLOCKER_PATTERNS = (
 )
 
 
-def build_preflight(query: str, current: Dict[str, Any] | None, cards: List[Dict[str, Any]], events: List[Dict[str, Any]]) -> Dict[str, Any]:
+TARGET_FIELD_KEYS = {"domain", "service", "repo", "project", "entity"}
+
+
+def build_preflight(
+    query: str,
+    current: Dict[str, Any] | None,
+    cards: List[Dict[str, Any]],
+    events: List[Dict[str, Any]],
+    *,
+    structured_fields: Dict[str, str] | None = None,
+    raw_query: str = "",
+) -> Dict[str, Any]:
     context = build_context(query, current, cards, events)
     fused = fuse_related_cards(cards)
     registry = [c for c in fused if c.get("type") in REGISTRY_TYPES or str(c.get("type", "")).startswith("wiki.")]
@@ -61,6 +72,7 @@ def build_preflight(query: str, current: Dict[str, Any] | None, cards: List[Dict
     readiness = preflight_readiness(freshness, resolution, guard_cards, fused)
     deploy_task = looks_like_deploy_task(query, fused)
     compact_guard = needs_compact_output_guard(query, actionable)
+    query_quality = preflight_query_quality(query, structured_fields or {}, fused)
     gate = build_gate(
         query=query,
         freshness=freshness,
@@ -69,9 +81,23 @@ def build_preflight(query: str, current: Dict[str, Any] | None, cards: List[Dict
         matched_cards=fused,
         deploy_task=deploy_task,
         compact_guard=compact_guard,
+        query_quality=query_quality,
     )
+    if query_quality.get("status") == "needs_clarification":
+        guard_cards = []
+        issue_patterns = []
+        invariants = []
+        methods = []
+        specs = []
+        must_keep = []
+        avoid = []
+        known_failure_modes = []
+        required_checks = []
+        registry = []
+        readiness = "needs_clarification"
 
     warnings = list(context.get("warnings") or [])
+    warnings.extend(query_quality.get("warnings") or [])
     if guard_cards:
         warnings.append("preflight matched historical guards; preserve must_keep and run required_checks before final response")
     if not guard_cards and fused:
@@ -85,6 +111,13 @@ def build_preflight(query: str, current: Dict[str, Any] | None, cards: List[Dict
         "schema": "xmem.preflight.v1",
         "truth_policy": context.get("truth_policy", ""),
         "query": query,
+        "query_hash": context.get("query_hash", ""),
+        "query_input": {
+            "raw_query": raw_query or query,
+            "search_query": query,
+            "structured_fields": structured_fields or {},
+            "quality": query_quality,
+        },
         "intent": "development_preflight",
         "readiness": readiness,
         "severity": gate["severity"],
@@ -117,6 +150,8 @@ def build_preflight(query: str, current: Dict[str, Any] | None, cards: List[Dict
 
 def is_preflight_actionable(card: Dict[str, Any]) -> bool:
     """Keep dev-start guardrails focused; body-only generic terms are not enough."""
+    if card.get("suppressed_for_query"):
+        return False
     why = str(card.get("why") or "")
     if any(part.strip().startswith(ACTIONABLE_WHY_PREFIXES) for part in why.split(";")):
         return True
@@ -179,6 +214,7 @@ def build_gate(
     matched_cards: List[Dict[str, Any]],
     deploy_task: bool,
     compact_guard: bool,
+    query_quality: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     blockers: List[Dict[str, Any]] = []
     required_before_edit: List[str] = []
@@ -190,6 +226,9 @@ def build_gate(
     if resolution.get("do_not_assume_single_project"):
         blockers.append(blocker("ambiguous_target", "project/domain/service identity is ambiguous; resolve the target before editing or deploy"))
         required_before_edit.append("Resolve project/domain/service identity from verified Project Wiki/card evidence before editing.")
+    if (query_quality or {}).get("status") == "needs_clarification":
+        blockers.append(blocker("low_confidence_preflight_query", "structured preflight target is not anchored by verified memory; rebuild fields/query before using guardrails"))
+        required_before_edit.append("Re-run preflight with explicit domain/service/repo/task fields or resolve the target with xmem context first.")
 
     for code, patterns in RUNTIME_BLOCKER_PATTERNS:
         if any(pattern in query.lower() for pattern in patterns):
@@ -228,6 +267,47 @@ def build_gate(
         "blockers": blockers,
         "required_before_edit": unique_strings(required_before_edit),
         "required_before_deploy": unique_strings(required_before_deploy),
+    }
+
+
+def preflight_query_quality(query: str, fields: Dict[str, str], cards: List[Dict[str, Any]]) -> Dict[str, Any]:
+    clean_fields = {k: v for k, v in fields.items() if str(v or "").strip()}
+    if not clean_fields:
+        return {"status": "plain_query", "confidence": "medium", "warnings": []}
+    target_fields = {k: v for k, v in clean_fields.items() if k in TARGET_FIELD_KEYS}
+    top_score = max([float(card.get("score") or 0) for card in cards] or [0.0])
+    anchored = any(
+        (
+            card.get("type") in REGISTRY_TYPES
+            or str(card.get("type", "")).startswith("wiki.")
+            or card.get("type") in {"traffic.switch", "traffic-switch", "scmp.traffic-switch", "relation", "link"}
+        )
+        and card.get("status") == "verified"
+        and float(card.get("score") or 0) >= 8
+        for card in cards[:10]
+    )
+    if target_fields and not anchored:
+        return {
+            "status": "needs_clarification",
+            "confidence": "low",
+            "top_score": round(top_score, 3),
+            "reason": "domain/service/repo fields did not resolve to a verified target anchor",
+            "warnings": ["structured preflight target is low confidence; no guardrail packet emitted until target is clarified"],
+        }
+    if top_score < 1:
+        return {
+            "status": "needs_clarification",
+            "confidence": "low",
+            "top_score": round(top_score, 3),
+            "reason": "structured preflight found no relevant cards",
+            "warnings": ["structured preflight matched no relevant memory; rebuild fields/query before relying on it"],
+        }
+    return {
+        "status": "structured",
+        "confidence": "high" if anchored else "medium",
+        "top_score": round(top_score, 3),
+        "target_anchor": anchored,
+        "warnings": [],
     }
 
 
@@ -310,6 +390,8 @@ def unique_strings(values: List[str]) -> List[str]:
 def preflight_action(readiness: str) -> str:
     if readiness == "blocked_source_stale":
         return "run xmem sync before relying on this preflight"
+    if readiness == "needs_clarification":
+        return "rebuild structured fields/query or resolve target with xmem context before editing"
     if readiness == "needs_disambiguation":
         return "disambiguate project/entity before editing"
     if readiness == "ready_with_guards":

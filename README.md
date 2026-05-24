@@ -2,7 +2,7 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.30`.
+Current package version: `0.1.31`.
 
 ## Goals
 
@@ -25,12 +25,14 @@ xmem status
 xmem doctor
 xmem sync
 xmem preflight "ads lazyload change"
+xmem preflight --fields domain=example.com task="ads lazyload change"
 xmem context "how did we add ads before"
 xmem why "car ads lazyload"
 xmem open ads.lazyload
 xmem new
 xmem check --sources
 xmem fix
+xmem suppress --card ads.lazyload --for-query "ads lazyload change" --reason irrelevant
 xmem gain
 xmem gain confirm "ads lazyload"
 ```
@@ -217,11 +219,15 @@ xmem_preflight:
 
 Agents should run `xmem preflight "<task>"` before implementation/bugfix work, then obey `severity`, `can_proceed`, `blockers`, `required_before_edit`, and `required_before_deploy` before editing/deploying. Preserve `must_keep`, avoid known failure modes, and run `required_checks`. If source freshness is stale, sync first; if project identity is ambiguous, disambiguate before editing.
 
+For hook-generated or long/noisy prompts, agents should prefer structured preflight fields: `xmem preflight --fields domain=... service=... repo=... task=... mode=...`. When domain/service/repo fields do not resolve to a verified target anchor, xmem returns `readiness: needs_clarification`, `can_proceed: false`, and clears guardrail sections instead of emitting a misleading rules packet.
+
 Preflight severity policy: hints only route the next read; warnings require preserving the invariant or running the check; blockers stop edits/deploy until resolved. Blockers include stale source exports, ambiguous production target, verified invariant removal, SCMP deploy payload/path mismatch, unconverged pods, failed safe-access/live verification, and missing domain binding for traffic-switch work. SCMP/Feishu/issue/rg/log queries also activate compact-output guardrails: summarize for agents and store bulky raw output as evidence paths.
 
 `xmem context` conservatively fuses duplicate cards with the same title and type family. The best card stays in `rules` / `methods` / `relations`, and matching duplicates appear as `supporting_cards`, keeping LLM packets compact while preserving source traceability.
 
 If a query hits a correction card, xmem expands the canonical alias as an extra search internally and marks the packet as `guided_by_correction` instead of pretending the wrong alias is reliable truth.
+
+If a card is true but irrelevant for the current query, use `xmem suppress --card <id> --for-query <query-or-hash> --reason irrelevant`. This writes a local feedback row and downranks that card for the exact query hash only; it does not change card truth, Project Wiki, or Issue Record.
 
 When a query hits a verified `traffic.switch` card, `xmem context` surfaces a `traffic_switch` packet before lower-confidence Project Wiki pending rows. This gives agents prod/validation service, repo, branch hints, approval group, common verification, stale policy, and "what lookup can be skipped" guidance without scanning issue-tracking. Domain/service binding and latest deploy state still require live verification.
 
@@ -252,6 +258,7 @@ xmem status                 # registry health and counts
 xmem doctor                 # registry/source/backup/current repo diagnosis
 xmem sync                   # rebuild from truth sources
 xmem preflight <query>      # dev-start bug guards and required checks
+xmem preflight --fields domain=... task=...  # structured preflight to avoid context pollution
 xmem check --sources        # validate Project Wiki / Issue Record exports
 xmem import project-memory  # import CONTEXT/ADR/OpenSpec/Spec Kit/Trellis from this folder
 xmem import openspec        # import OpenSpec files only
@@ -261,6 +268,7 @@ xmem new                    # create/register .xmem for this folder
 xmem why <query>            # explain matches
 xmem open <card-id-or-query>
 xmem fix                    # record alias correction/dispute
+xmem suppress --card <id> --for-query <query/hash>  # mark true-but-irrelevant match for ranking only
 xmem gain                   # key gain summary only
 xmem gain --detail          # full gain event/query tables
 xmem gain confirm <query>   # confirm a useful xmem hit/outcome

@@ -29,7 +29,7 @@ from .importers import (
 )
 from .project import detect_project, index_local, init_project
 from .preflight import build_preflight
-from .search import latest_events, search_cards
+from .search import latest_events, record_suppression, search_cards
 from .source_check import check_source_exports, compact_source_health
 from .sources import audit_local_sources, index_registered_sources, load_sources, register_local_root, registered_roots, sources_path
 from .store import connect, rows
@@ -125,9 +125,18 @@ def build_parser() -> argparse.ArgumentParser:
     ctx.add_argument("--legacy-toon", action="store_true", help="输出旧版 flat TOON table")
 
     preflight = sub.add_parser("preflight", help="开发/修 bug 前读取历史坑、invariant 和 required checks")
-    preflight.add_argument("query")
+    preflight.add_argument("query", nargs="?", default="")
     preflight.add_argument("--limit", type=int, default=8)
+    preflight.add_argument("--fields", nargs="*", default=[], metavar="KEY=VALUE", help="结构化 query 字段，如 domain=... service=... repo=... task=... mode=...")
+    for name in ("domain", "service", "repo", "project", "task", "mode"):
+        preflight.add_argument(f"--{name}", default="", help=argparse.SUPPRESS)
     preflight.add_argument("--json", action="store_true", help="输出 JSON")
+
+    suppress = sub.add_parser("suppress", help="标记某 card 对某 query 不相关，只影响 ranking")
+    suppress.add_argument("--card", required=True, help="card id")
+    suppress.add_argument("--for-query", required=True, help="原 query 或 query_hash")
+    suppress.add_argument("--reason", default="irrelevant", help="原因，默认 irrelevant")
+    suppress.add_argument("--json", action="store_true", help="输出 JSON")
 
     card = sub.add_parser("card", help="管理本地 cards")
     card_sub = card.add_subparsers(dest="card_cmd", required=True, metavar="<操作>", parser_class=XmemArgumentParser)
@@ -296,15 +305,24 @@ def main(argv: List[str] | None = None) -> int:
             current = detect_project(root)
         except Exception:
             pass
-        cards = search_cards(args.query, max(args.limit * 4, 20), gain_event="preflight")
-        for expanded_query in canonical_queries_from_corrections(args.query, cards):
+        structured_fields = collect_preflight_fields(args)
+        query = preflight_search_query(args.query, structured_fields)
+        cards = search_cards(query, max(args.limit * 4, 20), gain_event="preflight")
+        for expanded_query in canonical_queries_from_corrections(query, cards):
             cards = merge_cards(cards, search_cards(expanded_query, max(args.limit * 2, 10), record_gain=False))
         events = latest_events(3)
-        packet = build_preflight(args.query, current, cards, events)
+        packet = build_preflight(query, current, cards, events, structured_fields=structured_fields, raw_query=args.query)
         if args.json:
             print(json.dumps(packet, ensure_ascii=False, indent=2))
         else:
             print(preflight_packet(packet))
+        return 0
+    if args.cmd == "suppress":
+        row = record_suppression(args.card, args.for_query, args.reason)
+        if args.json:
+            print(json.dumps(row, ensure_ascii=False, indent=2))
+        else:
+            print(f"suppressed: {row['card_id']} for query_hash={row['query_hash']} reason={row['reason']}")
         return 0
     if args.cmd == "card":
         return card_cmd(args)
@@ -376,12 +394,14 @@ def help_cmd() -> int:
                 "- xmem sync                # 刷新索引；从 Project Wiki / Issue Record / 本地 cards 重建",
                 "- xmem context <query>     # 查历史项目、方法、证据，返回 LLM 好读 packet",
                 "- xmem preflight <query>   # 开发/修 bug 前查历史坑、must_keep、required checks",
+                "- xmem preflight --fields domain=... task=...  # Agent 用结构化字段，避免旧上下文污染",
                 "- xmem check               # 改完前检查 invariant / rule / guardrail",
                 "- xmem gain                # 查看 telemetry、粗估收益、确认收益口径",
                 "- xmem why <query>         # 解释为什么匹配",
                 "- xmem open <id|query>     # 打开 card / evidence 摘要",
                 "- xmem new                 # 新项目/新文件夹初始化并注册",
                 "- xmem fix                 # 记录 alias 纠错或争议",
+                "- xmem suppress --card <id> --for-query <query/hash>  # 这张卡本次不相关，只降 ranking",
                 "",
                 "代码索引：sync 会读取已存在的 .ai/map/map.db / .codegraph/codegraph.db，只写轻量 ref；代码文件仍是真相。",
                 "",
@@ -711,6 +731,28 @@ def parse_key_items(items: list[str]) -> dict[str, str]:
             key, value = item.split("=", 1)
             out[key.strip().lstrip("-")] = value.strip()
     return out
+
+
+def collect_preflight_fields(args: argparse.Namespace) -> dict[str, str]:
+    fields = parse_key_items(list(getattr(args, "fields", []) or []))
+    for key in ("domain", "service", "repo", "project", "task", "mode"):
+        value = str(getattr(args, key, "") or "").strip()
+        if value:
+            fields[key] = value
+    return {key: value for key, value in fields.items() if value}
+
+
+def preflight_search_query(raw_query: str, fields: dict[str, str]) -> str:
+    if not fields:
+        return raw_query
+    parts: list[str] = []
+    for key in ("domain", "service", "repo", "project", "task", "mode"):
+        value = fields.get(key)
+        if value:
+            parts.append(value)
+    if not fields.get("task") and raw_query:
+        parts.append(raw_query)
+    return " ".join(parts).strip() or raw_query
 
 
 def prompt(label: str, default: str = "", allow_blank: bool = False) -> str:

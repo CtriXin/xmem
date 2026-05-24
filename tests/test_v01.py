@@ -748,6 +748,114 @@ def test_preflight_returns_issue_patterns_before_development(tmp_path: Path):
     assert "must_keep" in text_packet
 
 
+def test_preflight_fields_avoid_noisy_raw_query_and_clarify_unanchored_target(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(
+        run(
+            [
+                str(XMEM),
+                "preflight",
+                "old ptc_moviecenter evidence ad lazyload",
+                "--fields",
+                "domain=unknown-preflight.example.com",
+                "task=ad lazyload",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+    text_packet = run(
+        [
+            str(XMEM),
+            "preflight",
+            "old ptc_moviecenter evidence ad lazyload",
+            "--fields",
+            "domain=unknown-preflight.example.com",
+            "task=ad lazyload",
+        ],
+        repo,
+        env,
+    ).stdout
+
+    assert packet["query"] == "unknown-preflight.example.com ad lazyload"
+    assert packet["query_input"]["raw_query"] == "old ptc_moviecenter evidence ad lazyload"
+    assert packet["query_input"]["quality"]["status"] == "needs_clarification"
+    assert packet["readiness"] == "needs_clarification"
+    assert packet["can_proceed"] is False
+    assert packet["must_keep"] == []
+    assert packet["invariants"] == []
+    assert "query_input:" in text_packet
+    assert "low_confidence_preflight_query" in text_packet
+
+
+def test_suppress_downranks_irrelevant_card_for_exact_query(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    cards_dir = tmp_path / "cards"
+    cards_dir.mkdir()
+    (cards_dir / "primary.yaml").write_text(
+        "\n".join(
+            [
+                "id: suppress.primary",
+                "type: rule",
+                "title: Shared suppress query primary",
+                "status: verified",
+                "confidence: 1.0",
+                "aliases:",
+                "  - shared suppress query",
+                "must_include:",
+                "  - primary should not be first after suppress",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (cards_dir / "secondary.yaml").write_text(
+        "\n".join(
+            [
+                "id: suppress.secondary",
+                "type: rule",
+                "title: Shared suppress query secondary",
+                "status: verified",
+                "confidence: 0.9",
+                "aliases:",
+                "  - shared suppress query",
+                "must_include:",
+                "  - secondary should rank above suppressed card",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    run([str(XMEM), "import", "cards", str(cards_dir)], repo, env)
+
+    before = json.loads(run([str(XMEM), "context", "shared suppress query", "--json"], repo, env).stdout)
+    assert before["rules"][0]["id"] == "suppress.primary"
+
+    row = json.loads(
+        run(
+            [
+                str(XMEM),
+                "suppress",
+                "--card",
+                "suppress.primary",
+                "--for-query",
+                "shared suppress query",
+                "--reason",
+                "irrelevant",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+    after = json.loads(run([str(XMEM), "context", "shared suppress query", "--json"], repo, env).stdout)
+
+    assert row["effect"] == "ranking_downweight_only"
+    assert after["rules"][0]["id"] == "suppress.secondary"
+    assert any(item["id"] == "suppress.primary" and item["suppressed_for_query"] for item in after["rules"])
+
+
 def test_preflight_filters_weak_body_only_guards(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     cards = tmp_path / "cards"

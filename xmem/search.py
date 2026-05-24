@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List
 
 from .store import connect, rows
-from .util import append_jsonl, home_dir, normalize_text, query_terms, query_variants, utc_now
+from .util import append_jsonl, home_dir, load_jsonl, normalize_text, query_hash, query_terms, query_variants, utc_now
 
 
 TOKEN_SAVING_EVENTS = {"context", "preflight"}
@@ -13,6 +14,7 @@ TOKEN_SAVING_EVENTS = {"context", "preflight"}
 def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_event: str = "search") -> List[Dict[str, Any]]:
     terms = query_terms(query)
     variants = query_variants(query)
+    suppressions = suppressions_for_query(query)
     with connect() as conn:
         cards = rows(conn, "SELECT * FROM cards")
         projects = {r["project_id"]: r for r in rows(conn, "SELECT * FROM projects")}
@@ -83,7 +85,16 @@ def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_
             why.append("evidence_source:issue-tracking")
         if score:
             card = dict(card)
-            card["score"] = round(score * float(card.get("confidence") or 0.5), 3)
+            raw_score = score * float(card.get("confidence") or 0.5)
+            suppressed = suppressions.get(str(card.get("card_id") or ""))
+            if suppressed:
+                raw_score *= 0.2
+                why.append(f"suppressed_for_query:{suppressed.get('reason') or 'irrelevant'}")
+                card["suppressed_for_query"] = {
+                    "reason": suppressed.get("reason") or "irrelevant",
+                    "query_hash": suppressed.get("query_hash") or query_hash(query),
+                }
+            card["score"] = round(raw_score, 3)
             card["why"] = compact_reasons(why)
             scored.append(card)
     scored.sort(key=lambda x: (x["score"], x.get("confidence") or 0), reverse=True)
@@ -110,6 +121,57 @@ def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_
             "sources": sorted({str(card.get("source") or "") for card in result if card.get("source")})[:6],
         })
     return result
+
+
+def record_suppression(card_id: str, for_query: str, reason: str = "irrelevant") -> Dict[str, Any]:
+    target = (for_query or "").strip()
+    is_hash = bool(re.fullmatch(r"[a-f0-9]{12,40}", target))
+    row = {
+        "ts": utc_now(),
+        "event": "suppress.irrelevant",
+        "card_id": card_id.strip(),
+        "query": "" if is_hash else target,
+        "query_hash": target[:12] if is_hash else query_hash(target),
+        "reason": reason.strip() or "irrelevant",
+        "status": "active",
+        "effect": "ranking_downweight_only",
+    }
+    append_jsonl(home_dir() / "suppressions.jsonl", row)
+    append_jsonl(home_dir() / "gain.jsonl", {
+        "ts": row["ts"],
+        "event": "suppress.irrelevant",
+        "source": "suppress",
+        "query": row["query"] or row["query_hash"],
+        "matches": 0,
+        "cards_considered": 0,
+        "estimated_tokens_saved": 0,
+        "top_card": card_id.strip(),
+        "top_score": 0,
+        "top_status": "",
+        "top_confidence": 0,
+        "top_why": row["reason"],
+        "sources": [],
+    })
+    return row
+
+
+def suppressions_for_query(query: str) -> Dict[str, Dict[str, Any]]:
+    current_hash = query_hash(query)
+    current_norm = normalize_text(query)
+    out: Dict[str, Dict[str, Any]] = {}
+    for row in load_jsonl(home_dir() / "suppressions.jsonl"):
+        if str(row.get("status") or "active") != "active":
+            continue
+        card_id = str(row.get("card_id") or "").strip()
+        if not card_id:
+            continue
+        row_query = str(row.get("query") or "")
+        row_hash = str(row.get("query_hash") or "")
+        if not row_hash and row_query:
+            row_hash = query_hash(row_query)
+        if row_hash == current_hash or (row_query and normalize_text(row_query) == current_norm):
+            out[card_id] = row
+    return out
 
 
 def compact_reasons(reasons: List[str], limit: int = 4) -> str:

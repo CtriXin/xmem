@@ -49,6 +49,8 @@ def llm_packet(packet: Dict[str, Any]) -> str:
     lines.append(f"  schema: {packet.get('schema', '')}")
     lines.append(f"  truth_policy: {quote_scalar(packet.get('truth_policy', ''))}")
     lines.append(f"  query: {quote_scalar(packet.get('query', ''))}")
+    if packet.get("query_hash"):
+        lines.append(f"  query_hash: {quote_scalar(packet.get('query_hash', ''))}")
     resolution = packet.get("resolution") or {}
     lines.append("  resolution:")
     for key in ("status", "do_not_assume_single_project", "reason"):
@@ -128,6 +130,22 @@ def preflight_packet(packet: Dict[str, Any]) -> str:
     lines = ["xmem_preflight:"]
     for key in ("schema", "truth_policy", "query", "intent", "readiness", "risk_level", "action"):
         lines.append(f"  {key}: {quote_scalar(packet.get(key, ''))}")
+    if packet.get("query_hash"):
+        lines.append(f"  query_hash: {quote_scalar(packet.get('query_hash', ''))}")
+    query_input = packet.get("query_input") or {}
+    if query_input:
+        lines.append("  query_input:")
+        for key in ("raw_query", "search_query"):
+            lines.append(f"    {key}: {quote_scalar(compact(query_input.get(key, ''), 200))}")
+        fields = query_input.get("structured_fields") or {}
+        lines.append(f"    structured_fields[{len(fields)}]:")
+        for key, value in fields.items():
+            lines.append(f"      {key}: {quote_scalar(value)}")
+        quality = query_input.get("quality") or {}
+        lines.append("    quality:")
+        for key in ("status", "confidence", "reason", "top_score"):
+            if key in quality:
+                lines.append(f"      {key}: {quote_scalar(quality.get(key, ''))}")
     lines.append(f"  severity: {quote_scalar(packet.get('severity', ''))}")
     lines.append(f"  can_proceed: {quote_scalar(packet.get('can_proceed', ''))}")
     symbolic = packet.get("symbolic_memory") or {}
@@ -205,6 +223,9 @@ def brief_item(item: Dict[str, Any], indent: int) -> List[str]:
         elif key == "why":
             value = compact(value, 160)
         lines.append(f"{sub}{key}: {quote_scalar(value)}")
+    suppressed = item.get("suppressed_for_query") or {}
+    if suppressed:
+        lines.append(f"{sub}suppressed_for_query: {quote_scalar(suppressed.get('reason', 'irrelevant'))}")
     aliases = item.get("aliases") or []
     if aliases:
         lines.append(f"{sub}aliases[{len(aliases)}]: {quote_scalar(', '.join(map(str, aliases[:8])))}")
