@@ -4,6 +4,15 @@ Lightweight cross-project memory for agents. xmem is a truth index, not a heavy 
 
 Current package version: `0.1.35`.
 
+## Current closeout
+
+The latest stable pickup point is:
+
+- `docs/closeouts/2026-05-24-xmem-v0.1-closeout.md`
+- `docs/context/agent-resume-2026-05-24.md`
+
+Read these first when a future agent needs to resume xmem work without transcript context.
+
 ## Goals
 
 - Resolve project identity across aliases, folders, services, domains, and branches.
