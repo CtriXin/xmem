@@ -140,6 +140,11 @@ def aggregate_top_cards(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "status": "",
                 "confidence": 0.0,
                 "recent_query": "",
+                "query_counts": Counter(),
+                "query_tokens": Counter(),
+                "query_matches": Counter(),
+                "event_counts": Counter(),
+                "why_counts": Counter(),
                 "sources": [],
             },
         )
@@ -155,7 +160,17 @@ def aggregate_top_cards(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if row.get("top_confidence"):
             item["confidence"] = max(float(item.get("confidence") or 0), float(row.get("top_confidence") or 0))
         if row.get("query"):
-            item["recent_query"] = row.get("query", "")
+            query = str(row.get("query") or "")
+            item["recent_query"] = query
+            item["query_counts"][query] += 1
+            item["query_tokens"][query] += int(row.get("estimated_tokens_saved") or 0)
+            item["query_matches"][query] += int(row.get("matches") or 0)
+        event = str(row.get("event") or "")
+        if event:
+            item["event_counts"][event] += 1
+        why = str(row.get("top_why") or "").strip()
+        if why:
+            item["why_counts"][why] += 1
         for source in row.get("sources") or []:
             if source not in item["sources"]:
                 item["sources"].append(source)
@@ -163,11 +178,65 @@ def aggregate_top_cards(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         count = int(item.pop("top_score_count") or 0)
         total = float(item.pop("top_score_sum") or 0)
         item["avg_score"] = round(total / count, 2) if count else 0.0
+        query_counts: Counter[str] = item.pop("query_counts")
+        query_tokens: Counter[str] = item.pop("query_tokens")
+        query_matches: Counter[str] = item.pop("query_matches")
+        item["common_queries"] = [
+            {
+                "query": query,
+                "count": count,
+                "estimated_tokens_saved": int(query_tokens.get(query) or 0),
+                "matches": int(query_matches.get(query) or 0),
+            }
+            for query, count in query_counts.most_common(3)
+        ]
+        item["events"] = [{"event": event, "count": count} for event, count in item.pop("event_counts").most_common(3)]
+        item["top_why"] = item.pop("why_counts").most_common(1)[0][0] if item.get("why_counts") else ""
     return sorted(
         out.values(),
         key=lambda item: (int(item["count"]), int(item["matches"]), int(item["estimated_tokens_saved"])),
         reverse=True,
     )[:10]
+
+
+def summarize_card_gain(card_id: str, limit: Optional[int] = None) -> Dict[str, object]:
+    target = str(card_id or "").strip()
+    rows = [row for row in load_jsonl(home_dir() / "gain.jsonl", limit=limit) if str(row.get("top_card") or "") == target]
+    summary = aggregate_top_cards(rows)
+    base = summary[0] if summary else {
+        "card_id": target,
+        "count": 0,
+        "estimated_tokens_saved": 0,
+        "matches": 0,
+        "status": "",
+        "confidence": 0.0,
+        "avg_score": 0.0,
+        "recent_query": "",
+        "common_queries": [],
+        "events": [],
+        "top_why": "",
+        "sources": [],
+    }
+    recent = [
+        {
+            "ts": row.get("ts", ""),
+            "event": row.get("event", ""),
+            "query": row.get("query", ""),
+            "matches": int(row.get("matches") or 0),
+            "estimated_tokens_saved": int(row.get("estimated_tokens_saved") or 0),
+            "top_score": row.get("top_score", 0),
+            "top_why": row.get("top_why", ""),
+            "sources": row.get("sources", []),
+        }
+        for row in rows[-8:]
+    ]
+    return {
+        **base,
+        "rows": len(rows),
+        "limit": limit,
+        "recent_hits": recent,
+        "truth_statement": "top_card aggregation comes from gain telemetry; it explains ranking/noise, not card truth by itself",
+    }
 
 
 def build_calibration(rows: List[Dict[str, Any]], top_queries: List[Dict[str, Any]]) -> Dict[str, object]:
@@ -618,6 +687,23 @@ def format_gain_detail_dashboard(data: Dict[str, object], *, color: bool = False
         )
     if not top_cards:
         lines.append("  - 暂无 top_card 日志；先跑 context/preflight 后再看")
+    lines.extend(["", paint("Top Card 解释", "green", color), thin])
+    if top_cards:
+        for item in top_cards[:5]:
+            common = item.get("common_queries") if isinstance(item.get("common_queries"), list) else []
+            query = compact_cell((common[0] or {}).get("query", item.get("recent_query", "")) if common else item.get("recent_query", ""), max(24, query_width - 8))
+            sources = compact_cell(", ".join(map(str, item.get("sources") or [])), 34)
+            why = compact_cell(item.get("top_why", ""), max(20, query_width - 18))
+            lines.append(
+                f"- {paint(compact_cell(item.get('card_id', ''), 34), 'cyan', color)}: "
+                f"count={int(item.get('count') or 0)} status={item.get('status') or '-'} "
+                f"avg_score={float(item.get('avg_score') or 0):.1f} sources={sources or '-'}"
+            )
+            lines.append(f"  最近/常见 query: {query or '-'}")
+            if why:
+                lines.append(f"  why: {why}")
+    else:
+        lines.append("- 暂无 top_card 可解释数据")
     review_items = calibration.get("needs_review") if isinstance(calibration.get("needs_review"), list) else []
     lines.extend(["", paint("待校准高估项", "green", color), thin])
     if review_items:
@@ -640,6 +726,58 @@ def format_gain_detail_dashboard(data: Dict[str, object], *, color: bool = False
             )
     else:
         lines.append("- 暂无 guardrail check 日志")
+    return "\n".join(lines)
+
+
+def format_card_gain_dashboard(data: Dict[str, object], *, color: bool = False, width: Optional[int] = None) -> str:
+    terminal_width = width or shutil.get_terminal_size((96, 24)).columns
+    dashboard_width = min(104, max(72, terminal_width))
+    query_width = max(30, dashboard_width - 38)
+    title = paint("XMEM Gain Card 解释", "green", color)
+    rule = paint("=" * dashboard_width, "dim", color)
+    thin = paint("-" * dashboard_width, "dim", color)
+    lines = [
+        title,
+        rule,
+        metric("Card", data.get("card_id", ""), color, value_style="cyan"),
+        metric("命中次数", int(data.get("count") or 0), color),
+        metric("状态", data.get("status") or "-", color, value_style=status_style(str(data.get("status") or ""))),
+        metric("粗估Token", human_number(int(data.get("estimated_tokens_saved") or 0)), color, value_style="green" if int(data.get("estimated_tokens_saved") or 0) else "dim"),
+        metric("Matches", int(data.get("matches") or 0), color),
+        metric("平均分", f"{float(data.get('avg_score') or 0):.2f}", color),
+        metric("来源", ", ".join(map(str, data.get("sources") or [])) or "-", color, value_style="dim"),
+        metric("最近query", compact_cell(data.get("recent_query", ""), dashboard_width - 28) or "-", color, value_style="cyan"),
+        metric("口径", "telemetry top_card 聚合；解释命中/噪音，不等于 card truth", color, value_style="dim"),
+        "",
+        paint("常见查询", "green", color),
+        thin,
+        f"{'#':>3}  {pad_display('Query', query_width)} {pad_display('次数', 6, 'right')} "
+        f"{pad_display('粗估Token', 9, 'right')} {pad_display('Matches', 7, 'right')}",
+    ]
+    common = data.get("common_queries") if isinstance(data.get("common_queries"), list) else []
+    for idx, item in enumerate(common[:8], 1):
+        saved = int(item.get("estimated_tokens_saved") or 0)
+        lines.append(
+            f"{idx:>3}. {cell(compact_cell(item.get('query', ''), query_width), query_width, 'cyan', color)} "
+            f"{int(item.get('count') or 0):>6} "
+            f"{paint(f'{human_number(saved):>9}', 'green' if saved else 'dim', color)} "
+            f"{int(item.get('matches') or 0):>7}"
+        )
+    if not common:
+        lines.append("  - 暂无常见 query")
+    lines.extend(["", paint("最近命中", "green", color), thin])
+    recent = data.get("recent_hits") if isinstance(data.get("recent_hits"), list) else []
+    for item in recent[-8:]:
+        query = compact_cell(item.get("query", ""), query_width)
+        why = compact_cell(item.get("top_why", ""), 34)
+        lines.append(
+            f"- {item.get('event', '')}: score={item.get('top_score', 0)} "
+            f"matches={int(item.get('matches') or 0)} query={query}"
+        )
+        if why:
+            lines.append(f"  why={why}")
+    if not recent:
+        lines.append("- 暂无 recent hit")
     return "\n".join(lines)
 
 

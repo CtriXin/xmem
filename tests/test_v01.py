@@ -151,6 +151,8 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     assert gain["top_queries"][0]["estimated_tokens_saved"] > 0
     assert gain["top_cards"][0]["card_id"]
     assert gain["top_cards"][0]["estimated_tokens_saved"] > 0
+    assert gain["top_cards"][0]["common_queries"]
+    assert gain["top_cards"][0]["recent_query"]
     assert gain["observed"]["context_hits"] == 1
     assert gain["calibration"]["status"] == "proxy_only"
     assert gain["calibration"]["confidence"] == "low"
@@ -161,6 +163,7 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     assert "按事件" in text_gain
     assert "Top 查询" in text_gain
     assert "Top Cards" in text_gain
+    assert "Top Card 解释" in text_gain
     assert "粗估占比" in text_gain
     assert "XMEM Gain 关键摘要" in summary_gain
     assert "可信结果:" in summary_gain
@@ -173,6 +176,14 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     assert "按事件" in detail_gain
     assert "粗估占比" in detail_gain
     assert "Top Cards" in detail_gain
+    card_id = gain["top_cards"][0]["card_id"]
+    card_gain = json.loads(run([str(XMEM), "gain", "card", card_id, "--json"], repo, env).stdout)
+    card_text = run([str(XMEM), "gain", "card", card_id], repo, env).stdout
+    assert card_gain["card_id"] == card_id
+    assert card_gain["common_queries"][0]["query"] == "ad lazyload"
+    assert "XMEM Gain Card 解释" in card_text
+    assert "常见查询" in card_text
+    assert "最近命中" in card_text
 
 
 def test_gain_distinguishes_lookup_from_context_savings(tmp_path: Path):

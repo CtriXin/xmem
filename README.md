@@ -2,7 +2,7 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.33`.
+Current package version: `0.1.34`.
 
 ## Goals
 
@@ -239,7 +239,7 @@ When a longer query contains a verified compact alias such as `网文二 repo va
 
 `xmem check` inspects the current git diff against local and indexed `invariant` / `rule` / `guard` cards. It is intentionally lightweight: it looks for explicit `diff_guard.warn_if_removed`, `warn_if_added`, and `forbid` terms and exits non-zero for human-visible warnings.
 
-`xmem gain` summarizes lookup, `context`, `preflight`, and `check` telemetry from `~/.xmem/gain.jsonl`. The default view is now the full event/query/card dashboard. Use `xmem gain --summary` for the short key summary with real confidence result, confirmed-vs-rough tokens, hit overview, risk signals, top query order, and the few queries that most need review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. In detail view, `Top 查询` aggregates query text, while `Top Cards` aggregates `top_card` ids from retrieval logs. The bar column is `粗估占比`: relative rough-token share inside that section, not progress or confirmed savings. `xmem gain --detail` remains as a compatibility alias for the default full dashboard.
+`xmem gain` summarizes lookup, `context`, `preflight`, and `check` telemetry from `~/.xmem/gain.jsonl`. The default view is now the full event/query/card dashboard. Use `xmem gain --summary` for the short key summary with real confidence result, confirmed-vs-rough tokens, hit overview, risk signals, top query order, and the few queries that most need review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. In detail view, `Top 查询` aggregates query text, while `Top Cards` aggregates `top_card` ids from retrieval logs. The `Top Card 解释` section shows common/recent queries, sources, avg score, and top why for noisy cards. Use `xmem gain card <id>` to inspect one card's common queries and recent hits. The bar column is `粗估占比`: relative rough-token share inside that section, not progress or confirmed savings. `xmem gain --detail` remains as a compatibility alias for the default full dashboard.
 
 Hit/miss/pass/prevented are log counts; `hit` only means candidates were returned. Token savings are rough, uncalibrated estimates for context/preflight matches only, not billing truth. Risk hints come from rule warnings, not confirmed production bugs. By default, `xmem gain` reads all gain rows; use `--limit N` only when you want a recent slice.
 
@@ -272,6 +272,7 @@ xmem suppress --card <id> --for-query <query/hash>  # mark true-but-irrelevant m
 xmem gain                   # full gain event/query/card dashboard
 xmem gain --summary         # key gain summary only
 xmem gain --detail          # compatibility alias for the full dashboard
+xmem gain card <id>         # explain one top_card's common/recent query hits
 xmem gain confirm <query>   # confirm a useful xmem hit/outcome
 xmem gain reject <query>    # mark a rough gain estimate as overestimated/wrong
 ```

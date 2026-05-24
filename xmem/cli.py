@@ -11,7 +11,7 @@ from . import __version__
 from .checks import check_diff
 from .code_index import code_index_status, import_code_indexes
 from .context import build_context, canonical_queries_from_corrections
-from .gain import format_gain_dashboard, record_gain_confirmation, summarize_gain
+from .gain import format_card_gain_dashboard, format_gain_dashboard, record_gain_confirmation, summarize_card_gain, summarize_gain
 from .health import backup_health, build_doctor_report
 from .hooks import outbox_counts, run_hook
 from .importers import (
@@ -185,6 +185,11 @@ def build_parser() -> argparse.ArgumentParser:
     gain_reject.add_argument("--note", default="")
     gain_reject.add_argument("--task", default="")
     gain_reject.add_argument("--json", action="store_true", help="输出 JSON")
+    gain_card = gain_sub.add_parser("card", help="解释某个 top_card 为什么高频命中")
+    gain_card.add_argument("card_id")
+    gain_card.add_argument("--json", action="store_true", help="输出 JSON")
+    gain_card.add_argument("--no-color", action="store_true", help="关闭 dashboard ANSI 颜色")
+    gain_card.add_argument("--limit", type=int, default=None, help="只读取最近 N 条 gain log；默认读取全部")
 
     tail = sub.add_parser("tail", help="查看最近 registry events")
     tail.add_argument("--limit", type=int, default=10)
@@ -400,6 +405,7 @@ def help_cmd() -> int:
                 "- xmem check               # 改完前检查 invariant / rule / guardrail",
                 "- xmem gain                # 查看完整 telemetry / Top 查询 / Top Cards 面板",
                 "- xmem gain --summary      # 只看关键摘要",
+                "- xmem gain card <id>      # 解释某个 card 的命中来源和最近 query",
                 "- xmem why <query>         # 解释为什么匹配",
                 "- xmem open <id|query>     # 打开 card / evidence 摘要",
                 "- xmem new                 # 新项目/新文件夹初始化并注册",
@@ -882,6 +888,14 @@ def gain_cmd(args: argparse.Namespace) -> int:
             print(json.dumps(row, ensure_ascii=False, indent=2))
         else:
             print(f"gain rejected: {args.query}")
+        return 0
+    if gain_cmd_name == "card":
+        data = summarize_card_gain(args.card_id, limit=args.limit)
+        if args.json:
+            print(json.dumps(data, ensure_ascii=False, indent=2))
+        else:
+            use_color = sys.stdout.isatty() and not args.no_color and not os.environ.get("NO_COLOR")
+            print(format_card_gain_dashboard(data, color=use_color))
         return 0
     data = summarize_gain(limit=args.limit)
     if args.json:
