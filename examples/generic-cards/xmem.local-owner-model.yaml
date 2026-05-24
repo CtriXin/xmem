@@ -1,0 +1,30 @@
+id: xmem.local-owner-model
+type: policy
+title: Generic xmem owner model
+scope:
+  feature: setup
+aliases:
+  - xmem setup
+  - local memory router
+  - project memory database
+truth:
+  status: verified
+  confidence: 0.9
+  basis:
+    - bundled_generic_policy
+  last_checked_at: 2026-05-24T00:00:00Z
+summary: xmem is a generic local memory router. It indexes user-owned repo cards, docs, issue exports, code refs, and runtime evidence without requiring any private wiki, ticket system, or deployment stack.
+must_include:
+  - Keep source truth in user-owned repos, docs, issue trackers, or runtime systems.
+  - Keep xmem cards compact and evidence-backed.
+  - Treat registry.sqlite as generated cache, not truth.
+avoid:
+  - Do not assume SCMP, Feishu, Project Wiki, Issue Record, Jira, Linear, or any company-specific source exists.
+  - Do not copy full docs, raw logs, screenshots, secrets, or bulky output into cards.
+checks:
+  - Use xmem status or xmem doctor before relying on a registry.
+  - Use xmem setup to register a new repo or workspace.
+  - Use xmem sync after source exports or cards change.
+evidence:
+  - kind: bundled-doc
+    path: README.md

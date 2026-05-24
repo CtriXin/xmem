@@ -48,6 +48,9 @@ def main() -> None:
         shim.symlink_to(XMEM)
         linked_status = run([str(shim), "status"], repo, env).stdout
         assert "registry_exists: true" in linked_status
+        setup_json = json.loads(run([str(XMEM), "setup", "--no-sync", "--json"], repo, env).stdout)
+        assert setup_json["schema"] == "xmem.setup.v1"
+        assert str(repo.resolve()) in setup_json["discovered_roots"]
         shutil.copy(ROOT / "examples" / "cards" / "ads.lazyload.yaml", repo / ".xmem" / "cards" / "ads.lazyload.yaml")
         (repo / "AdBanner.tsx").write_text("lazyload\n", encoding="utf-8")
         proc = run([str(XMEM), "check"], repo, env, check=False)

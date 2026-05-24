@@ -2,7 +2,7 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.35`.
+Current package version: `0.1.36`.
 
 ## Current closeout
 
@@ -30,6 +30,7 @@ Read these first when a future agent needs to resume xmem work without transcrip
 
 ```bash
 xmem help
+xmem setup
 xmem status
 xmem doctor
 xmem sync
@@ -44,6 +45,23 @@ xmem fix
 xmem suppress --card ads.lazyload --for-query "ads lazyload change" --reason irrelevant
 xmem gain
 xmem gain confirm "ads lazyload"
+```
+
+For a first-time generic install, start with:
+
+```bash
+xmem setup
+```
+
+`xmem setup` creates a user-owned `~/.xmem` workspace, registers the current repo or workspace roots, writes generic owner-model docs, and runs `xmem sync` unless `--no-sync` is passed. It does not require SCMP, Project Wiki, Issue Record, Feishu, Jira, Linear, or any private adapter.
+
+Useful setup variants:
+
+```bash
+xmem setup --root ~/projects --scan-depth 2
+xmem setup --root ~/projects --register-only
+xmem setup --memory-repo ~/xmem-memory
+xmem setup --dry-run --json
 ```
 
 Truth files live with the project:
@@ -121,6 +139,8 @@ Agents should route new durable facts to the owning source, run `xmem check --so
 ## New folders
 
 `xmem new` creates `.xmem/` for the current folder and registers that folder in `~/.xmem/sources.json`, so future `xmem sync` can index it from any other project.
+
+`xmem setup` is the broader onboarding command for a new machine or workspace. It can discover git repos under one or more roots, initialize repo-local `.xmem` identity files, create a generic `~/.xmem/config.toml`, and optionally create a shared memory repo with `--memory-repo`. Use `--register-only` when you want xmem to remember roots without writing `.xmem` into every repo yet.
 
 Creation basis is intentionally narrow:
 
@@ -263,6 +283,7 @@ Agent-facing output should be compact by default. Prefer compact JSON or TOON-st
 ## Useful commands
 
 ```bash
+xmem setup                  # first-time generic workspace/project onboarding
 xmem status                 # registry health and counts
 xmem doctor                 # registry/source/backup/current repo diagnosis
 xmem sync                   # rebuild from truth sources

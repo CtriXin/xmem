@@ -13,6 +13,7 @@ Truth rule: `.xmem/*.yaml`, source Markdown, code, git, runtime APIs, and human 
 
 ```bash
 xmem help
+xmem setup
 xmem status
 xmem doctor
 xmem sync
@@ -32,14 +33,17 @@ xmem gain card <id>
 
 ## Workflow
 
-1. Run `xmem preflight "<task>"` before development or bugfix edits to surface historical bug-patterns, invariants, and required checks.
-2. Run `xmem context "<task>"` before broad repo traversal or project selection.
-3. If `source_freshness.status` is not `fresh`, run `xmem sync` before relying on the packet.
-4. Trust only cards marked `verified`; treat `inferred`, `partial`, `stale`, `unknown`, and `disputed` as hints.
-5. For edits that hit a feature with invariant cards, run `xmem check` before final response.
-6. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
-7. Use `xmem gain` when asked what xmem saved.
-8. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
+1. Run `xmem setup` on a new machine/workspace when xmem has not been configured yet.
+2. Run `xmem preflight "<task>"` before development or bugfix edits to surface historical bug-patterns, invariants, and required checks.
+3. Run `xmem context "<task>"` before broad repo traversal or project selection.
+4. If `source_freshness.status` is not `fresh`, run `xmem sync` before relying on the packet.
+5. Trust only cards marked `verified`; treat `inferred`, `partial`, `stale`, `unknown`, and `disputed` as hints.
+6. For edits that hit a feature with invariant cards, run `xmem check` before final response.
+7. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
+8. Use `xmem gain` when asked what xmem saved.
+9. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
+
+`xmem setup` is generic onboarding. It creates `~/.xmem` docs/config, registers the current repo or `--root` workspace roots, can initialize repo-local `.xmem` identity files, and can create a shared memory repo via `--memory-repo`. It must not require SCMP, Project Wiki, Issue Record, Feishu/Lark, Jira, Linear, or any private adapter. Use `--register-only` if writing `.xmem` into discovered repos would be too invasive.
 
 `xmem gain` shows the full event/query/card dashboard by default. Use `xmem gain --summary` only when a short key signal is enough: real confidence result, confirmed-vs-rough token numbers, hit overview, risk signals, top query order, and a few queries needing review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. In detail view, `Top 查询` is query-text aggregation, `Top Cards` is top-card aggregation, missing old telemetry status/confidence is hydrated from current registry, `Top Card 解释` shows common/recent queries plus source/score/why, and `粗估占比` bars are relative rough-token share inside that section, not progress or confirmed savings. Use `xmem gain card <id>` when one card looks noisy or surprisingly high-frequency. `xmem gain --detail` remains a compatibility alias for the default full dashboard.
 

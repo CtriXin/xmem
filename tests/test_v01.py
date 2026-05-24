@@ -91,6 +91,51 @@ def test_multi_word_query_terms_keep_project_and_ads_tokens():
     assert "ptc-intention-informationads.txtgroup_nadstxt" not in terms
 
 
+def test_setup_creates_generic_workspace_and_syncs_without_private_sources(tmp_path: Path):
+    env = {
+        **os.environ,
+        "XMEM_HOME": str(tmp_path / "home"),
+        "XMEM_PROJECT_WIKI": str(tmp_path / "missing-project-wiki"),
+        "XMEM_ISSUE_TRACKING": str(tmp_path / "missing-issue-tracking"),
+    }
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    run(["git", "init", "-q"], repo, env)
+    run(["git", "config", "user.email", "test@example.com"], repo, env)
+    run(["git", "config", "user.name", "test"], repo, env)
+    (repo / "README.md").write_text("# Demo\n", encoding="utf-8")
+    run(["git", "add", "."], repo, env)
+    run(["git", "commit", "-q", "-m", "init"], repo, env)
+
+    data = json.loads(run([str(XMEM), "setup", "--json"], repo, env).stdout)
+
+    assert data["schema"] == "xmem.setup.v1"
+    assert data["discovered_roots"] == [str(repo.resolve())]
+    assert data["initialized_projects"][0]["root"] == str(repo.resolve())
+    assert (repo / ".xmem" / "project.yaml").exists()
+    assert (tmp_path / "home" / "README.md").exists()
+    assert (tmp_path / "home" / "config.toml").exists()
+    assert (tmp_path / "home" / "schemas" / "xmem-export.cards.example.jsonl").exists()
+    assert data["sync"]["cards"]["cards"] == 1
+    assert "scmp.webnovel" not in run([str(XMEM), "find", "webnovel traffic switch", "--json"], repo, env).stdout.lower()
+
+
+def test_setup_can_create_shared_memory_repo(tmp_path: Path):
+    env = {**os.environ, "XMEM_HOME": str(tmp_path / "home")}
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    memory_repo = tmp_path / "memory"
+
+    data = json.loads(run([str(XMEM), "setup", "--memory-repo", str(memory_repo), "--no-sync", "--json"], repo, env).stdout)
+
+    assert data["memory_repo"]["root"] == str(memory_repo.resolve())
+    assert (memory_repo / "README.md").exists()
+    assert (memory_repo / "AGENTS.md").exists()
+    assert (memory_repo / ".xmem" / "project.yaml").exists()
+    sources = json.loads((tmp_path / "home" / "sources.json").read_text(encoding="utf-8"))
+    assert str(memory_repo.resolve()) in [item["root"] for item in sources["local_roots"]]
+
+
 def test_check_uses_registry_invariant_cards(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)

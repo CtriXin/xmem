@@ -30,6 +30,7 @@ from .importers import (
 from .project import detect_project, index_local, init_project
 from .preflight import build_preflight
 from .search import latest_events, record_suppression, search_cards
+from .setup import setup_workspace
 from .source_check import check_source_exports, compact_source_health
 from .sources import audit_local_sources, index_registered_sources, load_sources, register_local_root, registered_roots, sources_path
 from .store import connect, rows
@@ -74,6 +75,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     sync = sub.add_parser("sync", help="从文件 truth sources 刷新 SQLite index")
     sync.add_argument("--json", action="store_true", help="输出 JSON")
+
+    setup = sub.add_parser("setup", help="泛化初始化：创建 ~/.xmem 工作区并注册项目 roots")
+    setup.add_argument("paths", nargs="*", help="项目 repo 或 workspace root；默认当前目录")
+    setup.add_argument("--root", action="append", default=[], help="额外项目/工作区 root，可重复")
+    setup.add_argument("--scan-depth", type=int, default=2, help="扫描 workspace 内 git repo 的深度，默认 2")
+    setup.add_argument("--register-only", action="store_true", help="只注册 roots，不写 repo-local .xmem")
+    setup.add_argument("--memory-repo", default="", help="可选：创建一个共享 xmem memory repo")
+    setup.add_argument("--max-roots", type=int, default=80, help="最多注册/初始化多少个 root，默认 80")
+    setup.add_argument("--no-sync", action="store_true", help="setup 后不自动 sync")
+    setup.add_argument("--dry-run", action="store_true", help="只预览会发现哪些 roots，不写文件")
+    setup.add_argument("--yes", action="store_true", help="兼容 installer；setup 默认非交互执行")
+    setup.add_argument("--json", action="store_true", help="输出 JSON")
 
     new = sub.add_parser("new", help="给当前/指定文件夹创建或刷新 .xmem")
     new.add_argument("path", nargs="?", default=".")
@@ -240,6 +253,8 @@ def main(argv: List[str] | None = None) -> int:
         return doctor_cmd(args)
     if args.cmd == "sync":
         return sync_cmd(args)
+    if args.cmd == "setup":
+        return setup_cmd(args)
     if args.cmd == "new":
         return new_cmd(args)
     if args.cmd == "init":
@@ -398,6 +413,7 @@ def help_cmd() -> int:
                 "xmem 常用命令：",
                 "- xmem status              # 查看索引状态、source 健康度、outbox",
                 "- xmem doctor              # 综合诊断 registry / source / backup / 当前 repo",
+                "- xmem setup               # 泛化初始化 ~/.xmem，并注册当前 repo / workspace",
                 "- xmem sync                # 刷新索引；从 Project Wiki / Issue Record / 本地 cards 重建",
                 "- xmem context <query>     # 查历史项目、方法、证据，返回 LLM 好读 packet",
                 "- xmem preflight <query>   # 开发/修 bug 前查历史坑、must_keep、required checks",
@@ -429,6 +445,10 @@ def package_root() -> Path:
 
 def default_cards_path() -> Path:
     return package_root() / "examples" / "cards"
+
+
+def generic_cards_path() -> Path:
+    return package_root() / "examples" / "generic-cards"
 
 
 def sync_cmd(args: argparse.Namespace) -> int:
@@ -479,11 +499,11 @@ def sync_cmd(args: argparse.Namespace) -> int:
     return 0
 
 
-def sync_sources() -> dict[str, Any]:
+def sync_sources(cards_path: Path | str | None = None) -> dict[str, Any]:
     class RebuildArgs:
         project_wiki = os.environ.get("XMEM_PROJECT_WIKI", "/Users/xin/project-wiki")
         issue_tracking = os.environ.get("XMEM_ISSUE_TRACKING", "/Users/xin/issue-tracking")
-        cards = str(default_cards_path())
+        cards = str(cards_path or default_cards_path())
         local = "."
         skip_project_wiki = False
         skip_issue_tracking = False
@@ -493,6 +513,51 @@ def sync_sources() -> dict[str, Any]:
     result = rebuild_data(RebuildArgs())
     result["status"] = registry_status()
     return result
+
+
+def setup_cmd(args: argparse.Namespace) -> int:
+    paths = [Path(p) for p in [*(args.paths or []), *(args.root or [])]]
+    memory_repo = Path(args.memory_repo).expanduser() if args.memory_repo else None
+    data = setup_workspace(
+        paths,
+        scan_depth=max(0, int(args.scan_depth)),
+        init_projects=not args.register_only,
+        memory_repo=memory_repo,
+        dry_run=bool(args.dry_run),
+        max_roots=max(1, int(args.max_roots)),
+    )
+    if not args.no_sync and not args.dry_run:
+        data["sync"] = sync_sources(cards_path=generic_cards_path())
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        print("xmem setup")
+        print(f"xmem_home: {data.get('xmem_home')}")
+        print(f"mode: {data.get('mode')}")
+        print(f"discovered_roots: {len(data.get('discovered_roots') or [])}")
+        for root in (data.get("discovered_roots") or [])[:10]:
+            print(f"- {root}")
+        if len(data.get("discovered_roots") or []) > 10:
+            print(f"- ... {len(data.get('discovered_roots') or []) - 10} more")
+        print(f"initialized_projects: {len(data.get('initialized_projects') or [])}")
+        print(f"registered_roots: {len(data.get('registered_roots') or [])}")
+        if data.get("memory_repo"):
+            print(f"memory_repo: {data['memory_repo'].get('root')}")
+        if data.get("files_written"):
+            print("files_written:")
+            for path in data["files_written"]:
+                print(f"- {path}")
+        if data.get("sync"):
+            counts = (data.get("sync") or {}).get("status", {}).get("counts", {})
+            print(f"synced: cards={counts.get('cards', 0)} projects={counts.get('projects', 0)}")
+        if data.get("skipped"):
+            print("skipped:")
+            for item in data["skipped"][:5]:
+                print(f"- {item.get('path')}: {item.get('reason')}")
+        print("next_steps:")
+        for step in data.get("next_steps") or []:
+            print(f"- {step}")
+    return 0
 
 
 def new_cmd(args: argparse.Namespace) -> int:
