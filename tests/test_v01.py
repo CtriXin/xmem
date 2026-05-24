@@ -202,6 +202,41 @@ def test_gain_distinguishes_lookup_from_context_savings(tmp_path: Path):
     assert context_gain["estimated_tokens_saved"] > 0
 
 
+def test_gain_hydrates_top_card_status_from_current_registry(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+    home = Path(env["XMEM_HOME"])
+    gain_log = home / "gain.jsonl"
+    gain_log.parent.mkdir(parents=True, exist_ok=True)
+    gain_log.write_text(
+        json.dumps(
+            {
+                "ts": "2026-05-24T00:00:00Z",
+                "event": "context.hit",
+                "source": "context",
+                "query": "legacy lazyload",
+                "matches": 2,
+                "estimated_tokens_saved": 2400,
+                "top_card": "ads.lazyload",
+                "top_score": 12,
+                "top_status": "",
+                "top_confidence": 0,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    gain = json.loads(run([str(XMEM), "gain", "--json"], repo, env).stdout)
+    card = next(item for item in gain["top_cards"] if item["card_id"] == "ads.lazyload")
+
+    assert card["status"] == "verified"
+    assert card["status_source"] == "current_registry"
+    assert card["confidence"] > 0
+
+
 def test_gain_confirm_and_hook_outcome_calibrate_dashboard(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)

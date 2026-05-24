@@ -8,6 +8,7 @@ import shutil
 import unicodedata
 from typing import Any, Dict, List, Optional
 
+from .store import connect, rows as db_rows
 from .util import append_jsonl, home_dir, load_jsonl, slugify, utc_now, write_json
 
 
@@ -122,6 +123,43 @@ def aggregate_queries(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     )[:10]
 
 
+def hydrate_top_card_metadata(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    card_ids = [str(item.get("card_id") or "") for item in items if item.get("card_id")]
+    if not card_ids:
+        return items
+    placeholders = ",".join("?" for _ in card_ids)
+    try:
+        with connect() as conn:
+            current = {
+                row["card_id"]: row
+                for row in db_rows(
+                    conn,
+                    f"SELECT card_id,status,confidence,source,source_ref,path FROM cards WHERE card_id IN ({placeholders})",
+                    card_ids,
+                )
+            }
+    except Exception:
+        return items
+    for item in items:
+        row = current.get(str(item.get("card_id") or ""))
+        if not row:
+            continue
+        if not item.get("status") and row.get("status"):
+            item["status"] = row.get("status", "")
+            item["status_source"] = "current_registry"
+        if not float(item.get("confidence") or 0) and row.get("confidence") is not None:
+            item["confidence"] = float(row.get("confidence") or 0)
+            item["confidence_source"] = "current_registry"
+        source = str(row.get("source") or "")
+        if source and source not in item.get("sources", []):
+            item.setdefault("sources", []).append(source)
+        if row.get("source_ref"):
+            item["source_ref"] = row.get("source_ref", "")
+        if row.get("path"):
+            item["source_path"] = row.get("path", "")
+    return items
+
+
 def aggregate_top_cards(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     out: Dict[str, Dict[str, Any]] = {}
     for row in rows:
@@ -192,8 +230,9 @@ def aggregate_top_cards(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         ]
         item["events"] = [{"event": event, "count": count} for event, count in item.pop("event_counts").most_common(3)]
         item["top_why"] = item.pop("why_counts").most_common(1)[0][0] if item.get("why_counts") else ""
+    hydrated = hydrate_top_card_metadata(list(out.values()))
     return sorted(
-        out.values(),
+        hydrated,
         key=lambda item: (int(item["count"]), int(item["matches"]), int(item["estimated_tokens_saved"])),
         reverse=True,
     )[:10]
