@@ -22,6 +22,7 @@ def summarize_gain(limit: Optional[int] = None) -> Dict[str, object]:
     matches = sum(int(row.get("matches") or 0) for row in rows)
     event_rows = aggregate_events(rows)
     query_rows = aggregate_queries(rows)
+    card_rows = aggregate_top_cards(rows)
     calibration = build_calibration(rows, query_rows)
     context_total = events.get("context.hit", 0) + events.get("context.miss", 0)
     preflight_total = events.get("preflight.hit", 0) + events.get("preflight.miss", 0)
@@ -81,6 +82,7 @@ def summarize_gain(limit: Optional[int] = None) -> Dict[str, object]:
         "calibration": calibration,
         "by_event": event_rows,
         "top_queries": query_rows or [{"query": query, "count": count} for query, count in queries.most_common(10)],
+        "top_cards": card_rows,
         "recent_queries": recent_queries,
         "recent_guardrails": guardrails,
     }
@@ -113,6 +115,54 @@ def aggregate_queries(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         for source in row.get("sources") or []:
             if source not in item["sources"]:
                 item["sources"].append(source)
+    return sorted(
+        out.values(),
+        key=lambda item: (int(item["count"]), int(item["matches"]), int(item["estimated_tokens_saved"])),
+        reverse=True,
+    )[:10]
+
+
+def aggregate_top_cards(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        card_id = str(row.get("top_card") or "").strip()
+        if not card_id:
+            continue
+        item = out.setdefault(
+            card_id,
+            {
+                "card_id": card_id,
+                "count": 0,
+                "estimated_tokens_saved": 0,
+                "matches": 0,
+                "top_score_sum": 0.0,
+                "top_score_count": 0,
+                "status": "",
+                "confidence": 0.0,
+                "recent_query": "",
+                "sources": [],
+            },
+        )
+        item["count"] += 1
+        item["estimated_tokens_saved"] += int(row.get("estimated_tokens_saved") or 0)
+        item["matches"] += int(row.get("matches") or 0)
+        score = float(row.get("top_score") or 0)
+        if score:
+            item["top_score_sum"] += score
+            item["top_score_count"] += 1
+        if row.get("top_status"):
+            item["status"] = row.get("top_status", "")
+        if row.get("top_confidence"):
+            item["confidence"] = max(float(item.get("confidence") or 0), float(row.get("top_confidence") or 0))
+        if row.get("query"):
+            item["recent_query"] = row.get("query", "")
+        for source in row.get("sources") or []:
+            if source not in item["sources"]:
+                item["sources"].append(source)
+    for item in out.values():
+        count = int(item.pop("top_score_count") or 0)
+        total = float(item.pop("top_score_sum") or 0)
+        item["avg_score"] = round(total / count, 2) if count else 0.0
     return sorted(
         out.values(),
         key=lambda item: (int(item["count"]), int(item["matches"]), int(item["estimated_tokens_saved"])),
@@ -440,16 +490,20 @@ def format_gain_detail_dashboard(data: Dict[str, object], *, color: bool = False
     observed = data.get("observed") if isinstance(data.get("observed"), dict) else {}
     by_event = data.get("by_event") if isinstance(data.get("by_event"), list) else []
     top_queries = data.get("top_queries") if isinstance(data.get("top_queries"), list) else []
+    top_cards = data.get("top_cards") if isinstance(data.get("top_cards"), list) else []
     guardrails = data.get("recent_guardrails") if isinstance(data.get("recent_guardrails"), list) else []
     calibration = data.get("calibration") if isinstance(data.get("calibration"), dict) else {}
     hit_rate = float(observed.get("context_hit_rate", 0) or 0)
     max_event_saved = max([int(item.get("estimated_tokens_saved") or 0) for item in by_event] or [0])
     max_query_saved = max([int(item.get("estimated_tokens_saved") or 0) for item in top_queries] or [0])
+    max_card_saved = max([int(item.get("estimated_tokens_saved") or 0) for item in top_cards] or [0])
     terminal_width = width or shutil.get_terminal_size((96, 24)).columns
     dashboard_width = min(104, max(72, terminal_width))
     impact_width = 10 if dashboard_width < 96 else 12
     event_width = min(22, max(16, dashboard_width - impact_width - 37))
     query_width = max(24, dashboard_width - impact_width - 32)
+    card_width = max(24, dashboard_width - impact_width - 54)
+    bar_label = "粗估占比"
     title = paint("XMEM Gain 收益面板 (Global Scope)", "green", color)
     rule = paint("=" * dashboard_width, "dim", color)
     thin = paint("-" * dashboard_width, "dim", color)
@@ -494,6 +548,7 @@ def format_gain_detail_dashboard(data: Dict[str, object], *, color: bool = False
         metric("命中口径", "hit=搜到候选，不代表人工确认正确", color, value_style="dim"),
         metric("收益口径", "未校准，只能看趋势，不能证明立竿见影", color, value_style="dim"),
         metric("token 估算公式", "context/preflight matches * 1200", color, value_style="dim"),
+        metric("条形口径", "粗估占比=本区块内相对 rough token；不是进度/真实收益", color, value_style="dim"),
         metric(
             "自校准状态",
             f"{calibration_status_text(calibration)}；outcomes={int(calibration.get('outcomes') or 0)} avg top_score={float(calibration.get('avg_top_score') or 0):.2f}",
@@ -506,7 +561,7 @@ def format_gain_detail_dashboard(data: Dict[str, object], *, color: bool = False
         thin,
         f"{'#':>3}  {pad_display('事件', event_width)} {pad_display('次数', 6, 'right')} "
         f"{pad_display('粗估Token', 9, 'right')} {pad_display('Matches', 7, 'right')} "
-        f"{pad_display('风险', 4, 'right')}  {pad_display('影响', impact_width)}",
+        f"{pad_display('风险', 4, 'right')}  {pad_display(bar_label, impact_width)}",
     ]
     for idx, item in enumerate(by_event[:10], 1):
         saved = int(item.get("estimated_tokens_saved") or 0)
@@ -528,7 +583,7 @@ def format_gain_detail_dashboard(data: Dict[str, object], *, color: bool = False
         thin,
         f"{'#':>3}  {pad_display('查询', query_width)} {pad_display('次数', 6, 'right')} "
         f"{pad_display('粗估Token', 9, 'right')} {pad_display('Matches', 7, 'right')}  "
-        f"{pad_display('影响', impact_width)}",
+        f"{pad_display(bar_label, impact_width)}",
     ])
     for idx, item in enumerate(top_queries[:10], 1):
         query = compact_cell(item.get("query", ""), query_width)
@@ -542,6 +597,27 @@ def format_gain_detail_dashboard(data: Dict[str, object], *, color: bool = False
         )
     if not top_queries:
         lines.append("  - 暂无 query event 日志")
+    lines.extend([
+        "",
+        paint("Top Cards", "green", color),
+        thin,
+        f"{'#':>3}  {pad_display('Card', card_width)} {pad_display('次数', 6, 'right')} "
+        f"{pad_display('状态', 8)} {pad_display('粗估Token', 9, 'right')} "
+        f"{pad_display('Matches', 7, 'right')}  {pad_display(bar_label, impact_width)}",
+    ])
+    for idx, item in enumerate(top_cards[:10], 1):
+        card_id = compact_cell(item.get("card_id", ""), card_width)
+        saved = int(item.get("estimated_tokens_saved") or 0)
+        lines.append(
+            f"{idx:>3}. {cell(card_id, card_width, 'cyan', color)} "
+            f"{int(item.get('count') or 0):>6} "
+            f"{cell(compact_cell(item.get('status') or '-', 8), 8, status_style(str(item.get('status') or '')), color)} "
+            f"{paint(f'{human_number(saved):>9}', 'green' if saved else 'dim', color)} "
+            f"{int(item.get('matches') or 0):>7} "
+            f"{impact_bar(saved, max_card_saved, impact_width, color=color)}"
+        )
+    if not top_cards:
+        lines.append("  - 暂无 top_card 日志；先跑 context/preflight 后再看")
     review_items = calibration.get("needs_review") if isinstance(calibration.get("needs_review"), list) else []
     lines.extend(["", paint("待校准高估项", "green", color), thin])
     if review_items:
@@ -665,6 +741,16 @@ def rate_style(percent: float) -> str:
     if percent >= 50:
         return "yellow"
     return "red"
+
+
+def status_style(status: str) -> str:
+    if status == "verified":
+        return "green"
+    if status in {"partial", "inferred", "stale", "unknown"}:
+        return "yellow"
+    if status == "disputed":
+        return "red"
+    return "dim"
 
 
 ANSI = {

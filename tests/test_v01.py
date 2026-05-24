@@ -148,6 +148,8 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
 
     assert gain["top_queries"][0]["query"] == "ad lazyload"
     assert gain["top_queries"][0]["estimated_tokens_saved"] > 0
+    assert gain["top_cards"][0]["card_id"]
+    assert gain["top_cards"][0]["estimated_tokens_saved"] > 0
     assert gain["observed"]["context_hits"] == 1
     assert gain["calibration"]["status"] == "proxy_only"
     assert gain["calibration"]["confidence"] == "low"
@@ -164,6 +166,8 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     detail_gain = run([str(XMEM), "gain", "--detail"], repo, env).stdout
     assert "XMEM Gain 收益面板" in detail_gain
     assert "按事件" in detail_gain
+    assert "粗估占比" in detail_gain
+    assert "Top Cards" in detail_gain
 
 
 def test_gain_distinguishes_lookup_from_context_savings(tmp_path: Path):

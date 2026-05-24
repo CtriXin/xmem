@@ -2,7 +2,7 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.31`.
+Current package version: `0.1.32`.
 
 ## Goals
 
@@ -239,7 +239,7 @@ When a longer query contains a verified compact alias such as `网文二 repo va
 
 `xmem check` inspects the current git diff against local and indexed `invariant` / `rule` / `guard` cards. It is intentionally lightweight: it looks for explicit `diff_guard.warn_if_removed`, `warn_if_added`, and `forbid` terms and exits non-zero for human-visible warnings.
 
-`xmem gain` summarizes lookup, `context`, `preflight`, and `check` telemetry from `~/.xmem/gain.jsonl`. The default view is a short key summary: real confidence result, confirmed-vs-rough tokens, hit overview, risk signals, top query order, and the few queries that most need review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. Use `xmem gain --detail` only when you need the full event/query tables.
+`xmem gain` summarizes lookup, `context`, `preflight`, and `check` telemetry from `~/.xmem/gain.jsonl`. The default view is a short key summary: real confidence result, confirmed-vs-rough tokens, hit overview, risk signals, top query order, and the few queries that most need review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. Use `xmem gain --detail` only when you need the full event/query/card tables. In detail view, `Top 查询` aggregates query text, while `Top Cards` aggregates `top_card` ids from retrieval logs. The bar column is `粗估占比`: relative rough-token share inside that section, not progress or confirmed savings.
 
 Hit/miss/pass/prevented are log counts; `hit` only means candidates were returned. Token savings are rough, uncalibrated estimates for context/preflight matches only, not billing truth. Risk hints come from rule warnings, not confirmed production bugs. By default, `xmem gain` reads all gain rows; use `--limit N` only when you want a recent slice.
 
