@@ -122,11 +122,23 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         anchor=registry_anchor,
     )
     relations_for_packet = compact_relation_cards(relations, strong_relation, has_identity_anchor=bool(strong_registry or strong_traffic))
-    next_reads = unique_paths(traffic[:3] + relations_for_packet[:4] + registry_for_packet[:4] + rules[:3] + methods[:3] + specs[:4] + code_indexes[:5] + memories[:3] + evidence[:3])
+    next_reads = unique_paths(traffic[:3] + evidence[:3] + relations_for_packet[:4] + registry_for_packet[:4] + rules[:3] + methods[:3] + specs[:4] + code_indexes[:5] + memories[:3])
+    symbolic_sections = {
+        "traffic_switch": traffic[:4],
+        "registry_candidates": registry_for_packet,
+        "rules": rules[:5],
+        "methods": methods[:5],
+        "memories": memories[:5],
+        "specs": specs[:6],
+        "code_indexes": code_indexes[:8],
+        "relations": relations_for_packet,
+        "evidence": evidence[:6],
+    }
     packet = {
         "schema": "xmem.context.v1",
         "truth_policy": "files/code/runtime are truth; sqlite is generated index/cache",
         "query": query,
+        "symbolic_memory": symbolic_memory_brief(symbolic_sections),
         "resolution": {
             "status": resolution,
             "do_not_assume_single_project": resolution in {"ambiguous", "guided_by_alias_card", "guided_by_correction"},
@@ -531,6 +543,8 @@ def card_brief(card: Dict[str, Any], rank: int) -> Dict[str, Any]:
     brief = {
         "rank": rank,
         "id": card.get("card_id", ""),
+        "node_id": node_id_for_card(card),
+        "memory_layer": memory_layer_for_card(card),
         "project_id": card.get("project_id", ""),
         "type": card.get("type", ""),
         "truth": card.get("status", ""),
@@ -539,6 +553,7 @@ def card_brief(card: Dict[str, Any], rank: int) -> Dict[str, Any]:
         "source": card.get("source", ""),
         "source_ref": card.get("source_ref", ""),
         "source_path": card.get("path", ""),
+        "evidence_ref": evidence_ref_for_card(card),
         "title": compact(card.get("title", ""), 96),
         "why": card.get("why", ""),
         "hints": card_hints(card.get("body", "")),
@@ -554,6 +569,8 @@ def card_brief(card: Dict[str, Any], rank: int) -> Dict[str, Any]:
 def supporting_card_brief(card: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "id": card.get("card_id", ""),
+        "node_id": node_id_for_card(card),
+        "memory_layer": memory_layer_for_card(card),
         "type": card.get("type", ""),
         "truth": card.get("status", ""),
         "confidence": float(card.get("confidence") or 0),
@@ -561,8 +578,53 @@ def supporting_card_brief(card: Dict[str, Any]) -> Dict[str, Any]:
         "source": card.get("source", ""),
         "source_ref": card.get("source_ref", ""),
         "source_path": card.get("path", ""),
+        "evidence_ref": evidence_ref_for_card(card),
         "title": compact(card.get("title", ""), 96),
     }
+
+
+def symbolic_memory_brief(sections: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
+    counts = {"L3": 0, "L2": 0, "L1": 0, "L0": 0}
+    for cards in sections.values():
+        for card in cards:
+            layer_id = memory_layer_for_card(card).split(":", 1)[0]
+            if layer_id in counts:
+                counts[layer_id] += 1
+    return {
+        "mode": "layered_symbolic",
+        "top_canvas": "read packet sections first; each item has node_id and evidence_ref for drilldown",
+        "drilldown": "use xmem open <card_id> or read evidence_ref/source_path; files/code/runtime remain truth",
+        "layers": [
+            {"id": "L3", "name": "policy_profile", "purpose": "rules, guardrails, SOP, user/project preferences", "count": counts["L3"]},
+            {"id": "L2", "name": "scenario_pattern", "purpose": "methods, specs, traffic/relation patterns, reusable fixes", "count": counts["L2"]},
+            {"id": "L1", "name": "atom_card", "purpose": "entity facts, aliases, corrections, compact memory cards", "count": counts["L1"]},
+            {"id": "L0", "name": "raw_evidence", "purpose": "issue/code/source refs used to recover ground truth", "count": counts["L0"]},
+        ],
+    }
+
+
+def node_id_for_card(card: Dict[str, Any]) -> str:
+    raw = str(card.get("card_id") or card.get("id") or card.get("source_ref") or card.get("path") or "")
+    slug = re.sub(r"[^A-Za-z0-9]+", "_", raw).strip("_").lower()
+    return f"n_{slug[:80]}" if slug else ""
+
+
+def evidence_ref_for_card(card: Dict[str, Any]) -> str:
+    return str(card.get("source_ref") or card.get("path") or "")
+
+
+def memory_layer_for_card(card: Dict[str, Any]) -> str:
+    card_type = str(card.get("type") or "")
+    source = str(card.get("source") or "")
+    if card_type in EVIDENCE_TYPES or card_type in CODE_TYPES or "issue" in source or "code-index" in source:
+        return "L0:raw_evidence"
+    if card_type in METHOD_TYPES or card_type in SPEC_TYPES or card_type in RELATION_TYPES or card_type in TRAFFIC_TYPES:
+        return "L2:scenario_pattern"
+    if card_type in RULE_TYPES or card_type in {"guard", "policy"}:
+        return "L3:policy_profile"
+    if card_type in REGISTRY_TYPES or card_type.startswith("wiki.") or card_type in ALIAS_TYPES or card_type in CORRECTION_TYPES or card_type in MEMORY_TYPES:
+        return "L1:atom_card"
+    return "L1:atom_card"
 
 
 def freshness_brief(data: Dict[str, Any]) -> Dict[str, Any]:

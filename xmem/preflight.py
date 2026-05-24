@@ -91,6 +91,7 @@ def build_preflight(query: str, current: Dict[str, Any] | None, cards: List[Dict
         "can_proceed": gate["can_proceed"],
         "risk_level": preflight_risk(issue_patterns, invariants, methods, gate["blockers"]),
         "action": preflight_action(readiness),
+        "symbolic_memory": context.get("symbolic_memory") or {},
         "blockers": gate["blockers"],
         "required_before_edit": gate["required_before_edit"],
         "required_before_deploy": gate["required_before_deploy"],

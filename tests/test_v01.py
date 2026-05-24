@@ -155,8 +155,9 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     assert gain["recent_queries"][0]["top_card"]
     assert gain["recent_guardrails"]
     assert "XMEM Gain 关键摘要" in text_gain
-    assert "关键结论:" in text_gain
-    assert "收益口径:" in text_gain
+    assert "可信结果:" in text_gain
+    assert "真实收益:" in text_gain
+    assert "Top 查询排序:" in text_gain
     assert "最该看" in text_gain
     assert "xmem gain --detail" in text_gain
     assert "按事件" not in text_gain
@@ -243,6 +244,26 @@ def test_context_next_reads_include_relation_cards(tmp_path: Path):
     packet = json.loads(run([str(XMEM), "context", "xmem shared skill", "--json"], repo, env).stdout)
 
     assert any("xmem.installation.yaml" in path for path in packet["next_reads"])
+
+
+def test_packets_include_layered_symbolic_trace_fields(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(run([str(XMEM), "context", "ad lazyload", "--json"], repo, env).stdout)
+    text_packet = run([str(XMEM), "context", "ad lazyload"], repo, env).stdout
+    preflight_text = run([str(XMEM), "preflight", "ad lazyload"], repo, env).stdout
+
+    assert packet["symbolic_memory"]["mode"] == "layered_symbolic"
+    assert packet["symbolic_memory"]["layers"][0]["id"] == "L3"
+    assert any(item["node_id"].startswith("n_") for item in packet["rules"])
+    assert any(item["memory_layer"].startswith("L3:") for item in packet["rules"])
+    assert any(item["evidence_ref"] for item in packet["rules"])
+    assert "symbolic_memory:" in text_packet
+    assert "node_id:" in text_packet
+    assert "memory_layer:" in text_packet
+    assert "evidence_ref:" in text_packet
+    assert "symbolic_memory:" in preflight_text
 
 
 def test_verified_relation_card_can_resolve_context(tmp_path: Path):

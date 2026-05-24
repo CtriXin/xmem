@@ -1,0 +1,44 @@
+id: xmem.layered-symbolic-memory
+type: method
+title: xmem layered symbolic memory packets
+scope:
+  system: xmem
+aliases:
+  - layered symbolic memory
+  - TencentDB Agent Memory absorption
+  - node_id drilldown
+  - evidence_ref trace
+  - symbolic top canvas
+truth:
+  status: verified
+  confidence: 0.9
+  basis:
+    - implemented_in_code
+    - policy_doc
+    - external_design_review
+  last_checked_at: 2026-05-24T00:00:00Z
+summary: xmem context and preflight packets use compact top sections with stable node_id, memory_layer, and evidence refs so agents can reason first and drill down to source truth only when needed.
+must_include:
+  - Emit symbolic_memory metadata in context and preflight packets.
+  - Add node_id and memory_layer to card items.
+  - Preserve source_ref, source_path, or evidence_ref for drilldown.
+  - Keep files, code, Project Wiki, Issue Record, and runtime APIs as truth.
+forbid:
+  - Do not add vector DB, daemon, web UI, or non-stdlib dependencies for this memory model.
+  - Do not duplicate full Project Wiki or Issue Record truth into xmem cards.
+  - Do not emit lossy summaries without source refs.
+checks:
+  - xmem context "ad lazyload"
+  - xmem preflight "ad lazyload"
+  - pytest tests/test_v01.py
+evidence:
+  - kind: policy
+    path: docs/policies/layered-symbolic-memory.md
+  - kind: code
+    path: xmem/context.py
+  - kind: code
+    path: xmem/toon.py
+  - kind: test
+    path: tests/test_v01.py
+  - kind: external
+    path: https://github.com/Tencent/TencentDB-Agent-Memory

@@ -113,7 +113,11 @@ def aggregate_queries(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         for source in row.get("sources") or []:
             if source not in item["sources"]:
                 item["sources"].append(source)
-    return sorted(out.values(), key=lambda item: (int(item["estimated_tokens_saved"]), int(item["count"])), reverse=True)[:10]
+    return sorted(
+        out.values(),
+        key=lambda item: (int(item["count"]), int(item["matches"]), int(item["estimated_tokens_saved"])),
+        reverse=True,
+    )[:10]
 
 
 def build_calibration(rows: List[Dict[str, Any]], top_queries: List[Dict[str, Any]]) -> Dict[str, object]:
@@ -323,17 +327,17 @@ def format_gain_summary_dashboard(data: Dict[str, object], *, color: bool = Fals
     context_hits = int(observed.get("context_hits") or 0)
     preflight_hits = int(observed.get("preflight_hits") or 0)
     guardrail_prevented = int(observed.get("guardrail_prevented") or 0)
-    conclusion = gain_conclusion(calibration, actual_tokens, rough_tokens, retrieval_hits)
+    confidence = gain_confidence_result(calibration, actual_tokens)
     lines = [
         title,
         rule,
-        metric("关键结论", conclusion, color, value_style="green" if actual_tokens else "yellow"),
         metric(
-            "可信度",
-            f"{calibration_status_text(calibration)}；confirmed={int(calibration.get('confirmed') or 0)} rejected={int(calibration.get('rejected') or 0)} outcomes={int(calibration.get('outcomes') or 0)}；hit=有候选，不等于正确/真实省 token",
+            "可信结果",
+            confidence,
             color,
-            value_style="yellow" if calibration.get("confidence") == "low" else "green",
+            value_style=gain_confidence_style(confidence),
         ),
+        metric("真实收益", f"confirmed={human_number(actual_tokens)} tokens；rough={human_number(rough_tokens)} 只看趋势", color, value_style="green" if actual_tokens else "dim"),
         metric(
             "命中概览",
             f"{retrieval_calls} calls / hit {retrieval_hits} / miss {retrieval_misses}；context {context_hits}，preflight {preflight_hits}",
@@ -341,17 +345,12 @@ def format_gain_summary_dashboard(data: Dict[str, object], *, color: bool = Fals
         ),
         metric("context 命中率", f"{hit_rate:.1f}% {bar(hit_rate, width=18, color=color)}", color, value_style=rate_style(hit_rate)),
         metric(
-            "收益口径",
-            f"confirmed={human_number(actual_tokens)} tokens；rough={human_number(rough_tokens)} tokens（非账单事实）",
-            color,
-            value_style="green" if actual_tokens else "dim",
-        ),
-        metric(
             "风险信号",
             f"规则拦截 {guardrail_prevented}；风险提示 {int(data.get('estimated_bug_prevented') or 0)}",
             color,
             value_style="yellow" if guardrail_prevented else "dim",
         ),
+        metric("Top 查询排序", "次数 desc -> matches desc -> rough tokens desc", color, value_style="dim"),
         "",
         paint("最该看", "green", color),
         thin,
@@ -363,6 +362,7 @@ def format_gain_summary_dashboard(data: Dict[str, object], *, color: bool = Fals
         thin,
         "- 默认只显示关键摘要；需要全量事件表时用 `xmem gain --detail`。",
         "- rough token 是趋势估算；只有 confirmed/outcome 才能当较强收益信号。",
+        "- hit 只是搜到候选；Top 查询默认按调用次数排序，不按 rough token 排序。",
     ])
     return "\n".join(lines)
 
@@ -410,6 +410,30 @@ def gain_conclusion(calibration: Dict[str, object], actual_tokens: int, rough_to
     if hits:
         return "有命中记录，但没有确认收益"
     return "暂无可用 gain 信号"
+
+
+def gain_confidence_result(calibration: Dict[str, object], actual_tokens: int) -> str:
+    confirmed = int(calibration.get("confirmed") or 0)
+    rejected = int(calibration.get("rejected") or 0)
+    outcomes = int(calibration.get("outcomes") or 0)
+    if actual_tokens > 0:
+        level = "高"
+        reason = "已有真实 token 数"
+    elif confirmed or outcomes:
+        level = "中"
+        reason = "有人工/任务结果信号，但没有真实 token 对照"
+    else:
+        level = "低"
+        reason = "只有命中日志和粗估"
+    return f"{level}；confirmed={confirmed} rejected={rejected} outcomes={outcomes}；{reason}"
+
+
+def gain_confidence_style(text: str) -> str:
+    if str(text).startswith("高"):
+        return "green"
+    if str(text).startswith("中"):
+        return "yellow"
+    return "dim"
 
 
 def format_gain_detail_dashboard(data: Dict[str, object], *, color: bool = False, width: Optional[int] = None) -> str:

@@ -67,6 +67,9 @@ def llm_packet(packet: Dict[str, Any]) -> str:
         lines.append(f"    stale[{len(stale)}]:")
         for item in stale[:5]:
             lines.append(f"      - kind: {quote_scalar(item.get('kind', ''))}; path: {quote_scalar(item.get('path', ''))}")
+    symbolic = packet.get("symbolic_memory") or {}
+    if symbolic:
+        lines.extend(symbolic_memory_item(symbolic, 2))
     local_health = packet.get("local_source_health") or {}
     if local_health:
         lines.append("  local_source_health:")
@@ -127,6 +130,9 @@ def preflight_packet(packet: Dict[str, Any]) -> str:
         lines.append(f"  {key}: {quote_scalar(packet.get(key, ''))}")
     lines.append(f"  severity: {quote_scalar(packet.get('severity', ''))}")
     lines.append(f"  can_proceed: {quote_scalar(packet.get('can_proceed', ''))}")
+    symbolic = packet.get("symbolic_memory") or {}
+    if symbolic:
+        lines.extend(symbolic_memory_item(symbolic, 2))
     blockers = packet.get("blockers") or []
     lines.append(f"  blockers[{len(blockers)}]:")
     for item in blockers:
@@ -189,10 +195,10 @@ def brief_item(item: Dict[str, Any], indent: int) -> List[str]:
     pad = " " * indent
     sub = " " * (indent + 2)
     lines = [f"{pad}- id: {quote_scalar(compact(item.get('id', ''), 96))}"]
-    keys = ["rank", "score", "type", "truth", "confidence", "project_id", "source", "title", "why", "source_ref", "source_path"]
+    keys = ["node_id", "memory_layer", "rank", "score", "type", "truth", "confidence", "project_id", "source", "title", "why", "evidence_ref", "source_ref", "source_path"]
     for key in keys:
         value = item.get(key, "")
-        if key in {"source_ref", "source_path"}:
+        if key in {"evidence_ref", "source_ref", "source_path"}:
             value = compact(value, 160)
         elif key == "title":
             value = compact(value, 96)
@@ -207,6 +213,27 @@ def brief_item(item: Dict[str, Any], indent: int) -> List[str]:
         lines.append(f"{sub}hints[{len(hints)}]:")
         for hint in hints[:10]:
             lines.append(f"{sub}  - {quote_scalar(compact(hint, 160))}")
+    return lines
+
+
+def symbolic_memory_item(item: Dict[str, Any], indent: int) -> List[str]:
+    pad = " " * indent
+    sub = " " * (indent + 2)
+    lines = [f"{pad}symbolic_memory:"]
+    for key in ("mode", "top_canvas", "drilldown"):
+        lines.append(f"{sub}{key}: {quote_scalar(compact(item.get(key, ''), 200))}")
+    layers = item.get("layers") or []
+    lines.append(f"{sub}layers[{len(layers)}]:")
+    for layer in layers:
+        lines.append(
+            "{pad}- id: {id}; name: {name}; count: {count}; purpose: {purpose}".format(
+                pad=" " * (indent + 4),
+                id=quote_scalar(layer.get("id", "")),
+                name=quote_scalar(layer.get("name", "")),
+                count=quote_scalar(layer.get("count", "")),
+                purpose=quote_scalar(compact(layer.get("purpose", ""), 160)),
+            )
+        )
     return lines
 
 

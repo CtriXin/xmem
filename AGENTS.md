@@ -14,3 +14,4 @@
 - Follow `docs/policies/truth-level.md`, `docs/policies/preflight-severity.md`, and `docs/policies/promotion-policy.md` when changing truth status, blockers, or promotion behavior.
 - Do not silently promote Project Wiki pending rows, single-incident bug patterns, generated indexes, or dynamic runtime state to `verified`.
 - Follow `docs/policies/agent-output-compactness.md`: prefer compact summaries plus evidence paths over raw JSON/logs, broad grep, long docs, repeated notices, or duplicated closeout text.
+- Keep context/preflight layered and symbolic: agent reads compact top sections first; every card item must preserve `node_id`, `memory_layer`, and evidence refs for drilldown.

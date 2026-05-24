@@ -38,13 +38,15 @@ xmem gain --detail
 7. Use `xmem gain` when asked what xmem saved.
 8. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
 
-`xmem gain` is concise by default. It should show only key signal: conclusion, confidence, hit overview, confirmed-vs-rough token numbers, risk signals, and a few queries needing review. Use `xmem gain --detail` only when the full event/query tables are needed.
+`xmem gain` is concise by default. It should show only key signal: real confidence result, confirmed-vs-rough token numbers, hit overview, risk signals, top query order, and a few queries needing review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. Use `xmem gain --detail` only when the full event/query tables are needed.
 
 Policy rule: when deciding whether a memory is truth, hint, or blocker, use `docs/policies/truth-level.md`, `docs/policies/preflight-severity.md`, and `docs/policies/promotion-policy.md`. In short: Project Wiki pending is hint-only, Issue patterns may be partial until repeated/reviewed, dynamic SCMP facts need live verification, and preflight blockers must stop edits/deploy.
 
 Output rule: use `docs/policies/agent-output-compactness.md` when tool output may be large. Prefer compact summaries and evidence paths; avoid pasting raw SCMP pod JSON, broad issue-tracking grep, safe-access card JSON, Feishu read-back payloads, repeated `_notice` text, or long skill docs into agent context.
 
-`xmem context` is LLM-first: use `resolution.status`, `suggested_queries`, `correction_guidance`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true. Duplicate cards may be fused; read `supporting_cards` for alternate sources behind the primary card.
+Layered symbolic rule: use `docs/policies/layered-symbolic-memory.md` for context/preflight packets. Read compact top sections first, then drill down through `node_id`, `memory_layer`, `evidence_ref`, `source_ref`, and `source_path` only when details matter. Do not create lossy summaries without a source path.
+
+`xmem context` is LLM-first: use `symbolic_memory`, `resolution.status`, `suggested_queries`, `correction_guidance`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true. Duplicate cards may be fused; read `supporting_cards` for alternate sources behind the primary card.
 
 If a long query contains a verified compact alias such as `网文二 repo validation_service`, treat the verified identity anchor as the route and use the extra words as requested fields. Do not surface weak same-template relation cards once a verified identity family is locked.
 

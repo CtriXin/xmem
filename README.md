@@ -2,7 +2,7 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.29`.
+Current package version: `0.1.30`.
 
 ## Goals
 
@@ -12,6 +12,7 @@ Current package version: `0.1.29`.
 - Import read-only sources such as Project Wiki and issue-tracking.
 - Import lightweight project memory/spec sources such as `CONTEXT.md`, ADRs, OpenSpec, Spec Kit, and Trellis.
 - Return compact agent context with freshness and evidence status.
+- Return layered symbolic packets: compact top sections plus `node_id`, `memory_layer`, and evidence refs for drilldown.
 - Return SCMP traffic-switch packets when a verified relation card matches a domain/service/template query.
 - Return development preflight packets that surface historical bug patterns before edits.
 - Track xmem telemetry and rough, uncalibrated savings hints with `xmem gain`.
@@ -149,6 +150,7 @@ Detailed governance lives in `docs/policies/`:
 - `docs/policies/preflight-severity.md`: how agents interpret `xmem preflight` as `hint`, `warn`, or `block`.
 - `docs/policies/promotion-policy.md`: how Project Wiki pending rows, Issue patterns, and xmem cards are promoted, merged, or rejected.
 - `docs/policies/agent-output-compactness.md`: how agents avoid raw JSON, broad grep, long docs, repeated notices, and duplicated closeout text.
+- `docs/policies/layered-symbolic-memory.md`: how context/preflight packets keep a compact symbolic top layer with evidence drilldown.
 
 Short rule cards for these policies live under `examples/cards/policy/`, so `xmem context "truth level policy"` and `xmem preflight "deploy blocker"` can surface the policy without reading long docs first.
 
@@ -172,6 +174,9 @@ xmem should stay small. A repo starts with at most a few cards. Full text search
 
 ```text
 xmem_context:
+  symbolic_memory:
+    mode: layered_symbolic
+    layers: L3 policy_profile / L2 scenario_pattern / L1 atom_card / L0 raw_evidence
   resolution:
     status: resolved | ambiguous | partial | missing
     do_not_assume_single_project: true | false
@@ -188,7 +193,7 @@ xmem_context:
   next_reads: ...
 ```
 
-Use `xmem why` for human/debug match reasons and `xmem context --json` for exact structured output.
+Each card item includes `node_id`, `memory_layer`, `evidence_ref`, `source_ref`, and `source_path` when available. Agent context should reason from the compact top layer, then drill down with `xmem open <card_id>` or source paths when facts matter. Use `xmem why` for human/debug match reasons and `xmem context --json` for exact structured output.
 
 `xmem preflight` is the development-start packet. It is narrower than `context`: it pulls matched Issue Record bug-patterns, invariant/rule cards, must-keep behavior, known failure modes, and required verification checks before code is edited. Preflight keeps an actionable relevance gate: alias/metadata matches are trusted as direct signals, while weak body-only matches must clear a score threshold before they can become guardrails.
 
@@ -228,7 +233,7 @@ When a longer query contains a verified compact alias such as `网文二 repo va
 
 `xmem check` inspects the current git diff against local and indexed `invariant` / `rule` / `guard` cards. It is intentionally lightweight: it looks for explicit `diff_guard.warn_if_removed`, `warn_if_added`, and `forbid` terms and exits non-zero for human-visible warnings.
 
-`xmem gain` summarizes lookup, `context`, `preflight`, and `check` telemetry from `~/.xmem/gain.jsonl`. The default view is a short key summary: conclusion, confidence, hit overview, confirmed-vs-rough tokens, risk signals, and the few queries that most need review. Use `xmem gain --detail` only when you need the full event/query tables.
+`xmem gain` summarizes lookup, `context`, `preflight`, and `check` telemetry from `~/.xmem/gain.jsonl`. The default view is a short key summary: real confidence result, confirmed-vs-rough tokens, hit overview, risk signals, top query order, and the few queries that most need review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. Use `xmem gain --detail` only when you need the full event/query tables.
 
 Hit/miss/pass/prevented are log counts; `hit` only means candidates were returned. Token savings are rough, uncalibrated estimates for context/preflight matches only, not billing truth. Risk hints come from rule warnings, not confirmed production bugs. By default, `xmem gain` reads all gain rows; use `--limit N` only when you want a recent slice.
 
