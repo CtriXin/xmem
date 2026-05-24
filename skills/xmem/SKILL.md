@@ -26,7 +26,7 @@ xmem check --sources
 xmem fix
 xmem suppress --card <id> --for-query "query" --reason irrelevant
 xmem gain
-xmem gain --detail
+xmem gain --summary
 ```
 
 ## Workflow
@@ -40,7 +40,7 @@ xmem gain --detail
 7. Use `xmem gain` when asked what xmem saved.
 8. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
 
-`xmem gain` is concise by default. It should show only key signal: real confidence result, confirmed-vs-rough token numbers, hit overview, risk signals, top query order, and a few queries needing review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. Use `xmem gain --detail` only when the full event/query/card tables are needed. In detail view, `Top 查询` is query-text aggregation, `Top Cards` is top-card aggregation, and `粗估占比` bars are relative rough-token share inside that section, not progress or confirmed savings.
+`xmem gain` shows the full event/query/card dashboard by default. Use `xmem gain --summary` only when a short key signal is enough: real confidence result, confirmed-vs-rough token numbers, hit overview, risk signals, top query order, and a few queries needing review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. In detail view, `Top 查询` is query-text aggregation, `Top Cards` is top-card aggregation, and `粗估占比` bars are relative rough-token share inside that section, not progress or confirmed savings. `xmem gain --detail` remains a compatibility alias for the default full dashboard.
 
 Policy rule: when deciding whether a memory is truth, hint, or blocker, use `docs/policies/truth-level.md`, `docs/policies/preflight-severity.md`, and `docs/policies/promotion-policy.md`. In short: Project Wiki pending is hint-only, Issue patterns may be partial until repeated/reviewed, dynamic SCMP facts need live verification, and preflight blockers must stop edits/deploy.
 

@@ -145,6 +145,7 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
 
     gain = json.loads(run([str(XMEM), "gain", "--json"], repo, env).stdout)
     text_gain = run([str(XMEM), "gain"], repo, env).stdout
+    summary_gain = run([str(XMEM), "gain", "--summary"], repo, env).stdout
 
     assert gain["top_queries"][0]["query"] == "ad lazyload"
     assert gain["top_queries"][0]["estimated_tokens_saved"] > 0
@@ -156,13 +157,17 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     assert gain["calibration"]["needs_review"]
     assert gain["recent_queries"][0]["top_card"]
     assert gain["recent_guardrails"]
-    assert "XMEM Gain 关键摘要" in text_gain
-    assert "可信结果:" in text_gain
-    assert "真实收益:" in text_gain
-    assert "Top 查询排序:" in text_gain
-    assert "最该看" in text_gain
-    assert "xmem gain --detail" in text_gain
-    assert "按事件" not in text_gain
+    assert "XMEM Gain 收益面板" in text_gain
+    assert "按事件" in text_gain
+    assert "Top 查询" in text_gain
+    assert "Top Cards" in text_gain
+    assert "粗估占比" in text_gain
+    assert "XMEM Gain 关键摘要" in summary_gain
+    assert "可信结果:" in summary_gain
+    assert "真实收益:" in summary_gain
+    assert "Top 查询排序:" in summary_gain
+    assert "最该看" in summary_gain
+    assert "按事件" not in summary_gain
     detail_gain = run([str(XMEM), "gain", "--detail"], repo, env).stdout
     assert "XMEM Gain 收益面板" in detail_gain
     assert "按事件" in detail_gain

@@ -162,14 +162,16 @@ def build_parser() -> argparse.ArgumentParser:
     gain = sub.add_parser("gain", help="查看 xmem telemetry / 收益口径 / guardrail 统计")
     gain.add_argument("--json", action="store_true", help="输出 JSON")
     gain.add_argument("--no-color", action="store_true", help="关闭 dashboard ANSI 颜色")
-    gain.add_argument("--detail", action="store_true", help="显示完整事件/查询表；默认只显示关键摘要")
+    gain.add_argument("--summary", action="store_true", help="只显示关键摘要")
+    gain.add_argument("--detail", action="store_true", help="兼容选项；gain 默认已显示完整面板")
     gain.add_argument("--limit", type=int, default=None, help="只读取最近 N 条 gain log；默认读取全部")
     gain_sub = gain.add_subparsers(dest="gain_cmd", metavar="<操作>", parser_class=XmemArgumentParser)
     gain_sub.title = "操作"
     gain_show = gain_sub.add_parser("show", help="显示 xmem telemetry 和粗估收益")
     gain_show.add_argument("--json", action="store_true", help="输出 JSON")
     gain_show.add_argument("--no-color", action="store_true", help="关闭 dashboard ANSI 颜色")
-    gain_show.add_argument("--detail", action="store_true", help="显示完整事件/查询表；默认只显示关键摘要")
+    gain_show.add_argument("--summary", action="store_true", help="只显示关键摘要")
+    gain_show.add_argument("--detail", action="store_true", help="兼容选项；gain 默认已显示完整面板")
     gain_show.add_argument("--limit", type=int, default=None, help="只读取最近 N 条 gain log；默认读取全部")
     gain_confirm = gain_sub.add_parser("confirm", help="确认一次 gain/outcome 信号")
     gain_confirm.add_argument("query")
@@ -396,7 +398,8 @@ def help_cmd() -> int:
                 "- xmem preflight <query>   # 开发/修 bug 前查历史坑、must_keep、required checks",
                 "- xmem preflight --fields domain=... task=...  # Agent 用结构化字段，避免旧上下文污染",
                 "- xmem check               # 改完前检查 invariant / rule / guardrail",
-                "- xmem gain                # 查看 telemetry、粗估收益、确认收益口径",
+                "- xmem gain                # 查看完整 telemetry / Top 查询 / Top Cards 面板",
+                "- xmem gain --summary      # 只看关键摘要",
                 "- xmem why <query>         # 解释为什么匹配",
                 "- xmem open <id|query>     # 打开 card / evidence 摘要",
                 "- xmem new                 # 新项目/新文件夹初始化并注册",
@@ -885,7 +888,7 @@ def gain_cmd(args: argparse.Namespace) -> int:
         print(json.dumps(data, ensure_ascii=False, indent=2))
     else:
         use_color = sys.stdout.isatty() and not args.no_color and not os.environ.get("NO_COLOR")
-        print(format_gain_dashboard(data, color=use_color, detail=getattr(args, "detail", False)))
+        print(format_gain_dashboard(data, color=use_color, detail=not getattr(args, "summary", False)))
     return 0
 
 

@@ -410,7 +410,7 @@ def format_gain_summary_dashboard(data: Dict[str, object], *, color: bool = Fals
         "",
         paint("口径", "green", color),
         thin,
-        "- 默认只显示关键摘要；需要全量事件表时用 `xmem gain --detail`。",
+        "- `xmem gain` 默认显示完整事件/查询/card 面板；短摘要用 `xmem gain --summary`。",
         "- rough token 是趋势估算；只有 confirmed/outcome 才能当较强收益信号。",
         "- hit 只是搜到候选；Top 查询默认按调用次数排序，不按 rough token 排序。",
     ])
