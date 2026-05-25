@@ -9,6 +9,16 @@ xmem is a lightweight truth index between wiki and DB. Use it to find durable pr
 
 Truth rule: `.xmem/*.yaml`, source Markdown, code, git, runtime APIs, and human confirmations are truth. `~/.xmem/registry.sqlite` is generated index/cache only.
 
+## What's New
+
+`xmem 0.1.37` is the public-onboarding cut. The supported generic path is:
+
+- `xmem setup` creates `~/.xmem`, generic docs/config/schema examples, and project/source registrations.
+- MMS public installs can opt in with `bash install.sh --install-xmem`; `--dry-run` previews the write/install/setup plan without changing files.
+- Installer-style setup should use `--register-only` when low-touch onboarding matters; avoid writing repo-local `.xmem` into many repos automatically.
+- xmem must stay generic by default: no SCMP, Project Wiki, Issue Record, Feishu/Lark, Jira, Linear, or cloud backup dependency.
+- In isolated sessions, host-home env (`XMEM_HOST_HOME`, `MMS_HOST_HOME`, `HOST_HOME`, `REAL_HOME`) should be honored so agents do not create or read the wrong registry.
+
 ## Short Commands
 
 ```bash

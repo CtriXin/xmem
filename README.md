@@ -4,10 +4,23 @@ Lightweight cross-project memory for agents. xmem is a truth index, not a heavy 
 
 Current package version: `0.1.37`.
 
+## What's New in 0.1.37
+
+This release is the public-onboarding cut of xmem. The main update is not a private SCMP/wiki integration; it is the generic path any user can start with.
+
+- `xmem setup` is now the first-run entry: it creates `~/.xmem`, writes generic docs/config/schema examples, discovers/registers project roots, and can create a shared memory repo with `--memory-repo`.
+- Public MMS installs can opt into xmem with `bash install.sh --install-xmem`; MMS also supports `--dry-run` to preview the xmem install/setup plan without writing files.
+- `--register-only` lets installers register roots without writing repo-local `.xmem` files, keeping first install low-touch.
+- Host-home handling is explicit for isolated sessions and temp-HOME installs, so `xmem status` reports the intended xmem home instead of accidentally reading a real-user registry.
+- The supported feature set is now documented as a lightweight memory router: compact cards, source imports, context/preflight packets, guard checks, gain telemetry, suppression feedback, and optional map/codegraph refs.
+
+Public boundary: xmem does not require or bundle SCMP, Project Wiki, Issue Record, Feishu/Lark, Jira, Linear, or cloud backup. Those can be adapters later, but the default install stays generic and user-owned.
+
 ## Current closeout
 
 The latest stable pickup point is:
 
+- `docs/updates/2026-05-24-xmem-public-onboarding.md`
 - `docs/closeouts/2026-05-24-xmem-v0.1-closeout.md`
 - `docs/context/agent-resume-2026-05-24.md`
 
@@ -63,6 +76,28 @@ xmem setup --root ~/projects --register-only
 xmem setup --memory-repo ~/xmem-memory
 xmem setup --dry-run --json
 ```
+
+MMS users can install the generic CLI and skill globally with:
+
+```bash
+bash install.sh --install-xmem
+bash install.sh --install-xmem --dry-run
+```
+
+The MMS installer uses the low-touch path: install the CLI/skill, create `~/.xmem`, register shallow HOME git roots, and avoid writing repo-local `.xmem` files until a user or agent runs `xmem setup` inside a specific project.
+
+## Supported Features
+
+| Area | Supported | Not the default |
+| --- | --- | --- |
+| Onboarding | `xmem setup`, `--root`, `--register-only`, `--memory-repo`, `--dry-run --json` | deep automatic repo rewrites |
+| Memory shape | compact YAML cards, aliases, truth status, evidence pointers | long wiki pages inside xmem |
+| Retrieval | `xmem context`, `xmem why`, `xmem open`, correction-guided search | guarantee that unknown/unindexed facts can be found |
+| Development gate | `xmem preflight`, structured `--fields`, invariant `xmem check` | replacing tests, code review, or live verification |
+| Source imports | Project Wiki/Issue exports when present, generic project memory/spec docs, local cards, outbox hints | requiring any private adapter |
+| Code routing | compact `.ai/map` / `.codegraph` refs when present | treating generated indexes as code truth |
+| Feedback | `xmem gain`, confirm/reject outcomes, suppress true-but-irrelevant hits | billing-accurate token savings |
+| Portability | user-owned files and optional git memory repo | silent cloud backup or upload |
 
 Truth files live with the project:
 
