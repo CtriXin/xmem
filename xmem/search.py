@@ -8,7 +8,7 @@ from .store import connect, rows
 from .util import append_jsonl, home_dir, load_jsonl, normalize_text, query_hash, query_terms, query_variants, utc_now
 
 
-TOKEN_SAVING_EVENTS = {"context", "preflight"}
+TOKEN_SAVING_EVENTS = {"context", "preflight", "resume"}
 
 
 def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_event: str = "search") -> List[Dict[str, Any]]:

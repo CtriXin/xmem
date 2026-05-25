@@ -11,8 +11,10 @@ Truth rule: `.xmem/*.yaml`, source Markdown, code, git, runtime APIs, and human 
 
 ## What's New
 
-`xmem 0.1.37` is the public-onboarding cut. The supported generic path is:
+`xmem 0.1.38` adds the `resume` takeover packet while keeping the 0.1.37 public-onboarding boundary. The supported generic path is:
 
+- `xmem resume <issue|domain|service|query>` combines context routing and preflight guardrails into compact task memory for fresh sessions.
+- `xmem resume --fields issue=... domain=... service=... task=...` lets hooks/agents avoid old-context pollution.
 - `xmem setup` creates `~/.xmem`, generic docs/config/schema examples, and project/source registrations.
 - MMS public installs can opt in with `bash install.sh --install-xmem`; `--dry-run` previews the write/install/setup plan without changing files.
 - Installer-style setup should use `--register-only` when low-touch onboarding matters; avoid writing repo-local `.xmem` into many repos automatically.
@@ -29,6 +31,8 @@ xmem doctor
 xmem sync
 xmem preflight "query"
 xmem preflight --fields domain=example.com task="query"
+xmem resume "query"
+xmem resume --fields issue=demo domain=example.com task="query"
 xmem context "query"
 xmem why "query"
 xmem open "query"
@@ -44,16 +48,19 @@ xmem gain card <id>
 ## Workflow
 
 1. Run `xmem setup` on a new machine/workspace when xmem has not been configured yet.
-2. Run `xmem preflight "<task>"` before development or bugfix edits to surface historical bug-patterns, invariants, and required checks.
-3. Run `xmem context "<task>"` before broad repo traversal or project selection.
-4. If `source_freshness.status` is not `fresh`, run `xmem sync` before relying on the packet.
-5. Trust only cards marked `verified`; treat `inferred`, `partial`, `stale`, `unknown`, and `disputed` as hints.
-6. For edits that hit a feature with invariant cards, run `xmem check` before final response.
-7. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
-8. Use `xmem gain` when asked what xmem saved.
-9. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
+2. Run `xmem resume "<issue|domain|service|task>"` when taking over an existing task or fresh session before reading long handoffs.
+3. Run `xmem preflight "<task>"` before development or bugfix edits to surface historical bug-patterns, invariants, and required checks.
+4. Run `xmem context "<task>"` before broad repo traversal or project selection.
+5. If `source_freshness.status` is not `fresh`, run `xmem sync` before relying on the packet.
+6. Trust only cards marked `verified`; treat `inferred`, `partial`, `stale`, `unknown`, and `disputed` as hints.
+7. For edits that hit a feature with invariant cards, run `xmem check` before final response.
+8. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
+9. Use `xmem gain` when asked what xmem saved.
+10. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
 
 `xmem setup` is generic onboarding. It creates `~/.xmem` docs/config, registers the current repo or `--root` workspace roots, can initialize repo-local `.xmem` identity files, and can create a shared memory repo via `--memory-repo`. It must not require SCMP, Project Wiki, Issue Record, Feishu/Lark, Jira, Linear, or any private adapter. Use `--register-only` if writing `.xmem` into discovered repos would be too invasive.
+
+`xmem resume` is the takeover packet. Use it before reading long handoffs or full skill docs when the user gives an issue slug, domain, service, repo, or task phrase. Read `identity`, `current_gate`, `historical_pitfalls`, `must_keep`, `avoid`, `required_checks`, `recent_evidence`, `token_savers`, and `next_action`. It is a read model, not a truth owner: live runtime state, current deploy status, and dynamic bindings still need owner-system verification.
 
 `xmem gain` shows the full event/query/card dashboard by default. Use `xmem gain --summary` only when a short key signal is enough: real confidence result, confirmed-vs-rough token numbers, hit overview, risk signals, top query order, and a few queries needing review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. In detail view, `Top 查询` is query-text aggregation, `Top Cards` is top-card aggregation, missing old telemetry status/confidence is hydrated from current registry, `Top Card 解释` shows common/recent queries plus source/score/why, and `粗估占比` bars are relative rough-token share inside that section, not progress or confirmed savings. Use `xmem gain card <id>` when one card looks noisy or surprisingly high-frequency. `xmem gain --detail` remains a compatibility alias for the default full dashboard.
 
@@ -62,6 +69,8 @@ Policy rule: when deciding whether a memory is truth, hint, or blocker, use `doc
 Output rule: use `docs/policies/agent-output-compactness.md` when tool output may be large. Prefer compact summaries and evidence paths; avoid pasting raw SCMP pod JSON, broad issue-tracking grep, safe-access card JSON, Feishu read-back payloads, repeated `_notice` text, or long skill docs into agent context.
 
 Layered symbolic rule: use `docs/policies/layered-symbolic-memory.md` for context/preflight packets. Read compact top sections first, then drill down through `node_id`, `memory_layer`, `evidence_ref`, `source_ref`, and `source_path` only when details matter. Do not create lossy summaries without a source path.
+
+`xmem resume` is LLM-first for takeover; `xmem context` is LLM-first for exploratory retrieval. For resume, prefer structured `--fields issue=... domain=... service=... task=...` when a hook or handoff has clean fields.
 
 `xmem context` is LLM-first: use `symbolic_memory`, `resolution.status`, `suggested_queries`, `correction_guidance`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true. Duplicate cards may be fused; read `supporting_cards` for alternate sources behind the primary card.
 

@@ -689,6 +689,29 @@ def test_context_returns_traffic_switch_packet_from_verified_cards(tmp_path: Pat
     assert "gain_hints" in text_packet
 
 
+def test_resume_returns_task_memory_for_traffic_switch(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(run([str(XMEM), "resume", "网文2 action.readoxa.com traffic switch", "--json"], repo, env).stdout)
+    text_packet = run([str(XMEM), "resume", "网文2 action.readoxa.com traffic switch"], repo, env).stdout
+
+    assert packet["schema"] == "xmem.resume.v1"
+    assert packet["intent"] == "task_resume"
+    traffic = packet["identity"]["traffic_switch"]
+    assert traffic["id"] == "scmp.webnovel2.traffic-switch"
+    assert traffic["prod_service"] == "ptc-v5-novabeats1"
+    assert traffic["validation_service"] == "ptc-v5-novabeats1-test"
+    assert "test_service" not in traffic
+    assert packet["current_gate"]["readiness"] in {"ready_no_known_guards", "ready_with_guards"}
+    assert any("skip broad repo/issue scan" in item for item in packet["token_savers"])
+    assert any("issue-tracking/issues/ptc_v5_reading" in item for item in packet["recent_evidence"])
+    assert any("agent-inbox.jsonl" in item for item in packet["recent_evidence"])
+    assert "xmem_resume:" in text_packet
+    assert "current_gate:" in text_packet
+    assert "prod_service: ptc-v5-novabeats1" in text_packet
+
+
 def test_plain_webnovel_alias_resolves_to_verified_traffic_anchor(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
@@ -852,6 +875,46 @@ def test_preflight_returns_issue_patterns_before_development(tmp_path: Path):
     assert any("iframe" in item["text"] for item in packet["required_checks"])
     assert "xmem_preflight:" in text_packet
     assert "must_keep" in text_packet
+
+
+def test_resume_includes_bug_patterns_and_must_keep(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    tracking = tmp_path / "issue-tracking"
+    index_dir = tracking / "index"
+    index_dir.mkdir(parents=True)
+    (index_dir / "bug-patterns.jsonl").write_text(
+        json.dumps(
+            {
+                "id": "issue-pattern.ad-lazy-regression",
+                "title": "Ad lazy-load regression",
+                "symptom": "ad iframe display was fixed but lazy-load stopped working",
+                "root_cause": "display fix bypassed the lazy-load initialization path",
+                "fix_pattern": "keep lazy-load wrapper when changing ad display",
+                "verification": "check filled iframe, unfilled collapse, desktop and mobile",
+                "regression_guard": "do not remove lazy-load when fixing ad display",
+                "aliases": ["ad iframe lazy regression", "广告没有延迟加载"],
+                "truth": {"status": "verified", "confidence": 0.9},
+                "evidence": [{"kind": "issue", "path": "issues/demo/ad-lazy/issue.md"}],
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    run([str(XMEM), "import", "issue-tracking", "--path", str(tracking)], repo, env)
+
+    packet = json.loads(run([str(XMEM), "resume", "ad iframe lazy regression", "--json"], repo, env).stdout)
+    text_packet = run([str(XMEM), "resume", "ad iframe lazy regression"], repo, env).stdout
+
+    assert packet["schema"] == "xmem.resume.v1"
+    assert packet["current_gate"]["readiness"] == "ready_with_guards"
+    assert packet["current_gate"]["risk_level"] == "high"
+    assert any(item["id"] == "issue-pattern.ad-lazy-regression" for item in packet["historical_pitfalls"])
+    assert any("lazy-load" in item["text"] for item in packet["must_keep"])
+    assert any("iframe" in item["text"] for item in packet["required_checks"])
+    assert "preserve must_keep" in packet["next_action"]
+    assert "xmem_resume:" in text_packet
+    assert "historical_pitfalls" in text_packet
 
 
 def test_preflight_fields_avoid_noisy_raw_query_and_clarify_unanchored_target(tmp_path: Path):

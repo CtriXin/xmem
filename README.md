@@ -2,7 +2,17 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.37`.
+Current package version: `0.1.38`.
+
+## What's New in 0.1.38
+
+This release adds `xmem resume`, a compact takeover packet for fresh sessions or existing tasks. It is the xmem-side answer to token waste from long handoffs, long skill reads, broad issue scans, raw runtime JSON, and repeated closeout readbacks.
+
+- `xmem resume <issue|domain|service|query>` combines `context` routing and `preflight` guardrails into one agent-facing packet.
+- `xmem resume --fields issue=... domain=... service=... task=...` lets hooks/agents pass clean structured targets and avoid old-context pollution.
+- The packet returns identity, current gate, historical pitfalls, invariants, must_keep/avoid, required checks, recent evidence refs, token_savers, next_reads, and next_action.
+- `resume` is a read model only: it does not verify live runtime state, does not own Project Wiki / Issue Record truth, and does not replace tests or deploy checks.
+- `resume` events now count as token-saving retrieval in `xmem gain`, so future reports can show whether takeover packets were actually used.
 
 ## What's New in 0.1.37
 
@@ -20,6 +30,8 @@ Public boundary: xmem does not require or bundle SCMP, Project Wiki, Issue Recor
 
 The latest stable pickup point is:
 
+- `docs/updates/2026-05-25-xmem-resume.md`
+- `docs/context/agent-resume-2026-05-25.md`
 - `docs/updates/2026-05-24-xmem-public-onboarding.md`
 - `docs/closeouts/2026-05-24-xmem-v0.1-closeout.md`
 - `docs/context/agent-resume-2026-05-24.md`
@@ -37,6 +49,7 @@ Read these first when a future agent needs to resume xmem work without transcrip
 - Return layered symbolic packets: compact top sections plus `node_id`, `memory_layer`, and evidence refs for drilldown.
 - Return SCMP traffic-switch packets when a verified relation card matches a domain/service/template query.
 - Return development preflight packets that surface historical bug patterns before edits.
+- Return resume packets for taking over existing tasks without reading long handoffs first.
 - Track xmem telemetry and rough, uncalibrated savings hints with `xmem gain`.
 
 ## Quick start
@@ -49,6 +62,8 @@ xmem doctor
 xmem sync
 xmem preflight "ads lazyload change"
 xmem preflight --fields domain=example.com task="ads lazyload change"
+xmem resume "issue slug or domain"
+xmem resume --fields issue=demo-issue domain=example.com task="ads lazyload change"
 xmem context "how did we add ads before"
 xmem why "car ads lazyload"
 xmem open ads.lazyload
@@ -92,8 +107,8 @@ The MMS installer uses the low-touch path: install the CLI/skill, create `~/.xme
 | --- | --- | --- |
 | Onboarding | `xmem setup`, `--root`, `--register-only`, `--memory-repo`, `--dry-run --json` | deep automatic repo rewrites |
 | Memory shape | compact YAML cards, aliases, truth status, evidence pointers | long wiki pages inside xmem |
-| Retrieval | `xmem context`, `xmem why`, `xmem open`, correction-guided search | guarantee that unknown/unindexed facts can be found |
-| Development gate | `xmem preflight`, structured `--fields`, invariant `xmem check` | replacing tests, code review, or live verification |
+| Retrieval | `xmem context`, `xmem resume`, `xmem why`, `xmem open`, correction-guided search | guarantee that unknown/unindexed facts can be found |
+| Development gate | `xmem preflight`, `xmem resume` current_gate, structured `--fields`, invariant `xmem check` | replacing tests, code review, or live verification |
 | Source imports | Project Wiki/Issue exports when present, generic project memory/spec docs, local cards, outbox hints | requiring any private adapter |
 | Code routing | compact `.ai/map` / `.codegraph` refs when present | treating generated indexes as code truth |
 | Feedback | `xmem gain`, confirm/reject outcomes, suppress true-but-irrelevant hits | billing-accurate token savings |
@@ -160,6 +175,28 @@ Registry rebuilds are atomic: `xmem sync` builds a temporary SQLite index and sw
 `xmem status` also reports `next_actions`, xmem-backup health, and registered local `.xmem/cards`. Generated identity cards may remain local, but non-identity rule/method/correction cards are flagged as `local_only_knowledge` when they are ignored or untracked by git. That warning means xmem can read them on this machine, but they are not portable through git until the owning project decides to track or export them. Context and preflight packets include compact `local_source_health` when matched cards come from a non-portable local source, so agents know when the evidence is machine-local without adding noise to unrelated queries.
 
 `xmem doctor` is the single maintenance view. It combines registry state, source export health, local-card portability, outbox counts, xmem-backup state, and current repo registration. Use it when `status` says there is a warning or before handing work to another agent.
+
+## Resume packets
+
+Use `xmem resume` when taking over an existing issue, domain, service, or long-running task. It is designed for fresh sessions before reading a long handoff.
+
+```bash
+xmem resume "ptc-v5-novabeats1 action.readoxa.com traffic switch"
+xmem resume --fields issue=t102748 domain=action.readoxa.com task="traffic switch"
+xmem resume "ad iframe lazy regression" --json
+```
+
+The packet is agent-facing and compact. It contains:
+
+- `identity`: resolved project/service/repo/traffic-switch hints from verified cards first.
+- `current_gate`: preflight readiness, blockers, required-before-edit/deploy checks, and completion basis.
+- `historical_pitfalls`: matched issue bug-patterns and regressions.
+- `must_keep` / `avoid` / `required_checks`: rules to preserve before editing or closing out.
+- `recent_evidence` / `next_reads`: source refs to drill into only when needed.
+- `token_savers`: what the agent can skip, such as broad repo/issue scans or raw JSON/log reads.
+- `next_action`: the shortest safe next step.
+
+`resume` is not a new truth owner. It starts from indexed cards and owner exports, then tells the agent where truth lives. Dynamic facts such as current deploy state, domain binding, branch, or pod status still require live verification in their owner systems.
 
 ## Control Plane Contract
 

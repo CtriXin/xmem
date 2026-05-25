@@ -29,12 +29,13 @@ from .importers import (
 )
 from .project import detect_project, index_local, init_project
 from .preflight import build_preflight
+from .resume import build_resume
 from .search import latest_events, record_suppression, search_cards
 from .setup import setup_workspace
 from .source_check import check_source_exports, compact_source_health
 from .sources import audit_local_sources, index_registered_sources, load_sources, register_local_root, registered_roots, sources_path
 from .store import connect, rows
-from .toon import context_packet, llm_packet, preflight_packet
+from .toon import context_packet, llm_packet, preflight_packet, resume_packet
 from .util import emit_yaml, git_root, home_dir, real_user_home, utc_now
 
 
@@ -144,6 +145,14 @@ def build_parser() -> argparse.ArgumentParser:
     for name in ("domain", "service", "repo", "project", "task", "mode"):
         preflight.add_argument(f"--{name}", default="", help=argparse.SUPPRESS)
     preflight.add_argument("--json", action="store_true", help="输出 JSON")
+
+    resume = sub.add_parser("resume", help="接手已有任务：按 issue/domain/service 生成紧凑 task memory")
+    resume.add_argument("query", nargs="?", default="")
+    resume.add_argument("--limit", type=int, default=8)
+    resume.add_argument("--fields", nargs="*", default=[], metavar="KEY=VALUE", help="结构化 query 字段，如 issue=... domain=... service=... repo=... task=...")
+    for name in ("issue", "domain", "service", "repo", "project", "task", "mode"):
+        resume.add_argument(f"--{name}", default="", help=argparse.SUPPRESS)
+    resume.add_argument("--json", action="store_true", help="输出 JSON")
 
     suppress = sub.add_parser("suppress", help="标记某 card 对某 query 不相关，只影响 ranking")
     suppress.add_argument("--card", required=True, help="card id")
@@ -339,6 +348,25 @@ def main(argv: List[str] | None = None) -> int:
         else:
             print(preflight_packet(packet))
         return 0
+    if args.cmd == "resume":
+        current = None
+        try:
+            root = git_root(Path.cwd())
+            current = detect_project(root)
+        except Exception:
+            pass
+        structured_fields = collect_resume_fields(args)
+        query = resume_search_query(args.query, structured_fields)
+        cards = search_cards(query, max(args.limit * 4, 20), gain_event="resume")
+        for expanded_query in canonical_queries_from_corrections(query, cards):
+            cards = merge_cards(cards, search_cards(expanded_query, max(args.limit * 2, 10), record_gain=False))
+        events = latest_events(3)
+        packet = build_resume(query, current, cards, events, structured_fields=structured_fields, raw_query=args.query)
+        if args.json:
+            print(json.dumps(packet, ensure_ascii=False, indent=2))
+        else:
+            print(resume_packet(packet))
+        return 0
     if args.cmd == "suppress":
         row = record_suppression(args.card, args.for_query, args.reason)
         if args.json:
@@ -418,6 +446,8 @@ def help_cmd() -> int:
                 "- xmem context <query>     # 查历史项目、方法、证据，返回 LLM 好读 packet",
                 "- xmem preflight <query>   # 开发/修 bug 前查历史坑、must_keep、required checks",
                 "- xmem preflight --fields domain=... task=...  # Agent 用结构化字段，避免旧上下文污染",
+                "- xmem resume <query>      # 接手已有任务：身份、历史坑、gate、证据、下一步一包返回",
+                "- xmem resume --fields issue=... domain=... task=...  # fresh session / hook 推荐入口",
                 "- xmem check               # 改完前检查 invariant / rule / guardrail",
                 "- xmem gain                # 查看完整 telemetry / Top 查询 / Top Cards 面板",
                 "- xmem gain --summary      # 只看关键摘要",
@@ -821,6 +851,28 @@ def preflight_search_query(raw_query: str, fields: dict[str, str]) -> str:
         return raw_query
     parts: list[str] = []
     for key in ("domain", "service", "repo", "project", "task", "mode"):
+        value = fields.get(key)
+        if value:
+            parts.append(value)
+    if not fields.get("task") and raw_query:
+        parts.append(raw_query)
+    return " ".join(parts).strip() or raw_query
+
+
+def collect_resume_fields(args: argparse.Namespace) -> dict[str, str]:
+    fields = parse_key_items(list(getattr(args, "fields", []) or []))
+    for key in ("issue", "domain", "service", "repo", "project", "task", "mode"):
+        value = str(getattr(args, key, "") or "").strip()
+        if value:
+            fields[key] = value
+    return {key: value for key, value in fields.items() if value}
+
+
+def resume_search_query(raw_query: str, fields: dict[str, str]) -> str:
+    if not fields:
+        return raw_query
+    parts: list[str] = []
+    for key in ("issue", "domain", "service", "repo", "project", "task", "mode"):
         value = fields.get(key)
         if value:
             parts.append(value)

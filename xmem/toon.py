@@ -209,6 +209,71 @@ def preflight_packet(packet: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def resume_packet(packet: Dict[str, Any]) -> str:
+    """Emit a compact task-resume packet for agents taking over existing work."""
+    lines = ["xmem_resume:"]
+    for key in ("schema", "truth_policy", "intent", "query", "resume_summary", "next_action"):
+        lines.append(f"  {key}: {quote_scalar(compact(packet.get(key, ''), 260))}")
+    if packet.get("query_hash"):
+        lines.append(f"  query_hash: {quote_scalar(packet.get('query_hash', ''))}")
+    identity = packet.get("identity") or {}
+    lines.append("  identity:")
+    for key in ("resolution_status", "reason"):
+        lines.append(f"    {key}: {quote_scalar(compact(identity.get(key, ''), 220))}")
+    lines.append(f"    do_not_assume_single_project: {quote_scalar(identity.get('do_not_assume_single_project', ''))}")
+    current = identity.get("current") or {}
+    if current:
+        lines.append("    current:")
+        for key in ("project_id", "root", "branch", "git_sha", "tech_stack"):
+            lines.append(f"      {key}: {quote_scalar(compact(current.get(key, ''), 180))}")
+    traffic = identity.get("traffic_switch") or {}
+    if traffic:
+        lines.append("    traffic_switch:")
+        for item in traffic_item(traffic, 6):
+            lines.append(item)
+    registry = identity.get("registry_candidates") or []
+    lines.append(f"    registry_candidates[{len(registry)}]:")
+    for item in registry:
+        lines.extend(brief_item(item, 6))
+    gate = packet.get("current_gate") or {}
+    lines.append("  current_gate:")
+    for key in ("readiness", "severity", "risk_level", "action", "completion_basis"):
+        lines.append(f"    {key}: {quote_scalar(compact(gate.get(key, ''), 220))}")
+    lines.append(f"    can_proceed: {quote_scalar(gate.get('can_proceed', ''))}")
+    for section in ("blockers", "required_before_edit", "required_before_deploy"):
+        items = gate.get(section) or []
+        lines.append(f"    {section}[{len(items)}]:")
+        for item in items[:8]:
+            if isinstance(item, dict):
+                lines.append(f"      - code: {quote_scalar(item.get('code', ''))}")
+                lines.append(f"        text: {quote_scalar(compact(item.get('text', ''), 200))}")
+            else:
+                lines.append(f"      - {quote_scalar(compact(item, 220))}")
+    for section in ("historical_pitfalls", "invariants", "methods"):
+        items = packet.get(section) or []
+        lines.append(f"  {section}[{len(items)}]:")
+        for item in items[:8]:
+            lines.extend(brief_item(item, 4))
+    for section in ("must_keep", "avoid", "required_checks"):
+        items = packet.get(section) or []
+        lines.append(f"  {section}[{len(items)}]:")
+        for item in items[:10]:
+            lines.append(f"    - text: {quote_scalar(compact(item.get('text', ''), 220))}")
+            lines.append(f"      card_id: {quote_scalar(item.get('card_id', ''))}")
+            lines.append(f"      truth: {quote_scalar(item.get('truth', ''))}")
+    for section in ("token_savers", "recent_evidence", "next_reads", "warnings"):
+        items = packet.get(section) or []
+        lines.append(f"  {section}[{len(items)}]:")
+        for item in items[:12]:
+            lines.append(f"    - {quote_scalar(compact(item, 240))}")
+    freshness = packet.get("source_freshness") or {}
+    if freshness:
+        lines.append("  source_freshness:")
+        for key in ("status", "stale_exports", "registry"):
+            lines.append(f"    {key}: {quote_scalar(freshness.get(key, ''))}")
+    return "\n".join(lines)
+
+
 def brief_item(item: Dict[str, Any], indent: int) -> List[str]:
     pad = " " * indent
     sub = " " * (indent + 2)
