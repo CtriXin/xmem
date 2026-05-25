@@ -12,6 +12,7 @@ from .checks import check_diff
 from .code_index import code_index_status, import_code_indexes
 from .context import build_context, canonical_queries_from_corrections
 from .gain import format_card_gain_dashboard, format_gain_dashboard, record_gain_confirmation, summarize_card_gain, summarize_gain
+from .gateway import run_gateway
 from .health import backup_health, build_doctor_report
 from .hooks import outbox_counts, run_hook
 from .importers import (
@@ -35,7 +36,7 @@ from .setup import setup_workspace
 from .source_check import check_source_exports, compact_source_health
 from .sources import audit_local_sources, index_registered_sources, load_sources, register_local_root, registered_roots, sources_path
 from .store import connect, rows
-from .toon import context_packet, llm_packet, preflight_packet, resume_packet
+from .toon import context_packet, gateway_packet, llm_packet, preflight_packet, resume_packet
 from .util import emit_yaml, git_root, home_dir, real_user_home, utc_now
 
 
@@ -153,6 +154,19 @@ def build_parser() -> argparse.ArgumentParser:
     for name in ("issue", "domain", "service", "repo", "project", "task", "mode"):
         resume.add_argument(f"--{name}", default="", help=argparse.SUPPRESS)
     resume.add_argument("--json", action="store_true", help="输出 JSON")
+
+    gateway = sub.add_parser("gateway", help="Agent 入口层：自动判断是否注入 xmem compact memory")
+    gateway.add_argument("query", nargs="?", default="")
+    gateway.add_argument("--cwd", default=".", help="任务所在工作目录，默认当前目录")
+    gateway.add_argument("--event", default="pre-task", help="事件：session-start/pre-task/pre-tool/tool-error/closeout/manual")
+    gateway.add_argument("--limit", type=int, default=8)
+    gateway.add_argument("--budget", type=int, default=700, help="输出预算提示，默认 700")
+    gateway.add_argument("--fields", nargs="*", default=[], metavar="KEY=VALUE", help="结构化字段，如 issue=... domain=... service=... task=...")
+    for name in ("issue", "domain", "service", "repo", "project", "task", "mode"):
+        gateway.add_argument(f"--{name}", default="", help=argparse.SUPPRESS)
+    gateway.add_argument("--format", choices=["toon", "text", "json"], default="toon", help="输出格式，默认 toon")
+    gateway.add_argument("--json", action="store_true", help="输出 JSON（等同 --format json）")
+    gateway.add_argument("--dry-run", action="store_true", help="只展示 would inject/skip，不代表已注入")
 
     suppress = sub.add_parser("suppress", help="标记某 card 对某 query 不相关，只影响 ranking")
     suppress.add_argument("--card", required=True, help="card id")
@@ -367,6 +381,22 @@ def main(argv: List[str] | None = None) -> int:
         else:
             print(resume_packet(packet))
         return 0
+    if args.cmd == "gateway":
+        structured_fields = collect_gateway_fields(args)
+        packet = run_gateway(
+            args.query,
+            fields=structured_fields,
+            cwd=Path(args.cwd),
+            event=args.event,
+            limit=args.limit,
+            budget=args.budget,
+            dry_run=args.dry_run,
+        )
+        if args.json or args.format == "json":
+            print(json.dumps(packet, ensure_ascii=False, indent=2))
+        else:
+            print(gateway_packet(packet))
+        return 0
     if args.cmd == "suppress":
         row = record_suppression(args.card, args.for_query, args.reason)
         if args.json:
@@ -448,6 +478,7 @@ def help_cmd() -> int:
                 "- xmem preflight --fields domain=... task=...  # Agent 用结构化字段，避免旧上下文污染",
                 "- xmem resume <query>      # 接手已有任务：身份、历史坑、gate、证据、下一步一包返回",
                 "- xmem resume --fields issue=... domain=... task=...  # fresh session / hook 推荐入口",
+                "- xmem gateway <query>     # Agent 入口层自动判断 skip/inject；给 MMS/hook 内部用",
                 "- xmem check               # 改完前检查 invariant / rule / guardrail",
                 "- xmem gain                # 查看完整 telemetry / Top 查询 / Top Cards 面板",
                 "- xmem gain --summary      # 只看关键摘要",
@@ -879,6 +910,15 @@ def resume_search_query(raw_query: str, fields: dict[str, str]) -> str:
     if not fields.get("task") and raw_query:
         parts.append(raw_query)
     return " ".join(parts).strip() or raw_query
+
+
+def collect_gateway_fields(args: argparse.Namespace) -> dict[str, str]:
+    fields = parse_key_items(list(getattr(args, "fields", []) or []))
+    for key in ("issue", "domain", "service", "repo", "project", "task", "mode"):
+        value = str(getattr(args, key, "") or "").strip()
+        if value:
+            fields[key] = value
+    return {key: value for key, value in fields.items() if value}
 
 
 def prompt(label: str, default: str = "", allow_blank: bool = False) -> str:

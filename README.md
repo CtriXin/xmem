@@ -2,7 +2,18 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.40`.
+Current package version: `0.1.41`.
+
+## What's New in 0.1.41
+
+This release adds `xmem gateway`, the thin center layer for MMS/Codex/Claude/OpenCode hooks. It avoids editing every skill just to remember xmem.
+
+- `xmem gateway "<user request>" --cwd "$PWD"` returns `decision: inject|skip` and only injects compact memory for domain/service/deploy/COS/copy-domain/history/bugfix-shaped tasks.
+- `xmem gateway --fields issue=... domain=... service=... task=... --format toon --budget 700` lets routers pass clean structured targets without noisy old context.
+- Gateway output is fail-open: if xmem is unavailable, empty, irrelevant, or low-value, callers should skip and continue normal repo inspection.
+- Gateway packets combine the useful parts of `resume` and `preflight`: identity, current gate, historical pitfalls, must_keep/avoid, required checks, token_savers, evidence refs, and next_action.
+- Gateway redacts common secret syntaxes before printing/logging compact output, including bearer tokens, CLI `--token`, cookies, webhook URLs, and key/password-style fields.
+- Simple local edits skip without searching the registry, keeping xmem cheap enough to sit at an entry layer.
 
 ## What's New in 0.1.40
 
@@ -49,6 +60,7 @@ Public boundary: xmem does not require or bundle SCMP, Project Wiki, Issue Recor
 The latest stable pickup point is:
 
 - `docs/updates/2026-05-25-copy-domain-resolution-memory.md`
+- `docs/updates/2026-05-25-xmem-gateway.md`
 - `docs/updates/2026-05-25-coscli-isolated-env-memory.md`
 - `docs/updates/2026-05-25-xmem-resume.md`
 - `docs/context/agent-resume-2026-05-25.md`
@@ -70,6 +82,7 @@ Read these first when a future agent needs to resume xmem work without transcrip
 - Return SCMP traffic-switch packets when a verified relation card matches a domain/service/template query.
 - Return development preflight packets that surface historical bug patterns before edits.
 - Return resume packets for taking over existing tasks without reading long handoffs first.
+- Return gateway decisions so launchers can auto-inject compact memory only when useful.
 - Track xmem telemetry and rough, uncalibrated savings hints with `xmem gain`.
 
 ## Quick start
@@ -84,6 +97,7 @@ xmem preflight "ads lazyload change"
 xmem preflight --fields domain=example.com task="ads lazyload change"
 xmem resume "issue slug or domain"
 xmem resume --fields issue=demo-issue domain=example.com task="ads lazyload change"
+xmem gateway "user request" --cwd "$PWD" --format toon
 xmem context "how did we add ads before"
 xmem why "car ads lazyload"
 xmem open ads.lazyload
@@ -195,6 +209,20 @@ Registry rebuilds are atomic: `xmem sync` builds a temporary SQLite index and sw
 `xmem status` also reports `next_actions`, xmem-backup health, and registered local `.xmem/cards`. Generated identity cards may remain local, but non-identity rule/method/correction cards are flagged as `local_only_knowledge` when they are ignored or untracked by git. That warning means xmem can read them on this machine, but they are not portable through git until the owning project decides to track or export them. Context and preflight packets include compact `local_source_health` when matched cards come from a non-portable local source, so agents know when the evidence is machine-local without adding noise to unrelated queries.
 
 `xmem doctor` is the single maintenance view. It combines registry state, source export health, local-card portability, outbox counts, xmem-backup state, and current repo registration. Use it when `status` says there is a warning or before handing work to another agent.
+
+## Gateway packets
+
+Use `xmem gateway` from launchers and hooks, not as a daily human command. It is the center entry layer that decides whether xmem should stay silent or inject a compact packet.
+
+```bash
+xmem gateway "修 buildaringfarm.net COS deploy，coscli 报 secretID is missing" --cwd "$PWD"
+xmem gateway --fields issue=t102746 task="crypto模版一 复制域名 4638" --format toon --budget 700
+xmem gateway "改 README 文案" --json
+```
+
+The gateway first checks the task shape. It searches the registry only for domain/service/deploy/COS/copy-domain/history/bugfix-style requests or when structured target fields exist. Simple local edits return `decision: skip` without registry search.
+
+When it injects, the packet contains the compact subset a launcher needs: identity, current gate, historical pitfalls, invariants, must_keep/avoid, required checks, token_savers, evidence refs, and next_action. It is fail-open and not a truth owner; dynamic runtime state still needs live verification.
 
 ## Resume packets
 
@@ -362,7 +390,7 @@ When a longer query contains a verified compact alias such as `网文二 repo va
 
 `xmem gain` summarizes lookup, `context`, `preflight`, and `check` telemetry from `~/.xmem/gain.jsonl`. The default view is now the full event/query/card dashboard. Use `xmem gain --summary` for the short key summary with real confidence result, confirmed-vs-rough tokens, hit overview, risk signals, top query order, and the few queries that most need review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. In detail view, `Top 查询` aggregates query text, while `Top Cards` aggregates `top_card` ids from retrieval logs. Top card status/confidence is hydrated from the current registry when old gain rows did not record it. The `Top Card 解释` section shows common/recent queries, sources, avg score, and top why for noisy cards. Use `xmem gain card <id>` to inspect one card's common queries and recent hits. The bar column is `粗估占比`: relative rough-token share inside that section, not progress or confirmed savings. `xmem gain --detail` remains as a compatibility alias for the default full dashboard.
 
-Hit/miss/pass/prevented are log counts; `hit` only means candidates were returned. Token savings are rough, uncalibrated estimates for context/preflight matches only, not billing truth. Risk hints come from rule warnings, not confirmed production bugs. By default, `xmem gain` reads all gain rows; use `--limit N` only when you want a recent slice.
+Hit/miss/pass/prevented are log counts; `hit` only means candidates were returned. Token savings are rough, uncalibrated estimates for context/preflight/resume/gateway-inject matches, not billing truth. Risk hints come from rule warnings, not confirmed production bugs. By default, `xmem gain` reads all gain rows; use `--limit N` only when you want a recent slice.
 
 The gain dashboard self-calibrates its own confidence labels. It reports whether the current data is only telemetry/proxy or partially calibrated, surfaces high rough estimates that need review, and records future match quality fields such as `top_score`, `top_status`, and `top_why`.
 

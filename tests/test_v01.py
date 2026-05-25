@@ -1240,6 +1240,101 @@ def test_resume_routes_crypto_template_copy_domain_task(tmp_path: Path):
     assert "ptc-temp-crypto-adx" in text_packet
 
 
+def test_gateway_skips_simple_local_task_without_search(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(run([str(XMEM), "gateway", "改一下 README 文案", "--json"], repo, env).stdout)
+
+    assert packet["schema"] == "xmem.gateway.v1"
+    assert packet["decision"] == "skip"
+    assert packet["action"] == "skip"
+    assert packet["search"]["matches"] == 0
+    assert packet["packet"] == {}
+
+
+def test_gateway_injects_coscli_memory_packet(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(
+        run(
+            [
+                str(XMEM),
+                "gateway",
+                "coscli secretID is missing COS deploy isolated HOME buildaringfarm.net",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+    text_packet = run(
+        [
+            str(XMEM),
+            "gateway",
+            "coscli secretID is missing COS deploy isolated HOME buildaringfarm.net",
+        ],
+        repo,
+        env,
+    ).stdout
+
+    assert packet["decision"] == "inject"
+    assert packet["action"] == "resume+preflight"
+    assert packet["confidence"] == "high"
+    assert packet["search"]["top_card"] == "scmp.coscli.isolated-home-env"
+    assert any(item["id"] == "scmp.coscli.isolated-home-env" for item in packet["packet"]["invariants"])
+    assert any("HOME=/Users/xin" in item["text"] for item in packet["packet"]["must_keep"])
+    assert "xmem_gateway:" in text_packet
+    assert "scmp.coscli.isolated-home-env" in text_packet
+
+
+def test_gateway_uses_structured_fields_for_copy_domain(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(
+        run(
+            [
+                str(XMEM),
+                "gateway",
+                "--fields",
+                "issue=t102746",
+                "task=crypto模版一 复制域名 4638",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+
+    assert packet["decision"] == "inject"
+    assert packet["action"] == "resume+preflight"
+    assert packet["query_input"]["structured_fields"]["issue"] == "t102746"
+    assert any(item["id"] == "scmp.rule.copy-domain-resolve-by-sibling-template" for item in packet["packet"]["invariants"])
+    assert any("lookup miss" in item for item in packet["packet"]["token_savers"])
+
+
+def test_gateway_redacts_secret_like_input_before_output(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+
+    stdout = run(
+        [
+            str(XMEM),
+            "gateway",
+            "deploy Authorization: Bearer abc123 --token realtoken password = hello world",
+            "--json",
+        ],
+        repo,
+        env,
+    ).stdout
+
+    assert "abc123" not in stdout
+    assert "realtoken" not in stdout
+    assert "hello world" not in stdout
+    assert "<redacted>" in stdout
+
+
 def test_check_sources_reports_export_shape_errors(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     export = tmp_path / "project-wiki" / "data" / "xmem-export.cards.jsonl"

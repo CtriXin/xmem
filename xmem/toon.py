@@ -274,6 +274,105 @@ def resume_packet(packet: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def gateway_packet(packet: Dict[str, Any]) -> str:
+    """Emit the memory-gateway decision in a small agent-facing shape."""
+    lines = ["xmem_gateway:"]
+    for key in ("schema", "truth_policy", "decision", "action", "reason", "confidence", "event"):
+        lines.append(f"  {key}: {quote_scalar(compact(packet.get(key, ''), 240))}")
+    lines.append(f"  dry_run: {quote_scalar(packet.get('dry_run', ''))}")
+    lines.append(f"  budget: {quote_scalar(packet.get('budget', ''))}")
+    categories = packet.get("categories") or []
+    lines.append(f"  categories[{len(categories)}]:")
+    for item in categories[:8]:
+        lines.append(f"    - {quote_scalar(item)}")
+    query_input = packet.get("query_input") or {}
+    lines.append("  query_input:")
+    for key in ("raw_query", "search_query", "cwd"):
+        lines.append(f"    {key}: {quote_scalar(compact(query_input.get(key, ''), 220))}")
+    fields = query_input.get("structured_fields") or {}
+    lines.append(f"    structured_fields[{len(fields)}]:")
+    for key, value in fields.items():
+        lines.append(f"      {key}: {quote_scalar(compact(value, 160))}")
+    search = packet.get("search") or {}
+    lines.append("  search:")
+    for key in ("matches", "top_card", "top_score", "top_status", "top_confidence", "top_source"):
+        lines.append(f"    {key}: {quote_scalar(search.get(key, ''))}")
+    sources = search.get("sources") or []
+    lines.append(f"    sources[{len(sources)}]:")
+    for item in sources[:6]:
+        lines.append(f"      - {quote_scalar(item)}")
+    memory = packet.get("packet") or {}
+    if memory:
+        lines.append("  packet:")
+        identity = memory.get("identity") or {}
+        lines.append("    identity:")
+        for key in ("resolution_status", "reason"):
+            lines.append(f"      {key}: {quote_scalar(compact(identity.get(key, ''), 180))}")
+        lines.append(f"      do_not_assume_single_project: {quote_scalar(identity.get('do_not_assume_single_project', ''))}")
+        current = identity.get("current") or {}
+        if current:
+            lines.append("      current:")
+            for key in ("project_id", "root", "branch", "git_sha", "tech_stack"):
+                lines.append(f"        {key}: {quote_scalar(compact(current.get(key, ''), 160))}")
+        traffic = identity.get("traffic_switch") or {}
+        if traffic:
+            lines.append("      traffic_switch:")
+            for item in traffic_item(traffic, 8):
+                lines.append(item)
+        registry = identity.get("registry_candidates") or []
+        lines.append(f"      registry_candidates[{len(registry)}]:")
+        for item in registry[:4]:
+            lines.extend(gateway_brief_item(item, 8))
+        gate = memory.get("current_gate") or {}
+        lines.append("    current_gate:")
+        for key in ("readiness", "severity", "risk_level", "action", "completion_basis"):
+            lines.append(f"      {key}: {quote_scalar(compact(gate.get(key, ''), 180))}")
+        lines.append(f"      can_proceed: {quote_scalar(gate.get('can_proceed', ''))}")
+        for section in ("historical_pitfalls", "invariants", "methods"):
+            items = memory.get(section) or []
+            lines.append(f"    {section}[{len(items)}]:")
+            for item in items[:4]:
+                lines.extend(gateway_brief_item(item, 6))
+        for section in ("must_keep", "avoid", "required_checks"):
+            items = memory.get(section) or []
+            lines.append(f"    {section}[{len(items)}]:")
+            for item in items[:6]:
+                lines.append(f"      - text: {quote_scalar(compact(item.get('text', ''), 180))}")
+                lines.append(f"        card_id: {quote_scalar(item.get('card_id', ''))}")
+                lines.append(f"        truth: {quote_scalar(item.get('truth', ''))}")
+        for section in ("token_savers", "recent_evidence"):
+            items = memory.get(section) or []
+            lines.append(f"    {section}[{len(items)}]:")
+            for item in items[:6]:
+                lines.append(f"      - {quote_scalar(compact(item, 180))}")
+        lines.append(f"    next_action: {quote_scalar(compact(memory.get('next_action', ''), 220))}")
+    warnings = packet.get("warnings") or []
+    lines.append(f"  warnings[{len(warnings)}]:")
+    for item in warnings[:8]:
+        lines.append(f"    - {quote_scalar(compact(item, 200))}")
+    next_reads = packet.get("next_reads") or []
+    lines.append(f"  next_reads[{len(next_reads)}]:")
+    for item in next_reads[:8]:
+        lines.append(f"    - {quote_scalar(compact(item, 180))}")
+    return "\n".join(lines)
+
+
+def gateway_brief_item(item: Dict[str, Any], indent: int) -> List[str]:
+    pad = " " * indent
+    sub = " " * (indent + 2)
+    source_ref = item.get("source_ref") or item.get("source_path") or item.get("evidence_ref") or ""
+    return [
+        f"{pad}- id: {quote_scalar(compact(item.get('id', ''), 80))}",
+        f"{sub}type: {quote_scalar(item.get('type', ''))}",
+        f"{sub}truth: {quote_scalar(item.get('truth', ''))}",
+        f"{sub}score: {quote_scalar(item.get('score', ''))}",
+        f"{sub}source: {quote_scalar(item.get('source', ''))}",
+        f"{sub}title: {quote_scalar(compact(item.get('title', ''), 110))}",
+        f"{sub}why: {quote_scalar(compact(item.get('why', ''), 120))}",
+        f"{sub}source_ref: {quote_scalar(compact(source_ref, 140))}",
+    ]
+
+
 def brief_item(item: Dict[str, Any], indent: int) -> List[str]:
     pad = " " * indent
     sub = " " * (indent + 2)

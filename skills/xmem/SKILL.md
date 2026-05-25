@@ -11,8 +11,9 @@ Truth rule: `.xmem/*.yaml`, source Markdown, code, git, runtime APIs, and human 
 
 ## What's New
 
-`xmem 0.1.40` adds copy-domain resolution memory on top of the COS isolated-env guard and `resume` takeover packet. The supported path is:
+`xmem 0.1.41` adds `xmem gateway`, a thin launcher/hook layer that decides `inject` vs `skip` before normal skills run. The supported path is:
 
+- `xmem gateway <user request>` is for MMS/Codex/Claude/OpenCode entry layers. It searches only for domain/service/deploy/COS/copy-domain/history/bugfix-shaped tasks, returns compact memory when useful, and skips simple local edits.
 - `xmem resume <issue|domain|service|query>` combines context routing and preflight guardrails into compact task memory for fresh sessions.
 - `xmem resume --fields issue=... domain=... service=... task=...` lets hooks/agents avoid old-context pollution.
 - Built-in SCMP cards now recall `coscli secretID is missing` as a likely isolated HOME / real credential path issue before long config debugging loops.
@@ -35,6 +36,7 @@ xmem preflight "query"
 xmem preflight --fields domain=example.com task="query"
 xmem resume "query"
 xmem resume --fields issue=demo domain=example.com task="query"
+xmem gateway "query" --cwd "$PWD" --format toon
 xmem context "query"
 xmem why "query"
 xmem open "query"
@@ -50,17 +52,20 @@ xmem gain card <id>
 ## Workflow
 
 1. Run `xmem setup` on a new machine/workspace when xmem has not been configured yet.
-2. Run `xmem resume "<issue|domain|service|task>"` when taking over an existing task, cross-project/domain/service/deploy/COS/copy-domain task, historical bug, or fresh session before reading long handoffs.
-3. Run `xmem preflight "<task>"` before development or bugfix edits to surface historical bug-patterns, invariants, and required checks.
-4. Run `xmem context "<task>"` before broad repo traversal or project selection.
-5. If `source_freshness.status` is not `fresh`, run `xmem sync` before relying on the packet.
-6. Trust only cards marked `verified`; treat `inferred`, `partial`, `stale`, `unknown`, and `disputed` as hints.
-7. For edits that hit a feature with invariant cards, run `xmem check` before final response.
-8. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
-9. Use `xmem gain` when asked what xmem saved.
-10. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
+2. Launchers/hooks should run `xmem gateway "<user request>" --cwd "$PWD"` before normal skill routing; obey `decision: inject|skip`.
+3. Run `xmem resume "<issue|domain|service|task>"` when taking over an existing task, cross-project/domain/service/deploy/COS/copy-domain task, historical bug, or fresh session before reading long handoffs.
+4. Run `xmem preflight "<task>"` before development or bugfix edits to surface historical bug-patterns, invariants, and required checks.
+5. Run `xmem context "<task>"` before broad repo traversal or project selection.
+6. If `source_freshness.status` is not `fresh`, run `xmem sync` before relying on the packet.
+7. Trust only cards marked `verified`; treat `inferred`, `partial`, `stale`, `unknown`, and `disputed` as hints.
+8. For edits that hit a feature with invariant cards, run `xmem check` before final response.
+9. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
+10. Use `xmem gain` when asked what xmem saved.
+11. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
 
 `xmem setup` is generic onboarding. It creates `~/.xmem` docs/config, registers the current repo or `--root` workspace roots, can initialize repo-local `.xmem` identity files, and can create a shared memory repo via `--memory-repo`. It must not require SCMP, Project Wiki, Issue Record, Feishu/Lark, Jira, Linear, or any private adapter. Use `--register-only` if writing `.xmem` into discovered repos would be too invasive.
+
+`xmem gateway` is the auto-use layer. It should be called by launchers/hooks before skill routing, not manually by the user. If it returns `decision: skip`, continue normally and do not mention xmem. If it returns `decision: inject`, read the compact `packet` and continue normal work. Gateway is fail-open and redacts common secret syntaxes before output/logging.
 
 `xmem resume` is the takeover packet. Use it before reading long handoffs or full skill docs when the user gives an issue slug, domain, service, repo, or task phrase. Read `identity`, `current_gate`, `historical_pitfalls`, `must_keep`, `avoid`, `required_checks`, `recent_evidence`, `token_savers`, and `next_action`. It is a read model, not a truth owner: live runtime state, current deploy status, and dynamic bindings still need owner-system verification.
 

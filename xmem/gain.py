@@ -655,7 +655,7 @@ def format_gain_detail_dashboard(data: Dict[str, object], *, color: bool = False
         metric("估算字段(非事实)", "理论少读 tokens；不是账单/真实省量", color, value_style="dim"),
         metric("命中口径", "hit=搜到候选，不代表人工确认正确", color, value_style="dim"),
         metric("收益口径", "未校准，只能看趋势，不能证明立竿见影", color, value_style="dim"),
-        metric("token 估算公式", "context/preflight matches * 1200", color, value_style="dim"),
+        metric("token 估算公式", "context/preflight/resume/gateway-inject matches * 1200", color, value_style="dim"),
         metric("条形口径", "粗估占比=本区块内相对 rough token；不是进度/真实收益", color, value_style="dim"),
         metric(
             "自校准状态",
