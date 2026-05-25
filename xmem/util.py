@@ -31,6 +31,10 @@ def home_dir() -> Path:
 
 
 def real_user_home() -> Path:
+    for key in ("XMEM_HOST_HOME", "MMS_HOST_HOME", "HOST_HOME", "REAL_HOME", "MMS_REAL_HOME", "ORIGINAL_HOME"):
+        value = os.environ.get(key)
+        if value:
+            return Path(value).expanduser()
     try:
         return Path(pwd.getpwuid(os.getuid()).pw_dir).expanduser()
     except Exception:

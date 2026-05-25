@@ -7,7 +7,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from xmem.util import query_terms
+from xmem.util import query_terms, real_user_home
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -89,6 +89,12 @@ def test_multi_word_query_terms_keep_project_and_ads_tokens():
     assert "group_n" in terms
     assert "adstxt" in terms
     assert "ptc-intention-informationads.txtgroup_nadstxt" not in terms
+
+
+def test_real_user_home_prefers_explicit_host_env(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("XMEM_HOST_HOME", str(tmp_path / "host-home"))
+
+    assert real_user_home() == tmp_path / "host-home"
 
 
 def test_setup_creates_generic_workspace_and_syncs_without_private_sources(tmp_path: Path):
