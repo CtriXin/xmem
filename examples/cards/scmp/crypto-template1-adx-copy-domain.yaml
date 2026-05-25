@@ -1,0 +1,81 @@
+id: scmp.identity.crypto-template1-adx-copy-domain
+type: identity
+title: crypto模版一 ADX copy-domain route
+scope:
+  system: scmp
+  project: ptc_ssr_crypto
+  feature: copy-domain
+aliases:
+  - t102746
+  - t102746 crypto模版一
+  - t102746 crypto 模版一
+  - crypto模版一 复制域名
+  - crypto模版一 ADX-4638
+  - Crypto Template1 ADX
+  - ptc-temp-crypto-adx
+  - ptc_ssr_crypto
+  - trelixi.com
+  - relsona.com
+  - valtrixi.com
+  - zeltvia.com
+  - tremisso.com
+  - coindomax.com
+  - cointomay.com
+  - cryptimx.com
+  - coinhubtime.com
+  - cryptmaxy.com
+truth:
+  status: verified
+  confidence: 0.88
+  basis:
+    - project_wiki_index
+    - issue_record
+    - scmp_closeout_evidence
+  last_checked_at: 2026-05-25T07:20:00Z
+  use_policy: routing_identity_only; live_verify_domain_binding_branch_and_deploy_state
+summary: For t102746 / ADX-4638 copy-domain tasks, crypto模版一 routes to repo ptc/fe/ptc_ssr_crypto and service ptc-temp-crypto-adx; use old sibling domains to resolve the service before new domains are bound.
+project: ptc_ssr_crypto
+service: ptc-temp-crypto-adx
+repo: git@gitlab.adsconflux.xyz:ptc/fe/ptc_ssr_crypto.git
+local_path_hint: /Users/xin/ptc_ssr_crypto__t102746_crypto_template1_4638
+branch_hint: t102746-crypto-template1-4638-20260525
+task_id: t102746
+feishu_guid: 10c5d007-46b6-4de0-98e3-ff5c3424fe18
+template: crypto模版一
+account: ADX-4638
+publisher: pub-6805566509184638
+ads_group: group_37
+old_sibling_domains:
+  - coindomax.com
+  - cointomay.com
+  - cryptimx.com
+  - coinhubtime.com
+  - newstechni.com
+  - cryptmaxy.com
+target_domains_observed:
+  - trelixi.com
+  - www.trelixi.com
+  - relsona.com
+  - www.relsona.com
+  - valtrixi.com
+  - www.valtrixi.com
+  - zeltvia.com
+  - www.zeltvia.com
+  - tremisso.com
+  - www.tremisso.com
+required_checks:
+  - Verify all apex/www target domains bind to ptc-temp-crypto-adx after ops completes.
+  - Verify title, /ads.txt publisher/group_37, GPT slots, content route, first-party assets, safe-access, delayed verification, purge, and after-purge verification.
+stale_policy:
+  - This card is a routing identity for known copy-domain/ad config work, not proof of current binding or deploy state.
+  - Branch/version/pipeline hints are task-scoped and must be live-verified before release.
+  - New target domains may legitimately miss lookup before ops binding; old sibling domains are the resolution path.
+evidence:
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ptc_ssr_crypto/t102746-crypto-template1-4638-20260525/issue.md
+  - kind: source-summary
+    path: /Users/xin/issue-tracking/issues/ptc_ssr_crypto/t102746-crypto-template1-4638-20260525/source-summary.md
+  - kind: project-wiki-pending
+    path: /Users/xin/project-wiki/data/agent-inbox.jsonl:107#wr_scmp_t102746
+  - kind: retrospective
+    path: /Users/xin/feature-update/.ai/retrospectives/t102746-xmem-scmpops-retro-20260525.md

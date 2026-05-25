@@ -1190,6 +1190,56 @@ def test_resume_surfaces_coscli_token_savers(tmp_path: Path):
     assert any("coscli-isolated-home.yaml" in item for item in packet["recent_evidence"])
 
 
+def test_preflight_recalls_copy_domain_resolution_guard(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(
+        run(
+            [
+                str(XMEM),
+                "preflight",
+                "t102746 crypto模版一 新建复制域名 新域名查不到",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+    text_packet = run(
+        [
+            str(XMEM),
+            "preflight",
+            "t102746 crypto模版一 新建复制域名 新域名查不到",
+        ],
+        repo,
+        env,
+    ).stdout
+
+    assert packet["readiness"] == "ready_with_guards"
+    assert any(item["id"] == "scmp.rule.copy-domain-resolve-by-sibling-template" for item in packet["invariants"])
+    assert any("do not conclude" in item["text"] for item in packet["must_keep"])
+    assert any("lookup miss" in item["text"] for item in packet["avoid"])
+    assert any("old sibling domains" in item["text"] for item in packet["required_checks"])
+    assert "scmp.rule.copy-domain-resolve-by-sibling-template" in text_packet
+
+
+def test_resume_routes_crypto_template_copy_domain_task(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(run([str(XMEM), "resume", "t102746 crypto模版一 复制域名 4638", "--json"], repo, env).stdout)
+    text_packet = run([str(XMEM), "resume", "t102746 crypto模版一 复制域名 4638"], repo, env).stdout
+
+    assert packet["schema"] == "xmem.resume.v1"
+    assert packet["current_gate"]["readiness"] == "ready_with_guards"
+    assert any(item["id"] == "scmp.identity.crypto-template1-adx-copy-domain" for item in packet["identity"]["registry_candidates"])
+    assert any(item["id"] == "scmp.rule.copy-domain-resolve-by-sibling-template" for item in packet["invariants"])
+    assert any("lookup miss" in item for item in packet["token_savers"])
+    assert any("ptc_ssr_crypto" in item for item in packet["recent_evidence"])
+    assert "ptc-temp-crypto-adx" in text_packet
+
+
 def test_check_sources_reports_export_shape_errors(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     export = tmp_path / "project-wiki" / "data" / "xmem-export.cards.jsonl"

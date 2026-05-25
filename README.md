@@ -2,7 +2,16 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.39`.
+Current package version: `0.1.40`.
+
+## What's New in 0.1.40
+
+This release adds the t102746 copy-domain resolution memory so xmem can help even when a task is not launched through scmp-ops.
+
+- `scmp.rule.copy-domain-resolve-by-sibling-template` tells agents that new copied domains may miss lookup/rf and must be resolved through template name, old sibling domains, Project Wiki/Issue history, or repo config before asking the user for service identity.
+- `scmp.identity.crypto-template1-adx-copy-domain` gives a compact routing identity for `t102746 / crypto模版一 / ADX-4638`: repo `ptc/fe/ptc_ssr_crypto`, service `ptc-temp-crypto-adx`, old sibling domains, target domains, and required verification hints.
+- `xmem resume "t102746 crypto模版一 复制域名 4638"` now surfaces the service/repo route, copy-domain guard, token_savers, evidence refs, and live-verification boundary.
+- `xmem` skill guidance now explicitly tells non-SCMP agents to use `xmem resume/preflight` for cross-project, domain/service, deploy, COS, copy-domain, or historical-bug tasks.
 
 ## What's New in 0.1.39
 
@@ -39,6 +48,7 @@ Public boundary: xmem does not require or bundle SCMP, Project Wiki, Issue Recor
 
 The latest stable pickup point is:
 
+- `docs/updates/2026-05-25-copy-domain-resolution-memory.md`
 - `docs/updates/2026-05-25-coscli-isolated-env-memory.md`
 - `docs/updates/2026-05-25-xmem-resume.md`
 - `docs/context/agent-resume-2026-05-25.md`

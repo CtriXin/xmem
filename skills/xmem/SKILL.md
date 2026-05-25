@@ -1,6 +1,6 @@
 ---
 name: xmem
-description: Use when the user asks for xmem, cross-project memory, project truth index, finding prior similar project work, preserving feature invariants, importing Project Wiki / issue-tracking evidence, or compact agent context for existing projects.
+description: Use when the user asks for xmem, cross-project memory, project truth index, prior similar project work, domain/service/deploy/COS/copy-domain routing, preserving feature invariants, importing Project Wiki / issue-tracking evidence, or compact agent context for existing projects.
 ---
 
 # xmem
@@ -11,11 +11,12 @@ Truth rule: `.xmem/*.yaml`, source Markdown, code, git, runtime APIs, and human 
 
 ## What's New
 
-`xmem 0.1.39` adds the COS isolated-env guard on top of the `resume` takeover packet while keeping the 0.1.37 public-onboarding boundary. The supported path is:
+`xmem 0.1.40` adds copy-domain resolution memory on top of the COS isolated-env guard and `resume` takeover packet. The supported path is:
 
 - `xmem resume <issue|domain|service|query>` combines context routing and preflight guardrails into compact task memory for fresh sessions.
 - `xmem resume --fields issue=... domain=... service=... task=...` lets hooks/agents avoid old-context pollution.
 - Built-in SCMP cards now recall `coscli secretID is missing` as a likely isolated HOME / real credential path issue before long config debugging loops.
+- Built-in SCMP cards now recall new copy-domain tasks where lookup/rf misses should route through template names and old sibling domains.
 - `xmem setup` creates `~/.xmem`, generic docs/config/schema examples, and project/source registrations.
 - MMS public installs can opt in with `bash install.sh --install-xmem`; `--dry-run` previews the write/install/setup plan without changing files.
 - Installer-style setup should use `--register-only` when low-touch onboarding matters; avoid writing repo-local `.xmem` into many repos automatically.
@@ -49,7 +50,7 @@ xmem gain card <id>
 ## Workflow
 
 1. Run `xmem setup` on a new machine/workspace when xmem has not been configured yet.
-2. Run `xmem resume "<issue|domain|service|task>"` when taking over an existing task or fresh session before reading long handoffs.
+2. Run `xmem resume "<issue|domain|service|task>"` when taking over an existing task, cross-project/domain/service/deploy/COS/copy-domain task, historical bug, or fresh session before reading long handoffs.
 3. Run `xmem preflight "<task>"` before development or bugfix edits to surface historical bug-patterns, invariants, and required checks.
 4. Run `xmem context "<task>"` before broad repo traversal or project selection.
 5. If `source_freshness.status` is not `fresh`, run `xmem sync` before relying on the packet.
@@ -64,6 +65,8 @@ xmem gain card <id>
 `xmem resume` is the takeover packet. Use it before reading long handoffs or full skill docs when the user gives an issue slug, domain, service, repo, or task phrase. Read `identity`, `current_gate`, `historical_pitfalls`, `must_keep`, `avoid`, `required_checks`, `recent_evidence`, `token_savers`, and `next_action`. It is a read model, not a truth owner: live runtime state, current deploy status, and dynamic bindings still need owner-system verification.
 
 For SCMP/COS deploy tasks, if a session sees `coscli secretID is missing`, `COS deploy`, or isolated credential errors, run xmem resume/preflight against that phrase before manual config archaeology. The expected guard is `scmp.coscli.isolated-home-env`: check real HOME/REAL_PATH env first, then extract compact deploy fields instead of reading full deploy config/logs.
+
+For copy-domain tasks, if new domains do not resolve through lookup/rf yet, run xmem resume/preflight with the task id, template name, and any old sibling domain. The expected guard is `scmp.rule.copy-domain-resolve-by-sibling-template`: do not treat new-domain lookup miss as final truth; resolve service/repo from template/sibling history first, then live-verify binding after ops completes.
 
 `xmem gain` shows the full event/query/card dashboard by default. Use `xmem gain --summary` only when a short key signal is enough: real confidence result, confirmed-vs-rough token numbers, hit overview, risk signals, top query order, and a few queries needing review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. In detail view, `Top 查询` is query-text aggregation, `Top Cards` is top-card aggregation, missing old telemetry status/confidence is hydrated from current registry, `Top Card 解释` shows common/recent queries plus source/score/why, and `粗估占比` bars are relative rough-token share inside that section, not progress or confirmed savings. Use `xmem gain card <id>` when one card looks noisy or surprisingly high-frequency. `xmem gain --detail` remains a compatibility alias for the default full dashboard.
 

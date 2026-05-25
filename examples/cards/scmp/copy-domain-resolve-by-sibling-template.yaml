@@ -1,0 +1,45 @@
+id: scmp.rule.copy-domain-resolve-by-sibling-template
+type: rule
+title: New copy-domain tasks resolve service by sibling template domains
+scope:
+  system: scmp
+  feature: copy-domain
+aliases:
+  - 新建复制域名
+  - 复制域名
+  - 新域名查不到
+  - 域名查不到
+  - 新域名 lookup miss
+  - template clone
+  - domain copy
+  - copy-domain ads
+  - crypto模版一
+  - t102746
+truth:
+  status: verified
+  confidence: 0.9
+  basis:
+    - user_correction
+    - issue_record
+    - project_wiki_pending_cross_checked
+  last_checked_at: 2026-05-25T07:20:00Z
+summary: New copied domains may not resolve through lookup/rf yet; route by template name, older sibling domains, Project Wiki/Issue history, or repo config before asking the user for service identity.
+must_include:
+  - When rf getcf / lookup misses new copied domains, do not conclude the project or service is missing.
+  - Resolve service/repo through the Feishu sheet template name, old sibling domains, Project Wiki, Issue Record history, or repo web-configs before editing.
+  - After the target service is confirmed, request ops/domain binding first and then verify the new domains with rf getcf / lookup / safe-access.
+  - For copy-domain ads tasks, verify title, /ads.txt group, GPT slots, content route, apex/www hosts, first-party assets, and cache purge.
+forbid:
+  - Do not treat new-domain lookup miss, system busy, not found, or empty result as final truth.
+  - Do not ask the user for service name before checking old template domains and indexed project memory.
+  - Do not claim online safe-access success while domains are not bound to the target service.
+checks:
+  - Run xmem resume/context with task id, template name, target domains, and any known old sibling domain.
+  - Compare old sibling domains against Project Wiki / Issue Record / repo config to identify service and repo.
+  - Live-verify binding after ops completes; historical service mapping is only a routing start.
+  - Store final service/repo/domain mapping in Project Wiki or Issue Record export so xmem can recall it next time.
+evidence:
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ptc_ssr_crypto/t102746-crypto-template1-4638-20260525/issue.md
+  - kind: retrospective
+    path: /Users/xin/feature-update/.ai/retrospectives/t102746-xmem-scmpops-retro-20260525.md

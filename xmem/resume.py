@@ -119,7 +119,10 @@ def token_savers(context: Dict[str, Any], preflight: Dict[str, Any]) -> List[str
     for item in preflight.get("avoid") or []:
         text = str(item.get("text") or "")
         lower = text.lower()
-        if any(key in lower for key in ("raw", "json", "rg", "grep", "skill.md", "notice", "issue-tracking", "feishu", "lark", "log")):
+        if any(key in lower for key in (
+            "raw", "json", "rg", "grep", "skill.md", "notice", "issue-tracking",
+            "feishu", "lark", "log", "lookup", "rf", "domain", "full", "deploy.config",
+        )):
             hints.append(text)
     for warning in preflight.get("warnings") or []:
         if "compact-output" in str(warning) or "raw JSON" in str(warning) or "broad" in str(warning):
