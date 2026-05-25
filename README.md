@@ -2,7 +2,16 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.41`.
+Current package version: `0.1.42`.
+
+## What's New in 0.1.42
+
+This release tightens SCMP deploy memory and gateway intent filtering.
+
+- Added `scmp.rule.deploy-tag-empty-for-branch`: for SCMP branch deploy, use `--branch` plus `--version`; leave `--tag` empty unless the value is a real git tag.
+- `xmem preflight "SCMP branch deploy --tag commit hash"` now warns before an agent sends a commit hash as `--tag`.
+- `xmem gateway` now filters ad-specific cards when a prompt is clearly about log/raw-output text that merely contains `ads.txt` or advertising config snippets.
+- The filter keeps project/service identity cards but avoids turning "log contains ads text" into an advertising gate.
 
 ## What's New in 0.1.41
 
@@ -60,6 +69,7 @@ Public boundary: xmem does not require or bundle SCMP, Project Wiki, Issue Recor
 The latest stable pickup point is:
 
 - `docs/updates/2026-05-25-copy-domain-resolution-memory.md`
+- `docs/updates/2026-05-25-scmp-branch-deploy-tag.md`
 - `docs/updates/2026-05-25-xmem-gateway.md`
 - `docs/updates/2026-05-25-coscli-isolated-env-memory.md`
 - `docs/updates/2026-05-25-xmem-resume.md`

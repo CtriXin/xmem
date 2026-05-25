@@ -1335,6 +1335,49 @@ def test_gateway_redacts_secret_like_input_before_output(tmp_path: Path):
     assert "<redacted>" in stdout
 
 
+def test_preflight_recalls_scmp_branch_deploy_tag_guard(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(run([str(XMEM), "preflight", "SCMP branch deploy --tag commit hash", "--json"], repo, env).stdout)
+    text_packet = run([str(XMEM), "preflight", "SCMP branch deploy --tag commit hash"], repo, env).stdout
+
+    assert packet["readiness"] == "ready_with_guards"
+    assert any(item["id"] == "scmp.rule.deploy-tag-empty-for-branch" for item in packet["invariants"])
+    assert any("--branch" in item["text"] and "--version" in item["text"] for item in packet["must_keep"])
+    assert any("commit hash" in item["text"] and "--tag" in item["text"] for item in packet["avoid"])
+    assert any("actual git tag" in item["text"] for item in packet["required_checks"])
+    assert "scmp.rule.deploy-tag-empty-for-branch" in text_packet
+
+
+def test_gateway_filters_ad_cards_when_ads_text_is_only_log_content(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(
+        run(
+            [
+                str(XMEM),
+                "gateway",
+                "SCMP deploy 日志里包含 ads.txt 广告配置文本，不是在修广告",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+
+    ids = {
+        item["id"]
+        for section in ("historical_pitfalls", "invariants", "methods")
+        for item in packet.get("packet", {}).get(section, [])
+    }
+    assert packet["decision"] == "inject"
+    assert any("ads/log noise filter active" in item for item in packet["warnings"])
+    assert not any(item.startswith("ads.") or item.startswith("scmp.ads-sheet.") for item in ids)
+    assert not str(packet["search"]["top_card"]).startswith("scmp.ads-sheet.")
+
+
 def test_check_sources_reports_export_shape_errors(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     export = tmp_path / "project-wiki" / "data" / "xmem-export.cards.jsonl"

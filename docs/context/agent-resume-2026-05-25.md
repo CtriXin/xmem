@@ -7,7 +7,7 @@ Use this as the compact pickup surface after the `xmem gateway` feature.
 ```toon
 schema: xmem_agent_resume.v1
 status: gateway_packet_implemented
-version: 0.1.41
+version: 0.1.42
 primary_feature: xmem gateway
 primary_commands[11]: xmem status,xmem doctor,xmem sync,xmem gateway,xmem resume,xmem preflight,xmem context,xmem check --sources,xmem gain,xmem gain card,xmem suppress
 truth_model: owner_sources_are_truth__registry_is_cache
@@ -18,6 +18,8 @@ truth_model: owner_sources_are_truth__registry_is_cache
 - `xmem gateway` now gives launchers/hooks a central `inject|skip` decision, so ordinary skills do not need individual xmem edits.
 - Gateway searches only when the request has domain/service/deploy/COS/copy-domain/history/bugfix signal or structured target fields.
 - Gateway output is a compact subset of resume/preflight and redacts common secret syntaxes before printing/logging.
+- `scmp.rule.deploy-tag-empty-for-branch` now guards SCMP branch deploy payloads: use `--branch` + `--version`, and leave `--tag` empty unless it is a real git tag.
+- Gateway now filters ad-specific cards when a log/raw-output prompt merely contains `ads.txt` or advertising config text.
 - `xmem resume` now builds a compact takeover packet from context + preflight.
 - Structured fields are supported: `issue`, `domain`, `service`, `repo`, `project`, `task`, and `mode`.
 - Resume output includes identity, current_gate, historical_pitfalls, must_keep, avoid, required_checks, token_savers, recent_evidence, next_reads, warnings, source_freshness, and next_action.

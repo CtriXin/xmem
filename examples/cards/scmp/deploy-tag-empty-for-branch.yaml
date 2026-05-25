@@ -1,0 +1,34 @@
+id: scmp.rule.deploy-tag-empty-for-branch
+type: rule
+title: SCMP branch deploy must not pass commit hash as tag
+scope:
+  system: scmp
+  feature: branch-deploy
+aliases:
+  - SCMP branch deploy tag empty
+  - deploy tag empty for branch
+  - branch deploy commit hash tag
+  - scmp deploy --tag commit hash
+  - --tag only real git tag
+  - branch deploy --branch --version
+truth:
+  status: verified
+  confidence: 0.9
+  basis:
+    - user_session_recap
+    - deploy_failure_pattern
+  last_checked_at: 2026-05-25T09:25:00Z
+summary: For SCMP branch deploys, use --branch plus --version and leave --tag empty unless the value is a real git tag; a commit hash is not a release tag.
+must_include:
+  - For SCMP branch deploy, use --branch with the target branch and --version with the commit/version identifier.
+  - Leave --tag empty unless deploying an actual git tag or release tag.
+forbid:
+  - Do not pass a commit hash to --tag for branch deploy.
+  - Do not treat --tag as a generic commit/version field.
+checks:
+  - Before triggering SCMP branch deploy, verify the payload separates branch, version, and tag semantics.
+  - If the source is a branch/commit deploy, ensure --tag is omitted or empty and the commit hash is carried by --version only.
+  - If --tag is non-empty, verify it is an actual git tag with git tag --list or owner deploy metadata.
+evidence:
+  - kind: user-recap
+    path: conversation:2026-05-25-scmp-branch-deploy-tag-empty

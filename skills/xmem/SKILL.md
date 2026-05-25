@@ -11,9 +11,11 @@ Truth rule: `.xmem/*.yaml`, source Markdown, code, git, runtime APIs, and human 
 
 ## What's New
 
-`xmem 0.1.41` adds `xmem gateway`, a thin launcher/hook layer that decides `inject` vs `skip` before normal skills run. The supported path is:
+`xmem 0.1.42` adds SCMP branch deploy tag memory and keeps the `xmem gateway` launcher/hook layer. The supported path is:
 
 - `xmem gateway <user request>` is for MMS/Codex/Claude/OpenCode entry layers. It searches only for domain/service/deploy/COS/copy-domain/history/bugfix-shaped tasks, returns compact memory when useful, and skips simple local edits.
+- Gateway filters ad-specific cards when a task is clearly about log/raw-output text that merely contains `ads.txt` or advertising config snippets; do not infer an advertising task from log content alone.
+- Built-in SCMP cards now recall that branch deploy should use `--branch` plus `--version`; `--tag` is only for a real git/release tag, not a commit hash.
 - `xmem resume <issue|domain|service|query>` combines context routing and preflight guardrails into compact task memory for fresh sessions.
 - `xmem resume --fields issue=... domain=... service=... task=...` lets hooks/agents avoid old-context pollution.
 - Built-in SCMP cards now recall `coscli secretID is missing` as a likely isolated HOME / real credential path issue before long config debugging loops.

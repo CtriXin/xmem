@@ -167,10 +167,12 @@ def run_gateway(
         prelim_categories.extend(match_tool_failures(query))
     has_target_fields = any(clean_fields.get(key) for key in TARGET_FIELD_KEYS)
     should_search = bool(query.strip()) and (bool(prelim_categories) or has_target_fields)
+    filter_warnings: List[str] = []
     if should_search:
         cards = search_cards(query, max(limit * 4, 20), record_gain=False)
         for expanded_query in canonical_queries_from_corrections(query, cards):
             cards = merge_cards(cards, search_cards(expanded_query, max(limit * 2, 10), record_gain=False))
+        cards, filter_warnings = filter_gateway_cards(query, cards)
     events = latest_events(3)
     profile = classify_gateway(query, clean_fields, event, cards, current)
     packet = build_gateway_packet(
@@ -184,6 +186,7 @@ def run_gateway(
         profile=profile,
         budget=budget,
         dry_run=dry_run,
+        filter_warnings=filter_warnings,
     )
     record_gateway_event(packet, cards)
     return packet
@@ -317,6 +320,74 @@ def match_tool_failures(text: str) -> List[str]:
     return []
 
 
+def filter_gateway_cards(query: str, cards: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[str]]:
+    if not looks_like_ad_text_in_log(query):
+        return cards, []
+    kept = [card for card in cards if not is_ad_specific_card(card)]
+    if len(kept) == len(cards):
+        return cards, []
+    return kept, ["ads/log noise filter active; do not infer an advertising task from log text or raw config snippets"]
+
+
+def looks_like_ad_text_in_log(query: str) -> bool:
+    text = query.lower()
+    has_log_marker = any(marker in text for marker in (
+        "log",
+        "logs",
+        "stdout",
+        "stderr",
+        "grep output",
+        "raw output",
+        "日志",
+        "输出",
+        "文本",
+    ))
+    has_ad_marker = any(marker in text for marker in ("ads.txt", "ad config", "广告配置", "广告文本", "广告"))
+    explicit_not_ad_task = any(marker in text for marker in (
+        "不是在修广告",
+        "不是修广告",
+        "not fixing ads",
+        "not an ad task",
+        "not ads task",
+    ))
+    log_contains_marker = any(marker in text for marker in (
+        "log contains",
+        "日志里",
+        "日志中",
+        "输出里",
+        "输出中",
+        "contains ads",
+        "包含 ads",
+        "包含广告",
+    ))
+    direct_ad_task = any(marker in text for marker in (
+        "广告位",
+        "ad slot",
+        "gpt slot",
+        "lazyload",
+        "lazy load",
+        "新增广告",
+        "添加广告",
+        "修复广告",
+        "改广告",
+        "ads.txt 404",
+        "ads.txt group",
+    ))
+    if explicit_not_ad_task:
+        return has_ad_marker or log_contains_marker
+    return has_log_marker and has_ad_marker and log_contains_marker and not direct_ad_task
+
+
+def is_ad_specific_card(card: Dict[str, Any]) -> bool:
+    card_id = str(card.get("card_id") or "").lower()
+    if card_id.startswith("ads.") or card_id.startswith("scmp.ads-sheet."):
+        return True
+    title = str(card.get("title") or "").lower()
+    if title.startswith("ads ") or " ad slot" in title or "ads.txt" in title:
+        return True
+    return False
+
+
 def build_gateway_packet(
     *,
     query: str,
@@ -329,6 +400,7 @@ def build_gateway_packet(
     profile: Dict[str, Any],
     budget: int,
     dry_run: bool,
+    filter_warnings: List[str] | None = None,
 ) -> Dict[str, Any]:
     packet: Dict[str, Any] = {
         "schema": "xmem.gateway.v1",
@@ -349,7 +421,7 @@ def build_gateway_packet(
         },
         "search": search_summary(cards),
         "packet": {},
-        "warnings": [],
+        "warnings": filter_warnings or [],
         "next_reads": [],
     }
     if profile["decision"] != "inject":
@@ -387,9 +459,10 @@ def build_gateway_packet(
     for source in (resume_data or {}, preflight_data or {}):
         warnings.extend(str(item) for item in source.get("warnings") or [])
         next_reads.extend(str(item) for item in source.get("next_reads") or [])
-    packet["warnings"] = unique_strings(warnings)[:max_items]
+    packet["warnings"] = unique_strings((filter_warnings or []) + warnings)[:max_items]
     packet["next_reads"] = unique_strings(next_reads)[:max_items]
     return packet
+
 
 def preflight_fields(fields: Dict[str, str]) -> Dict[str, str]:
     return {key: value for key, value in fields.items() if key in {"domain", "service", "repo", "project", "task", "mode"}}
