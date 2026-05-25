@@ -1131,6 +1131,65 @@ def test_preflight_adds_compact_output_guard(tmp_path: Path):
     assert any("compact-output guard active" in warning for warning in packet["warnings"])
 
 
+def test_preflight_recalls_coscli_isolated_home_guard(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(
+        run(
+            [
+                str(XMEM),
+                "preflight",
+                "coscli secretID is missing COS deploy isolated HOME buildaringfarm.net",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+    text_packet = run(
+        [
+            str(XMEM),
+            "preflight",
+            "coscli secretID is missing COS deploy isolated HOME buildaringfarm.net",
+        ],
+        repo,
+        env,
+    ).stdout
+
+    assert packet["readiness"] == "ready_with_guards"
+    assert any(item["id"] == "scmp.coscli.isolated-home-env" for item in packet["invariants"])
+    assert any("HOME=/Users/xin" in item["text"] for item in packet["must_keep"])
+    assert any("config/log/inode" in item["text"] for item in packet["avoid"])
+    assert any("bucket, region, uploadCommand" in item["text"] for item in packet["required_checks"])
+    assert "scmp.coscli.isolated-home-env" in text_packet
+
+
+def test_resume_surfaces_coscli_token_savers(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
+
+    packet = json.loads(
+        run(
+            [
+                str(XMEM),
+                "resume",
+                "buildaringfarm.net COS deploy coscli secretID is missing",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+
+    assert packet["schema"] == "xmem.resume.v1"
+    assert packet["current_gate"]["readiness"] == "ready_with_guards"
+    assert any(item["id"] == "scmp.coscli.isolated-home-env" for item in packet["invariants"])
+    assert any("isolated HOME" in item for item in packet["token_savers"])
+    assert any("deploy.config.json" in item for item in packet["token_savers"])
+    assert any("coscli-isolated-home.yaml" in item for item in packet["recent_evidence"])
+
+
 def test_check_sources_reports_export_shape_errors(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     export = tmp_path / "project-wiki" / "data" / "xmem-export.cards.jsonl"

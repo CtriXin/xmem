@@ -1,0 +1,36 @@
+id: scmp.coscli.isolated-home-env
+type: rule
+title: COS deploy in isolated agent sessions needs real HOME env
+scope:
+  system: scmp
+  feature: cos-deploy
+aliases:
+  - coscli secretID is missing
+  - coscli isolated HOME
+  - COS deploy isolated session
+  - COS upload REAL_PATH HOME
+  - Tencent COS deploy env
+  - isolated HOME credentials missing
+  - buildaringfarm.net COS deploy
+  - brain_recall COS deploy
+truth:
+  status: verified
+  confidence: 0.88
+  basis:
+    - user_session_recap
+    - repeated_agent_failure_pattern
+  last_checked_at: 2026-05-25T06:35:00Z
+summary: When coscli reports secretID is missing inside an isolated agent session, treat isolated HOME/config lookup as the first suspect; use the real user HOME/env template before debugging config contents.
+must_include:
+  - For coscli/COS deploy in isolated sessions, run with REAL_PATH plus HOME=/Users/xin-style real user home env before assuming credentials are missing.
+  - Start from a compact deploy infra packet for domain -> bucket -> region -> branch -> upload command when available.
+forbid:
+  - Do not spend a long config/log/inode debugging loop on secretID is missing before checking isolated HOME and real credential path.
+  - Do not paste full deploy.config.json or raw coscli logs when only bucket, region, upload command, purge command, and error class are needed.
+checks:
+  - On first secretID is missing, classify as possible isolated HOME credential lookup failure and retry with the real HOME/REAL_PATH env template.
+  - For COS deploy tasks, extract only bucket, region, uploadCommand, purgeCommand, and branch/service hints before reading full deploy.config.json.
+  - Verify domain -> bucket/region/branch from owner source or live deploy evidence before closeout; xmem only provides the remembered failure pattern.
+evidence:
+  - kind: session-recap
+    path: docs/updates/2026-05-25-coscli-isolated-env-memory.md

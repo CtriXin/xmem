@@ -2,7 +2,16 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.38`.
+Current package version: `0.1.39`.
+
+## What's New in 0.1.39
+
+This release adds a verified SCMP/COS deploy memory card for the repeated `coscli secretID is missing` failure mode in isolated agent sessions.
+
+- `scmp.coscli.isolated-home-env` is now imported with built-in cards.
+- `xmem preflight "coscli secretID is missing COS deploy isolated HOME"` surfaces the REAL_HOME / HOME=/Users/xin-style env requirement before long config debugging loops.
+- `xmem resume "buildaringfarm.net COS deploy coscli secretID is missing"` surfaces token_savers that tell the agent to avoid full `deploy.config.json` / raw coscli logs and extract only bucket, region, upload/purge command, and branch/service hints.
+- This is still a memory guard, not runtime truth: bucket, region, branch, and current deploy state must be verified in owner sources or live deploy evidence.
 
 ## What's New in 0.1.38
 
@@ -30,6 +39,7 @@ Public boundary: xmem does not require or bundle SCMP, Project Wiki, Issue Recor
 
 The latest stable pickup point is:
 
+- `docs/updates/2026-05-25-coscli-isolated-env-memory.md`
 - `docs/updates/2026-05-25-xmem-resume.md`
 - `docs/context/agent-resume-2026-05-25.md`
 - `docs/updates/2026-05-24-xmem-public-onboarding.md`

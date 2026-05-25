@@ -11,10 +11,11 @@ Truth rule: `.xmem/*.yaml`, source Markdown, code, git, runtime APIs, and human 
 
 ## What's New
 
-`xmem 0.1.38` adds the `resume` takeover packet while keeping the 0.1.37 public-onboarding boundary. The supported generic path is:
+`xmem 0.1.39` adds the COS isolated-env guard on top of the `resume` takeover packet while keeping the 0.1.37 public-onboarding boundary. The supported path is:
 
 - `xmem resume <issue|domain|service|query>` combines context routing and preflight guardrails into compact task memory for fresh sessions.
 - `xmem resume --fields issue=... domain=... service=... task=...` lets hooks/agents avoid old-context pollution.
+- Built-in SCMP cards now recall `coscli secretID is missing` as a likely isolated HOME / real credential path issue before long config debugging loops.
 - `xmem setup` creates `~/.xmem`, generic docs/config/schema examples, and project/source registrations.
 - MMS public installs can opt in with `bash install.sh --install-xmem`; `--dry-run` previews the write/install/setup plan without changing files.
 - Installer-style setup should use `--register-only` when low-touch onboarding matters; avoid writing repo-local `.xmem` into many repos automatically.
@@ -61,6 +62,8 @@ xmem gain card <id>
 `xmem setup` is generic onboarding. It creates `~/.xmem` docs/config, registers the current repo or `--root` workspace roots, can initialize repo-local `.xmem` identity files, and can create a shared memory repo via `--memory-repo`. It must not require SCMP, Project Wiki, Issue Record, Feishu/Lark, Jira, Linear, or any private adapter. Use `--register-only` if writing `.xmem` into discovered repos would be too invasive.
 
 `xmem resume` is the takeover packet. Use it before reading long handoffs or full skill docs when the user gives an issue slug, domain, service, repo, or task phrase. Read `identity`, `current_gate`, `historical_pitfalls`, `must_keep`, `avoid`, `required_checks`, `recent_evidence`, `token_savers`, and `next_action`. It is a read model, not a truth owner: live runtime state, current deploy status, and dynamic bindings still need owner-system verification.
+
+For SCMP/COS deploy tasks, if a session sees `coscli secretID is missing`, `COS deploy`, or isolated credential errors, run xmem resume/preflight against that phrase before manual config archaeology. The expected guard is `scmp.coscli.isolated-home-env`: check real HOME/REAL_PATH env first, then extract compact deploy fields instead of reading full deploy config/logs.
 
 `xmem gain` shows the full event/query/card dashboard by default. Use `xmem gain --summary` only when a short key signal is enough: real confidence result, confirmed-vs-rough token numbers, hit overview, risk signals, top query order, and a few queries needing review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. In detail view, `Top 查询` is query-text aggregation, `Top Cards` is top-card aggregation, missing old telemetry status/confidence is hydrated from current registry, `Top Card 解释` shows common/recent queries plus source/score/why, and `粗估占比` bars are relative rough-token share inside that section, not progress or confirmed savings. Use `xmem gain card <id>` when one card looks noisy or surprisingly high-frequency. `xmem gain --detail` remains a compatibility alias for the default full dashboard.
 
