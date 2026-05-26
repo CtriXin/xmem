@@ -100,7 +100,9 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--alias", action="append", default=[])
     init.add_argument("--force", action="store_true", help="允许覆盖已有 .xmem")
 
-    sub.add_parser("index", help="把本地 .xmem cards 写入全局 index").add_argument("path", nargs="?", default=".")
+    index = sub.add_parser("index", help="把本地 .xmem cards 写入全局 index")
+    index.add_argument("path", nargs="?", default=None, help="repo 路径；默认当前目录")
+    index.add_argument("--cwd", default="", help="兼容 Agent 调用习惯；等同于指定 repo 路径")
 
     imp = sub.add_parser("import", help="导入 read-only sources")
     imp_sub = imp.add_subparsers(dest="source", required=True, metavar="<source>", parser_class=XmemArgumentParser)
@@ -287,7 +289,10 @@ def main(argv: List[str] | None = None) -> int:
         print(f"global: {home_dir()}")
         return 0
     if args.cmd == "index":
-        count = index_local(Path(args.path))
+        if args.cwd and args.path:
+            print("xmem index: use either positional path or --cwd, not both", file=sys.stderr)
+            return 2
+        count = index_local(Path(args.cwd or args.path or "."))
         print(f"indexed {count} local cards")
         return 0
     if args.cmd == "import":
@@ -473,6 +478,7 @@ def help_cmd() -> int:
                 "- xmem doctor              # 综合诊断 registry / source / backup / 当前 repo",
                 "- xmem setup               # 泛化初始化 ~/.xmem，并注册当前 repo / workspace",
                 "- xmem sync                # 刷新索引；从 Project Wiki / Issue Record / 本地 cards 重建",
+                "- xmem index [path|--cwd <repo>]  # 只刷新某个 repo 的本地 .xmem cards",
                 "- xmem context <query>     # 查历史项目、方法、证据，返回 LLM 好读 packet",
                 "- xmem preflight <query>   # 开发/修 bug 前查历史坑、must_keep、required checks",
                 "- xmem preflight --fields domain=... task=...  # Agent 用结构化字段，避免旧上下文污染",
