@@ -1,0 +1,76 @@
+id: scmp.nuxt-cos-fallback-hard-constraints
+type: method
+title: Nuxt COS fallback rollout hard constraints
+scope:
+  system: scmp
+  feature: nuxt-cos-fallback
+aliases:
+  - Nuxt COS fallback
+  - Nuxt chunk 404 COS fallback
+  - nodejs-builder-cos
+  - NUXT_ASSET_BACKUP
+  - webnovel Nuxt 404
+  - runtime self-upload
+  - first pod backfill
+truth:
+  status: partial
+  confidence: 0.84
+  basis:
+    - human_correction_recorded
+    - issue_record_cross_checked
+    - test_service_verified_only
+  last_checked_at: 2026-05-26T07:46:21Z
+summary: >-
+  Nuxt chunk 404/COS fallback rollout is not just a Nuxt code change. Agents must check
+  Dockerfile builder image, backup env names, Tencent COS credential field names, and
+  first current-pod asset backfill before claiming deploy readiness. Current evidence
+  covers webnovel1/webnovel2 validation services only; do not infer production coverage.
+support_scope:
+  verified_services:
+    - ptc-v5-novabeats-test
+    - ptc-v5-novabeats1-test
+  production_support: not_verified_from_this_card
+allowed_builder_images:
+  - tencnet-ptc.tencentcloudcr.com/tencent-ptc/nodejs-builder-cos:v20.17.0
+  - tencnet-ptc.tencentcloudcr.com/tencent-ptc/nodejs-builder-cos:v24.7.0
+required_env_fields:
+  - NUXT_ASSET_BACKUP_BUCKET
+  - NUXT_ASSET_BACKUP_SERVICE
+  - NUXT_ASSET_BACKUP_ENV
+  - NUXT_ASSET_BACKUP_ENDPOINT
+  - TENCENT_ACCESS_KEY_ID
+  - TENCENT_SECRET_ACCESS_KEY
+must_include:
+  - Check and update Dockerfile; Nuxt server/plugin/script changes alone are insufficient.
+  - Use only a known supported nodejs-builder-cos image tag unless owner/runtime proof adds another tag.
+  - Ask ops to configure Tencent COS credential/env fields by field name only; never record secret values.
+  - Backfill the first backup from the active Running pod's actual serving /_nuxt assets before trusting runtime self-upload.
+  - Verify fallback asset returns 200 and true miss returns 404/no-store.
+  - Run SCMP safe-access after deploy and verify current service/domain binding live.
+forbid:
+  - Do not invent new nodejs-builder-cos tags.
+  - Do not store Tencent credential values in xmem, issue records, tickets, or chat.
+  - Do not mark production service support complete from validation-service evidence alone.
+  - Do not rely on runtime self-upload before current-pod backfill evidence exists.
+checks:
+  - Dockerfile image tag is in allowed_builder_images.
+  - Required NUXT_ASSET_BACKUP_* and Tencent credential field names are present in ops/service config.
+  - Current Running pod asset sample has been uploaded to COS for the target prefix.
+  - Host-header /_nuxt fallback sample returns 200; intentionally missing asset returns 404/no-store.
+  - Public safe-access passes after deploy.
+evidence:
+  - kind: progress
+    path: /Users/xin/feature-update/.ai/plan/progress/webnovel-telemetry-nuxt404-summary-20260526.md
+    note: User correction recorded with image allowlist, first pod backfill, and ops env field gates.
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ptc_v5_reading/readnewline-mobile-nuxt-chunk-404-20260513/issue.md
+    note: Nuxt chunk 404/COS fallback timeline and Tencent env field mismatch.
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ptc_v5_reading/stats-event-in-page-story-20260512/issue.md
+    note: Later validation kept Nuxt/COS fallback healthy on ptc-v5-novabeats1-test.
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ai_novabeats/sync-adventure-home3-to-test-20260523/issue.md
+    note: webnovel1 validation service relation used for future rollout routing.
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ptc_v5_reading/sync-biography-home3-to-test-20260523/issue.md
+    note: webnovel2 validation service relation used for future rollout routing.
