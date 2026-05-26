@@ -35,7 +35,11 @@ project: ai_novabeats
 repo: git@gitlab.adsconflux.xyz:ptc/fe/ai_novabeats.git
 repo_local_hints:
   - /Users/xin/ai_novabeats
+historical_worktree_hints:
   - /Users/xin/ai_novabeats__test_sync_home3_20260523
+local_hint_policy:
+  - Treat repo_local_hints as convenience only; verify the path exists before use.
+  - Historical worktree hints may be absent on the current host; use the base repo plus git branch inspection instead of broad filesystem search.
 source_sheet:
   title: 【1001项目】广告位信息记录2
   wiki_url: https://adsconflux.feishu.cn/wiki/TGEOwuPjXicoqXkQblmcuw7knHd?sheet=0IIBHM
@@ -50,6 +54,17 @@ validation_pipeline_hint: ptc-v5-novabeats-test-2444
 prod_branch_hint: t102748-home3-ads-20260522
 validation_branch_hint: 1.0.19.9
 approval_group: 域名自动化流程
+feature_support:
+  ad_telemetry:
+    status: pattern_available
+    ref_card: scmp.webnovel.telemetry-pattern
+    note: ai_novabeats is the stable adTelemetryV2 source; preserve legacy adPosition/adClick bridge behavior.
+  nuxt_cos_fallback:
+    status: validation_service_verified_only
+    ref_card: scmp.nuxt-cos-fallback-hard-constraints
+    services:
+      - ptc-v5-novabeats-test
+    note: Do not infer production support; Dockerfile/COS/env/backfill gates still apply per rollout.
 role_semantics:
   - validation_service is not a generic test environment; it is a candidate service used to validate new feature behavior before traffic switch.
   - Service names may contain -test, but agents must not infer QA/test-environment semantics from the name.
@@ -86,6 +101,7 @@ apex_www_policy:
   - Always live-verify each target with rf getcf / lookup before switch.
 common_verification:
   - xmem preflight 网文1 <domain> traffic switch
+  - xmem context webnovel telemetry Nuxt COS fallback
   - lookup <domain>
   - rf getcf <domain>
   - SCMP safe-access for current service domains plus target sample domain.
@@ -99,8 +115,15 @@ stale_policy:
   - Domain-to-service binding and current deploy state must be live verified before deploy or traffic switch.
   - Repo-to-service relation can be used as verified starting truth for routing.
   - Branch hints are task/time scoped and must be checked against git/SCMP before release.
+  - Nuxt/COS fallback support is validation-service evidence only unless current production rollout evidence says otherwise.
   - Project Wiki pending rows are hint-only unless promoted by Project Wiki export.
 evidence:
+  - kind: progress
+    path: /Users/xin/feature-update/.ai/plan/progress/webnovel-telemetry-nuxt404-summary-20260526.md
+  - kind: method-card
+    path: /Users/xin/auto-skills/CtriXin-repo/xmem/examples/cards/scmp/nuxt-cos-fallback-hard-constraints.yaml
+  - kind: method-card
+    path: /Users/xin/auto-skills/CtriXin-repo/xmem/examples/cards/scmp/webnovel-telemetry-pattern.yaml
   - kind: issue
     path: /Users/xin/issue-tracking/issues/ai_novabeats/sync-adventure-home3-to-test-20260523/issue.md
   - kind: issue
