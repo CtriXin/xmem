@@ -142,6 +142,19 @@ def test_setup_can_create_shared_memory_repo(tmp_path: Path):
     assert str(memory_repo.resolve()) in [item["root"] for item in sources["local_roots"]]
 
 
+def test_index_accepts_cwd_option_for_agent_calls(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+
+    indexed = run([str(XMEM), "index", "--cwd", str(repo)], tmp_path, env).stdout
+    index_help = run([str(XMEM), "index", "-h"], repo, env).stdout
+    ambiguous = run([str(XMEM), "index", str(repo), "--cwd", str(repo)], tmp_path, env, check=False)
+
+    assert "indexed 1 local cards" in indexed
+    assert "--cwd" in index_help
+    assert ambiguous.returncode == 2
+    assert "use either positional path or --cwd" in ambiguous.stderr
+
+
 def test_check_uses_registry_invariant_cards(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     run([str(XMEM), "import", "cards", str(ROOT / "examples" / "cards")], repo, env)
