@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 from .store import connect, log_event, upsert_card, upsert_evidence, upsert_project
+from .trellis_policy import guarded_trellis_body
 from .util import field_from_text, flatten_strings, home_dir, read_json, slugify, utc_now
 
 VALID_STATUSES = {"verified", "inferred", "partial", "stale", "disputed", "unknown"}
@@ -659,6 +660,7 @@ def import_markdown_cards(root: Path, files: List[Path], source: str, classifier
         for file in files:
             text = read_markdown(file)
             meta = classifier(base, file, text)
+            card_body = str(meta.get("body") or text)
             rel = relative_path(base, file)
             card_id = f"{source}.{project_id}.{slugify(str(rel), 'doc')}.{hashlib.sha1(str(rel).encode()).hexdigest()[:8]}"
             card = {
@@ -670,7 +672,7 @@ def import_markdown_cards(root: Path, files: List[Path], source: str, classifier
                 "status": meta["status"],
                 "confidence": meta["confidence"],
                 "aliases": meta["aliases"],
-                "body": text,
+                "body": card_body,
                 "updated_at": utc_now(),
                 "source": source,
                 "source_ref": str(rel),
@@ -685,7 +687,7 @@ def import_markdown_cards(root: Path, files: List[Path], source: str, classifier
                 "path": str(file),
                 "title": meta["title"],
                 "status": meta["status"],
-                "body": summarize_markdown(text),
+                "body": str(meta.get("evidence_body") or summarize_markdown(text)),
                 "updated_at": utc_now(),
                 "source": source,
             })
@@ -746,23 +748,66 @@ def classify_speckit_doc(root: Path, file: Path, text: str) -> Dict[str, Any]:
 
 
 def classify_trellis_doc(root: Path, file: Path, text: str) -> Dict[str, Any]:
-    rel = str(relative_path(root, file)).lower()
+    rel_path = relative_path(root, file)
+    rel = str(rel_path).lower()
     if ".trellis/workspace/" in rel:
         card_type = "memory"
         status = "inferred"
         confidence = 0.45
         evidence_kind = "trellis-workspace"
+        recall_role = "low_confidence_hint"
+        task_scoped = True
+        workspace_journal = True
+        hint_only = True
+        body_import = "summary_or_pointer_only"
     elif ".trellis/tasks/" in rel:
         card_type = "spec.task"
         status = "partial"
         confidence = 0.55
         evidence_kind = "trellis-task"
+        recall_role = "next_read_pointer"
+        task_scoped = True
+        workspace_journal = False
+        hint_only = False
+        body_import = "source_pointer_with_guard"
     else:
         card_type = "spec.current"
         status = "partial"
         confidence = 0.65
         evidence_kind = "trellis-spec"
-    return markdown_meta(root, file, text, card_type=card_type, evidence_kind=evidence_kind, status=status, confidence=confidence)
+        recall_role = "evidence_pointer"
+        task_scoped = False
+        workspace_journal = False
+        hint_only = False
+        body_import = "source_pointer_with_guard"
+    meta = markdown_meta(root, file, text, card_type=card_type, evidence_kind=evidence_kind, status=status, confidence=confidence)
+    meta["aliases"] = list(
+        dict.fromkeys(
+            [
+                *meta["aliases"],
+                "trellis",
+                "source_tool=trellis",
+                evidence_kind,
+                "finish-work done ship next_action" if workspace_journal else "",
+            ]
+        )
+    )[:30]
+    meta["body"] = guarded_trellis_body(
+        rel=str(rel_path),
+        source_kind=evidence_kind,
+        raw_text=text,
+        source_path=file,
+        title=meta["title"],
+        task_scoped=task_scoped,
+        durable_knowledge=False,
+        recall_role=recall_role,
+        workspace_journal=workspace_journal,
+        hint_only=hint_only,
+        body_import=body_import,
+        summary=summarize_markdown(text, limit=1200),
+    )
+    meta["evidence_body"] = summarize_markdown(text, limit=1200) if not workspace_journal else f"Trellis workspace pointer: {rel_path}"
+    return meta
 
 
 def markdown_meta(root: Path, file: Path, text: str, *, card_type: str, evidence_kind: str, status: str, confidence: float) -> Dict[str, Any]:

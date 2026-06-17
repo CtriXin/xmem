@@ -206,6 +206,8 @@ Imports are read-only. xmem does not silently rewrite Project Wiki or issue reco
 
 These project-memory adapters are source routers, not workflow dependencies. xmem reads their Markdown outputs as evidence pointers and compact cards; it does not require OpenSpec, Spec Kit, Trellis, or grill-with-docs to be installed.
 
+Trellis imports are guarded at import time and again at the final card indexing boundary. `.trellis/spec/**` and `.trellis/tasks/**` become source pointers, while `.trellis/workspace/**` becomes low-confidence pointer-only memory with raw journal bodies omitted. Generic card/export/sync paths that carry `source_tool=trellis` or `.trellis/**` are forced through the same guard. Trellis cards carry D3/registry policy refs, cannot be promoted in place, and `xmem recall` / `xmem context` warn that Trellis does not own lifecycle, done, or ship.
+
 `xmem-export.cards.jsonl` is the preferred bridge format for other truth systems. Project Wiki can export entity cards, and Issue Record can export verified bug-pattern/rule cards; xmem imports them as generated index rows while keeping the source files as truth.
 
 Project Wiki `agent-inbox.jsonl` rows are imported only as `wiki.pending` cards with `truth.status=partial`, confidence capped at `0.6`, and `hint_only_until_project_wiki_accepts` policy. They make pending writebacks searchable, but they never override verified Project Wiki exports.
@@ -280,6 +282,44 @@ Creation basis is intentionally narrow:
 - Human confirmation or runtime/code evidence only when explicitly captured in cards.
 
 If only the folder name is known, the identity starts as `inferred`. Add small cards when durable facts are known; do not inflate it into a long wiki page.
+
+## Local Memory Engine
+
+`xmem capture` adds local-first memory without sending data to a hosted API. Captured items are redacted and written to a pending queue first; they do not become durable truth until promoted.
+
+```bash
+xmem capture --type preference "preference: User prefers local-first memory over hosted APIs"
+xmem capture --from-session session.md --scope project --confidence 0.6
+xmem review-pending
+xmem promote <pending-id>        # writes a compact card, default truth is partial
+xmem promote <pending-id> --verified
+xmem promote-trellis --source-card <id> --decision distill --decided-by human:xin --basis "reviewed"
+xmem recall "local-first memory" # compact hybrid recall packet
+xmem profile --cwd .             # writes ~/.xmem/profile/user.md and project profile
+xmem forget <memory-or-card-id>
+xmem supersede <old-id> <new-id>
+xmem agent-hook UserPromptSubmit --host codex
+xmem agent-hook Stop --host claude
+xmem benchmark .xmem/benchmarks/memorybench.jsonl
+xmem smfs export
+xmem smfs grep "isolated host home"
+xmem maintain
+xmem mcp
+```
+
+P1 retrieval is local hybrid: existing card scoring plus SQLite FTS5, keyword, semantic-lite n-gram rerank, project match, confidence, recency, TTL decay, and lifecycle filtering. Files remain truth; SQLite and FTS are generated cache. Optional embeddings can be added later, but xmem does not require non-stdlib dependencies for the local memory path.
+
+`xmem capture --from-session` also accepts structured blocks with `type`, `summary`, `scope`, `confidence`, `evidence_path`, `ttl`, `supersedes`, and `aliases`. These fields stay on the pending record so review/promotion keeps the evidence trail.
+
+`xmem promote-trellis` is the only Trellis-specific promotion path. `distill` creates a new pending memory from a reviewed claim, `keep-pointer` leaves the Trellis card as a guarded source pointer, and `reject` records the decision only. Every decision writes `~/.xmem/audit/trellis-promotion-audit.jsonl`; the original Trellis card remains non-verified.
+
+`xmem agent-hook` is for Claude/Codex style automatic memory. `UserPromptSubmit` emits a compact recall packet only when useful and captures durable-looking prompt facts into pending; `Stop`/`SessionEnd` refresh profile files and captures durable transcript lessons into pending. Hooks are fail-open and do not promote memory directly. Default hook output is compact; use `--verbose` or `--json` only when debugging recall details.
+
+`xmem smfs export` projects indexed cards to `~/.xmem/smfs/cards/**/*.md` so agents can inspect memory as files without a daemon. `xmem smfs grep "<query>"` is semantic grep-lite over the same local memory packet.
+
+`xmem maintain` reports expired/decayed TTL cards, duplicate card candidates, and duplicate pending memories. It does not rewrite truth; use `xmem supersede` or `xmem forget` only after evidence review.
+
+`xmem benchmark` is a local MemoryBench-lite runner for JSONL/JSON cases with `query`, `expect`, and optional `reject`. It reports accuracy, latency, estimated injected tokens, and wrong recall rate. `xmem mcp` exposes stdio tools for `memory/capture`, `memory/recall`, `memory/semantic_grep`, `memory/maintain`, `context/profile`, and `memory/review_pending`.
 
 ## Agent hooks
 
@@ -424,6 +464,7 @@ xmem import project-memory  # import CONTEXT/ADR/OpenSpec/Spec Kit/Trellis from 
 xmem import openspec        # import OpenSpec files only
 xmem import speckit         # import Spec Kit files only
 xmem import trellis         # import Trellis files only
+xmem promote-trellis --source-card <id> --decision distill|reject|keep-pointer --decided-by human:xin --basis "..."
 xmem new                    # create/register .xmem for this folder
 xmem why <query>            # explain matches
 xmem open <card-id-or-query>

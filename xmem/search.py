@@ -12,8 +12,8 @@ TOKEN_SAVING_EVENTS = {"context", "preflight", "resume", "gateway"}
 
 
 def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_event: str = "search") -> List[Dict[str, Any]]:
-    terms = query_terms(query)
-    variants = query_variants(query)
+    terms = query_terms(query)[:32]
+    variants = [variant for variant in query_variants(query) if len(variant) <= 240][:4]
     suppressions = suppressions_for_query(query)
     with connect() as conn:
         cards = rows(conn, "SELECT * FROM cards")
@@ -35,15 +35,35 @@ def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_
         alias_parts = aliases + project_aliases
         meta_parts = strong_parts + [card.get("type", ""), card.get("source", "")] + alias_parts
         body = str(card.get("body", ""))
+        body_head = body[:20000]
+        body_lower = body_head.lower()
+        body_norm = ""
         meta = "\n".join(str(x).lower() for x in meta_parts)
         alias_values = alias_parts + [card.get("title", ""), card.get("card_id", "")]
         alias_text = "\n".join(str(x).lower() for x in alias_values)
-        alias_norms = [normalize_text(x) for x in alias_values if normalize_text(x)]
+        alias_norms = []
+        for value in alias_values:
+            alias_norm = normalize_text(value)
+            if alias_norm:
+                alias_norms.append(alias_norm)
         meta_norm = normalize_text(meta)
         alias_norm = normalize_text(alias_text)
-        body_norm = normalize_text(body[:20000])
         score = 0.0
         why: List[str] = []
+
+        def body_contains(needle: str, raw: str) -> bool:
+            nonlocal body_norm
+            if not needle:
+                return False
+            raw_lower = str(raw or "").lower()
+            if raw_lower and raw_lower in body_lower:
+                return True
+            if needle not in body_lower:
+                return False
+            if not body_norm:
+                body_norm = normalize_text(body_head)
+            return needle in body_norm
+
         for variant in variants:
             loose_variant = normalize_text(variant)
             if not loose_variant:
@@ -57,7 +77,7 @@ def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_
             elif loose_variant in meta_norm:
                 score += 8.0
                 why.append(f"metadata_match:{variant}")
-            elif loose_variant in body_norm:
+            elif body_contains(loose_variant, variant):
                 score += 1.5
                 why.append(f"body_match:{variant}")
         for term in terms:
@@ -70,7 +90,7 @@ def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_
             elif term_norm and term_norm in meta_norm:
                 score += 2.0
                 why.append(f"metadata_term:{term}")
-            elif term_norm and term_norm in body_norm:
+            elif term_norm and body_contains(term_norm, term):
                 # Body matches are evidence hints, not identity proof.
                 score += 0.35
                 why.append(f"body_term:{term}")

@@ -8,3 +8,5 @@ dist/
 *.egg-info/
 .xmem/
 .codegraph/
+.level-up/
+.ai/agent-release-notes.md

@@ -6,6 +6,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
+from .trellis_policy import guard_trellis_card_for_index
 from .util import append_jsonl, home_dir, utc_now
 
 SCHEMA = """
@@ -107,6 +108,7 @@ def upsert_project(conn: sqlite3.Connection, project: Dict[str, Any]) -> None:
 
 
 def upsert_card(conn: sqlite3.Connection, card: Dict[str, Any]) -> None:
+    card = guard_trellis_card_for_index(card)
     aliases = card.get("aliases") or []
     conn.execute(
         """INSERT INTO cards(card_id,project_id,type,title,path,status,confidence,aliases_json,body,updated_at,source,source_ref)

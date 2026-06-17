@@ -1,0 +1,80 @@
+id: scmp.novel-template-8-profile
+type: method
+title: Novel template 8 clean-project profile rollout
+scope:
+  system: scmp
+  project: ai_novabeats
+  template: novel-template-8
+aliases:
+  - novel-template-8
+  - novel8
+  - 网文八
+  - 网文小说模版八
+  - t102813
+  - ptc-novabeats-ai-a
+  - novabeats-ai
+truth:
+  status: partial
+  confidence: 0.86
+  basis:
+    - verified_issue_record
+    - target_commit_observed
+    - project_wiki_pending_association
+  last_checked_at: 2026-05-26T13:23:55Z
+summary: >-
+  Feishu Todo t102813 added novel-template-8 routing/config for 10 production
+  domains on service ptc-novabeats-ai-a in repo novabeats-ai. Reuse the compact
+  siteProfile/legalProfile/replaceSlots pattern for similar clean-project template
+  work, but keep exact domain lists and live deploy state in Project Wiki/Issue Record.
+routing:
+  service: ptc-novabeats-ai-a
+  repo_path: /Users/xin/novabeats-ai
+  remote: git@gitlab.adsconflux.xyz:ptc/fe/novabeats-ai.git
+  branch: main
+  target_commit: 82e735e163aa7ec2dbbdb16671f7538bf669f05b
+  project_wiki_writeback: wr_scmp_1b961ffb7b61
+config_pattern:
+  site_profile: novel-template-8
+  legal_profile: novel-template-8
+  ads_txt_group: group_35
+  ads_txt_publisher: pub-3272410396891794
+  replace_slots: true
+  expected_slot_count: 7
+  normal_path_ads: debug_only
+  debug_ads_path: /?db=1
+must_include:
+  - Put shared service/theme/legal/ads defaults in siteProfiles and legalProfiles.
+  - Keep per-domain entries lightweight: brand/siteName/email/about/seo/slot overrides only.
+  - Set replaceSlots=true so new template domains do not inherit default home_3/home_4/home_5 slots.
+  - Verify /ads.txt returns group_35 publisher data for every target domain.
+  - Verify Legal routes replace placeholders server-side and render the per-domain email/brand text.
+  - Verify ad DOM on /?db=1; do not assume the normal homepage renders ads.
+  - Run binding-check, safe-access, and live route smoke before closing deploy work.
+forbid:
+  - Do not copy the exact 10-domain list into reusable xmem rules; Project Wiki and issue evidence own it.
+  - Do not treat SCMP run success alone as deploy completion without pod, binding, safe-access, and live route evidence.
+  - Do not change the project default debug-only ad rendering behavior while reusing this card.
+  - Do not include pre-existing .deploy-path or .playwright-cli state in future task commits.
+checks:
+  - pnpm run typecheck
+  - pnpm test
+  - pnpm run build
+  - Host-header smoke for /ads.txt, Legal routes, and /?db=1 debug ads.
+  - binding-check target domains all resolve to ptc-novabeats-ai-a.
+  - safe-access production domains and first-party assets pass.
+evidence:
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ai_novabeats/t102813-novel8-domains-ads-legal-20260526/issue.md
+    note: Verified task truth, target commit, validation, and evidence paths.
+  - kind: progress
+    path: /Users/xin/feature-update/.ai/plan/progress/t102813-novel8-domains-ads-legal-20260526.md
+    note: Compact closeout progress and deploy identifiers.
+  - kind: artifact
+    path: /Users/xin/issue-tracking/playwright/ai_novabeats/main/t102813-novel8-domains-ads-legal-20260526/evidence/deploy/bind-check-summary.json
+    note: Binding-check 10/10 matched ptc-novabeats-ai-a.
+  - kind: artifact
+    path: /Users/xin/issue-tracking/playwright/ai_novabeats/main/t102813-novel8-domains-ads-legal-20260526/evidence/safe-access/summary.json
+    note: Production safe-access passed.
+  - kind: artifact
+    path: /Users/xin/issue-tracking/playwright/ai_novabeats/main/t102813-novel8-domains-ads-legal-20260526/evidence/safe-access/live-route-smoke.json
+    note: Live /ads.txt, Legal, and /?db=1 route smoke passed.

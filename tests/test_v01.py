@@ -14,8 +14,22 @@ ROOT = Path(__file__).resolve().parents[1]
 XMEM = ROOT / "bin" / "xmem"
 
 
-def run(cmd: list[str], cwd: Path, env: dict[str, str], check: bool = True) -> subprocess.CompletedProcess[str]:
-    proc = subprocess.run(cmd, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+def run(
+    cmd: list[str],
+    cwd: Path,
+    env: dict[str, str],
+    check: bool = True,
+    input_text: str | None = None,
+) -> subprocess.CompletedProcess[str]:
+    proc = subprocess.run(
+        cmd,
+        cwd=cwd,
+        env=env,
+        text=True,
+        input=input_text,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
     if check and proc.returncode != 0:
         raise AssertionError(f"command failed {cmd}\nstdout={proc.stdout}\nstderr={proc.stderr}")
     return proc
@@ -607,6 +621,181 @@ def test_imports_context_specs_and_trellis_sources(tmp_path: Path):
     assert any(item["source"] == "speckit" for item in packet["specs"])
     assert any(item["source"] == "trellis" for item in packet["specs"])
     assert any("CONTEXT.md" in path for path in packet["next_reads"])
+
+
+def test_trellis_import_adds_d3_guard_metadata_and_redacts_workspace_body(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    (repo / ".trellis" / "spec").mkdir(parents=True)
+    (repo / ".trellis" / "tasks").mkdir(parents=True)
+    (repo / ".trellis" / "workspace").mkdir(parents=True)
+    (repo / ".trellis" / "spec" / "site.md").write_text(
+        "# Trellis Site Spec\n\nStable content IA reference.\n",
+        encoding="utf-8",
+    )
+    (repo / ".trellis" / "tasks" / "ship.md").write_text(
+        "# Trellis Ship Task\n\nTask says finish-work can mark done and next_action is ship.\n",
+        encoding="utf-8",
+    )
+    (repo / ".trellis" / "workspace" / "journal.md").write_text(
+        "# Trellis Workspace Journal\n\n"
+        "done=true ship=true next_action=deploy finish-work.\n"
+        "SECRET RAW JOURNAL LINE SHOULD NOT BE STORED IN XMEM BODY.\n",
+        encoding="utf-8",
+    )
+
+    imported = json.loads(run([str(XMEM), "import", "trellis", str(repo)], repo, env).stdout)
+    assert imported["cards"] == 3
+
+    conn = sqlite3.connect(Path(env["XMEM_HOME"]) / "registry.sqlite")
+    conn.row_factory = sqlite3.Row
+    cards = {row["source_ref"]: dict(row) for row in conn.execute("SELECT * FROM cards WHERE source='trellis'")}
+
+    spec = cards[".trellis/spec/site.md"]
+    assert spec["type"] == "spec.current"
+    assert spec["status"] == "partial"
+    assert spec["confidence"] == 0.65
+    assert "source_tool=trellis" in spec["body"]
+    assert "promotion_policy=distill_only" in spec["body"]
+    assert "docs/decisions.md#D3" in spec["body"]
+    assert "docs/capability-registry.md" in spec["body"]
+
+    task = cards[".trellis/tasks/ship.md"]
+    assert task["type"] == "spec.task"
+    assert task["status"] == "partial"
+    assert task["confidence"] == 0.55
+    assert "task_scoped=true" in task["body"]
+    assert "durable_knowledge=false" in task["body"]
+    assert "recall_role=next_read_pointer" in task["body"]
+
+    workspace = cards[".trellis/workspace/journal.md"]
+    assert workspace["type"] == "memory"
+    assert workspace["status"] == "inferred"
+    assert workspace["confidence"] == 0.45
+    assert "body_import=summary_or_pointer_only" in workspace["body"]
+    assert "source_sha256=" in workspace["body"]
+    assert "SECRET RAW JOURNAL LINE SHOULD NOT BE STORED" not in workspace["body"]
+
+
+def test_trellis_recall_and_context_warn_once_with_d3_and_registry(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    other = tmp_path / "other-repo"
+    for root, title in [(repo, "Primary"), (other, "Secondary")]:
+        (root / ".trellis" / "spec").mkdir(parents=True, exist_ok=True)
+        (root / ".trellis" / "workspace").mkdir(parents=True, exist_ok=True)
+        (root / ".trellis" / "spec" / "site.md").write_text(
+            f"# {title} Trellis Spec\n\nTrellis producer artifact.\n",
+            encoding="utf-8",
+        )
+        (root / ".trellis" / "workspace" / "journal.md").write_text(
+            f"# {title} Trellis Journal\n\nfinish-work done ship next_action for {title}.\n",
+            encoding="utf-8",
+        )
+        run([str(XMEM), "import", "trellis", str(root)], repo, env)
+
+    recall = json.loads(
+        run([str(XMEM), "recall", "finish-work done ship next_action Trellis", "--cwd", str(repo), "--json"], repo, env).stdout
+    )
+    assert sum("Trellis artifact matched" in warning for warning in recall["warnings"]) == 1
+    assert "docs/decisions.md#D3" in recall["warnings"][0]
+    assert "docs/capability-registry.md" in recall["warnings"][0]
+    assert any(".trellis/workspace/journal.md" in item["path"] for item in recall["memories"])
+
+    text_recall = run([str(XMEM), "recall", "finish-work done ship next_action Trellis", "--cwd", str(repo)], repo, env).stdout
+    assert "Trellis artifact matched" in text_recall
+    assert "docs/decisions.md#D3" in text_recall
+
+    context = json.loads(run([str(XMEM), "context", "finish-work done ship next_action Trellis", "--json"], repo, env).stdout)
+    assert sum("Trellis artifact matched" in warning for warning in context["warnings"]) == 1
+    context_warning = next(warning for warning in context["warnings"] if "Trellis artifact matched" in warning)
+    assert "docs/decisions.md#D3" in context_warning
+    assert "docs/capability-registry.md" in context_warning
+    assert len([path for path in context["next_reads"] if ".trellis/" in path]) >= 2
+
+    clean_base = tmp_path / "clean"
+    clean_base.mkdir()
+    clean_repo, clean_env = init_repo(clean_base)
+    non_trellis = json.loads(run([str(XMEM), "context", "demo ads IntersectionObserver", "--json"], clean_repo, clean_env).stdout)
+    assert not any("Trellis artifact matched" in warning for warning in non_trellis["warnings"])
+
+
+def test_trellis_promotion_requires_explicit_decision_and_writes_audit(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    (repo / ".trellis" / "spec").mkdir(parents=True)
+    (repo / ".trellis" / "spec" / "site.md").write_text(
+        "# Trellis Site Spec\n\nStable IA can be distilled, but Trellis status is advisory.\n",
+        encoding="utf-8",
+    )
+    run([str(XMEM), "import", "trellis", str(repo)], repo, env)
+
+    conn = sqlite3.connect(Path(env["XMEM_HOME"]) / "registry.sqlite")
+    card_id = conn.execute("SELECT card_id FROM cards WHERE source='trellis'").fetchone()[0]
+
+    blocked = run([str(XMEM), "promote", card_id, "--verified", "--json"], repo, env, check=False)
+    assert blocked.returncode != 0
+    assert "Refusing direct promotion of Trellis artifact card" in (blocked.stderr + blocked.stdout)
+
+    keep_pointer = json.loads(
+        run(
+            [
+                str(XMEM),
+                "promote-trellis",
+                "--source-card",
+                card_id,
+                "--decision",
+                "keep-pointer",
+                "--decided-by",
+                "human:xin",
+                "--basis",
+                "Keep as source pointer only.",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+    assert keep_pointer["decision"] == "keep-pointer"
+    assert keep_pointer["output_pending_id"] == ""
+
+    distilled = json.loads(
+        run(
+            [
+                str(XMEM),
+                "promote-trellis",
+                "--source-card",
+                card_id,
+                "--decision",
+                "distill",
+                "--decided-by",
+                "human:xin",
+                "--basis",
+                "Only the stable IA decision is reusable; Trellis finish status is ignored.",
+                "--output-type",
+                "decision",
+                "--summary",
+                "Trellis pilot specs can seed xmem only as reviewed source pointers, never as done truth.",
+                "--evidence",
+                ".trellis/spec/site.md",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+    assert distilled["decision"] == "distill"
+    assert distilled["output_pending_id"].startswith("pending.decision.")
+    assert Path(distilled["output_path"]).exists()
+
+    refreshed = conn.execute("SELECT status FROM cards WHERE card_id=?", (card_id,)).fetchone()[0]
+    assert refreshed == "partial"
+
+    audit_path = Path(env["XMEM_HOME"]) / "audit" / "trellis-promotion-audit.jsonl"
+    audit_rows = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    assert len(audit_rows) == 2
+    assert audit_rows[-1]["source_card_id"] == card_id
+    assert audit_rows[-1]["decided_by"] == "human:xin"
+    assert audit_rows[-1]["basis"]
+    assert audit_rows[-1]["d3_ref"] == "docs/decisions.md#D3"
+    assert audit_rows[-1]["registry_ref"] == "docs/capability-registry.md"
 
 
 def test_sync_imports_generated_code_index_refs_as_hints(tmp_path: Path):
@@ -1588,3 +1777,374 @@ def test_context_warns_when_source_export_is_newer_than_registry(tmp_path: Path)
     text_packet = run([str(XMEM), "context", "freshness-service"], repo, env).stdout
     assert "source_freshness:" in text_packet
     assert "stale_exports:" in text_packet
+
+
+def test_memory_capture_promote_recall_and_profile(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    capture = json.loads(
+        run(
+            [
+                str(XMEM),
+                "capture",
+                "--type",
+                "preference",
+                "--scope",
+                "project",
+                "--confidence",
+                "0.8",
+                "--alias",
+                "memory-demo",
+                "preference: User wants xmem to avoid Supermemory hosted API and use local-first memory.",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+    pending_id = capture["pending"][0]["id"]
+    pending_path = Path(capture["pending"][0]["path"])
+
+    assert capture["created"] == 1
+    assert pending_path.exists()
+
+    review = json.loads(run([str(XMEM), "review-pending", "--json"], repo, env).stdout)
+    assert review["count"] == 1
+    assert review["pending"][0]["id"] == pending_id
+
+    promoted = json.loads(run([str(XMEM), "promote", pending_id, "--json"], repo, env).stdout)
+    assert promoted["status"] == "partial"
+    assert Path(promoted["path"]).exists()
+
+    recall = json.loads(run([str(XMEM), "recall", "Supermemory hosted local-first", "--json"], repo, env).stdout)
+    assert recall["schema"] == "xmem.recall.v1"
+    assert any(item["id"] == promoted["card_id"] for item in recall["memories"])
+
+    profile = json.loads(run([str(XMEM), "profile", "--cwd", str(repo), "--json"], repo, env).stdout)
+    assert set(profile["paths"]) == {"project", "user"}
+    assert Path(profile["paths"]["project"]).exists()
+    assert Path(profile["paths"]["user"]).exists()
+
+    forgotten = json.loads(run([str(XMEM), "forget", promoted["card_id"], "--reason", "test", "--json"], repo, env).stdout)
+    assert forgotten["status"] == "forgotten"
+    recalled_after_forget = json.loads(run([str(XMEM), "recall", "Supermemory hosted local-first", "--json"], repo, env).stdout)
+    assert all(item["id"] != promoted["card_id"] for item in recalled_after_forget["memories"])
+
+
+def test_structured_session_capture_preserves_memory_metadata(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    session = "\n".join(
+        [
+            "type: decision",
+            "title: Local first memory decision",
+            "summary: Do not use Supermemory hosted API; xmem memory must stay local-first.",
+            "scope: user",
+            "confidence: 0.82",
+            "evidence_path: docs/memory.md",
+            "ttl: durable",
+            "supersedes: memory.try-supermemory",
+            "aliases: supermemory, local-first",
+        ]
+    )
+
+    capture = json.loads(
+        run(
+            [str(XMEM), "capture", "--from-session", "-", "--json"],
+            repo,
+            env,
+            input_text=session,
+        ).stdout
+    )
+    pending = json.loads(Path(capture["pending"][0]["path"]).read_text(encoding="utf-8"))
+
+    assert capture["created"] == 1
+    assert pending["type"] == "decision"
+    assert pending["scope"]["kind"] == "user"
+    assert pending["confidence"] == 0.82
+    assert pending["ttl"] == "durable"
+    assert pending["supersedes"] == ["memory.try-supermemory"]
+    assert pending["aliases"] == ["local-first", "supermemory"]
+    assert pending["evidence"][0]["path"] == "docs/memory.md"
+
+
+def test_agent_hook_recalls_captures_and_stop_refreshes_profile(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    capture = json.loads(
+        run(
+            [
+                str(XMEM),
+                "capture",
+                "--type",
+                "preference",
+                "--scope",
+                "project",
+                "preference: User wants xmem to remember local-first memory and avoid Supermemory hosted API.",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+    promoted = json.loads(run([str(XMEM), "promote", capture["pending"][0]["id"], "--json"], repo, env).stdout)
+    payload = json.dumps(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "cwd": str(repo),
+            "prompt": "preference: User prefers local-first xmem memory; avoid Supermemory hosted API.",
+        }
+    )
+
+    packet = json.loads(
+        run(
+            [str(XMEM), "agent-hook", "UserPromptSubmit", "--host", "codex", "--cwd", str(repo), "--json"],
+            repo,
+            env,
+            input_text=payload,
+        ).stdout
+    )
+    text_packet = run(
+        [str(XMEM), "agent-hook", "UserPromptSubmit", "--host", "codex", "--cwd", str(repo)],
+        repo,
+        env,
+        input_text=payload,
+    ).stdout
+
+    assert packet["ok"] is True
+    assert packet["action"] == "recall"
+    assert packet["captured"]["created"] == 1
+    assert any(item["id"] == promoted["card_id"] for item in packet["recall"]["memories"])
+    assert "xmem_agent_memory: compact" in text_packet
+    assert "pending_captured: 1" in text_packet
+    assert "summary:" not in text_packet
+    assert "evidence:" not in text_packet
+
+    verbose_packet = run(
+        [str(XMEM), "agent-hook", "UserPromptSubmit", "--host", "codex", "--cwd", str(repo), "--verbose"],
+        repo,
+        env,
+        input_text=payload,
+    ).stdout
+    assert "summary:" in verbose_packet
+
+    stop = json.loads(
+        run(
+            [str(XMEM), "agent-hook", "Stop", "--host", "claude", "--cwd", str(repo), "--json"],
+            repo,
+            env,
+            input_text=json.dumps({"cwd": str(repo)}),
+        ).stdout
+    )
+    stop_text = run([str(XMEM), "agent-hook", "Stop", "--host", "claude", "--cwd", str(repo)], repo, env).stdout
+
+    assert stop["ok"] is True
+    assert stop["profile_refs"]["user"].endswith("profile/user.md")
+    assert Path(stop["profile_refs"]["user"]).exists()
+    assert stop_text == ""
+
+
+def test_agent_hook_suppresses_unrelated_cross_project_recall(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    export = tmp_path / "other-export.cards.jsonl"
+    export.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "id": "issue.other-open-bugs-review",
+                        "type": "evidence.issue",
+                        "title": "Other project open bugs review",
+                        "project_id": "other-project",
+                        "truth": {"status": "verified", "confidence": 0.9},
+                        "summary": "Open bugs review checklist for another unrelated project.",
+                        "evidence": [{"kind": "test", "path": "/tmp/other-project/issue.md"}],
+                    }
+                ),
+                json.dumps(
+                    {
+                        "id": "issue.demo-opencode-route-fix",
+                        "type": "evidence.issue",
+                        "title": "Demo OpenCode route 修复验证",
+                        "project_id": "demo-ads",
+                        "truth": {"status": "verified", "confidence": 0.9},
+                        "summary": "Route fix verification, not profile ordering or review default selection.",
+                        "evidence": [{"kind": "test", "path": str(repo / "issue.md")}],
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    run([str(XMEM), "import", "export", str(export)], repo, env)
+    payload = json.dumps(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "cwd": str(repo),
+            "prompt": "opencode 里的四个 profile 不按修复顺序吗，上次使用审核下次是不是也应该审核",
+        }
+    )
+
+    text_packet = run(
+        [str(XMEM), "agent-hook", "UserPromptSubmit", "--host", "codex", "--cwd", str(repo), "--no-capture"],
+        repo,
+        env,
+        input_text=payload,
+    ).stdout
+    json_packet = json.loads(
+        run(
+            [str(XMEM), "agent-hook", "UserPromptSubmit", "--host", "codex", "--cwd", str(repo), "--no-capture", "--json"],
+            repo,
+            env,
+            input_text=payload,
+        ).stdout
+    )
+
+    assert text_packet == ""
+    assert json_packet["action"] == "skip"
+    assert json_packet["recall"]["memories"] == []
+
+
+def test_memory_benchmark_and_mcp_stdio(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    capture = json.loads(
+        run(
+            [
+                str(XMEM),
+                "capture",
+                "--type",
+                "project_fact",
+                "project_fact: MemoryBench should recall the local-first xmem card.",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+    promoted = json.loads(run([str(XMEM), "promote", capture["pending"][0]["id"], "--json"], repo, env).stdout)
+    bench_dir = repo / ".xmem" / "benchmarks"
+    bench_dir.mkdir(parents=True, exist_ok=True)
+    (bench_dir / "memorybench.jsonl").write_text(
+        json.dumps({"query": "local-first xmem card", "expect": [promoted["card_id"]], "reject": ["missing-card"]}) + "\n",
+        encoding="utf-8",
+    )
+
+    bench = json.loads(run([str(XMEM), "benchmark", "--json"], repo, env).stdout)
+    assert bench["status"] == "ok"
+    assert bench["metrics"]["accuracy"] == 1.0
+    assert bench["metrics"]["wrong_recall_rate"] == 0.0
+
+    mcp_input = "\n".join(
+        [
+            json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}),
+            json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}),
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {"name": "memory/recall", "arguments": {"query": "local-first xmem card", "cwd": str(repo)}},
+                }
+            ),
+            "",
+        ]
+    )
+    proc = run([str(XMEM), "mcp"], repo, env, input_text=mcp_input)
+    responses = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
+
+    assert responses[0]["result"]["serverInfo"]["name"] == "xmem"
+    assert any(tool["name"] == "memory/recall" for tool in responses[1]["result"]["tools"])
+    assert any(tool["name"] == "memory/semantic_grep" for tool in responses[1]["result"]["tools"])
+    assert any(tool["name"] == "memory/maintain" for tool in responses[1]["result"]["tools"])
+    assert promoted["card_id"] in responses[2]["result"]["content"][0]["text"]
+
+
+def test_semantic_lite_ttl_and_maintenance_report(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    cards = repo / ".xmem" / "cards"
+    (cards / "firebase-default.yaml").write_text(
+        "\n".join(
+            [
+                "id: memory.firebase.default",
+                "type: preference",
+                "title: Firebase analytics defaults",
+                "project_id: demo-ads",
+                "truth:",
+                "  status: verified",
+                "  confidence: 0.9",
+                "  last_checked_at: 2026-01-01T00:00:00Z",
+                "aliases:",
+                "  - analytics instrumentation",
+                "summary: Default web app work should consider Firebase analytics instrumentation.",
+                "ttl: durable",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (cards / "old-ttl.yaml").write_text(
+        "\n".join(
+            [
+                "id: memory.old.deploy.fact",
+                "type: project_fact",
+                "title: Old deploy fact",
+                "project_id: demo-ads",
+                "truth:",
+                "  status: partial",
+                "  confidence: 0.7",
+                "  last_checked_at: 2020-01-01T00:00:00Z",
+                "summary: This fact should be reviewed because its ttl expired.",
+                "ttl: 1d",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (cards / "firebase-default-copy.yaml").write_text(
+        (cards / "firebase-default.yaml").read_text(encoding="utf-8").replace(
+            "memory.firebase.default", "memory.firebase.default.copy"
+        ),
+        encoding="utf-8",
+    )
+    run([str(XMEM), "index", "."], repo, env)
+
+    recall = json.loads(run([str(XMEM), "recall", "firebase analytics instrumentation", "--json"], repo, env).stdout)
+    hit = next(item for item in recall["memories"] if item["id"] == "memory.firebase.default")
+    assert any(str(reason).startswith("semantic_lite:") for reason in hit["why"])
+
+    old_recall = json.loads(run([str(XMEM), "recall", "old deploy fact ttl expired", "--json"], repo, env).stdout)
+    old_hit = next(item for item in old_recall["memories"] if item["id"] == "memory.old.deploy.fact")
+    assert any(str(reason).startswith("ttl_decay:") for reason in old_hit["why"])
+
+    report = json.loads(run([str(XMEM), "maintain", "--cwd", str(repo), "--json"], repo, env).stdout)
+    assert report["status"] == "review_needed"
+    assert any(item["id"] == "memory.old.deploy.fact" for item in report["expired_or_decayed"])
+    assert any(item["left"] == "memory.firebase.default" or item["right"] == "memory.firebase.default" for item in report["duplicate_cards"])
+
+
+def test_smfs_export_and_semantic_grep(tmp_path: Path):
+    repo, env = init_repo(tmp_path)
+    capture = json.loads(
+        run(
+            [
+                str(XMEM),
+                "capture",
+                "--type",
+                "workflow_lesson",
+                "workflow_lesson: MMS isolated sessions should read host-home env before trusting sandbox HOME.",
+                "--json",
+            ],
+            repo,
+            env,
+        ).stdout
+    )
+    promoted = json.loads(run([str(XMEM), "promote", capture["pending"][0]["id"], "--verified", "--json"], repo, env).stdout)
+
+    exported = json.loads(run([str(XMEM), "smfs", "export", "--cwd", str(repo), "--json"], repo, env).stdout)
+    assert exported["cards"] >= 1
+    assert Path(exported["index"]).exists()
+
+    grep_packet = json.loads(
+        run([str(XMEM), "smfs", "grep", "isolated host home sandbox", "--cwd", str(repo), "--json"], repo, env).stdout
+    )
+    assert grep_packet["mode"] == "semantic_grep_lite"
+    assert any(item["id"] == promoted["card_id"] for item in grep_packet["hits"])
+    assert Path(grep_packet["hits"][0]["smfs_path"]).suffix == ".md"

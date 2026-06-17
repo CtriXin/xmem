@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any, List
 
 from . import __version__
+from .agent_hooks import run_agent_hook
+from .benchmark import format_benchmark, run_memory_benchmark
 from .checks import check_diff
 from .code_index import code_index_status, import_code_indexes
 from .context import build_context, canonical_queries_from_corrections
@@ -15,6 +17,20 @@ from .gain import format_card_gain_dashboard, format_gain_dashboard, record_gain
 from .gateway import run_gateway
 from .health import backup_health, build_doctor_report
 from .hooks import outbox_counts, run_hook
+from .maintenance import build_memory_maintenance, format_memory_maintenance
+from .memory import (
+    build_recall,
+    capture_memories,
+    forget_memory,
+    format_pending_review,
+    format_recall,
+    promote_memory,
+    promote_trellis_memory,
+    review_pending,
+    supersede_memory,
+    synthesize_profile,
+)
+from .mcp_server import run_mcp_server
 from .importers import (
     import_bug_patterns,
     import_context_docs,
@@ -33,6 +49,7 @@ from .preflight import build_preflight
 from .resume import build_resume
 from .search import latest_events, record_suppression, search_cards
 from .setup import setup_workspace
+from .smfs import export_smfs, format_smfs_export, format_smfs_grep, grep_smfs
 from .source_check import check_source_exports, compact_source_health
 from .sources import audit_local_sources, index_registered_sources, load_sources, register_local_root, registered_roots, sources_path
 from .store import connect, rows
@@ -227,6 +244,103 @@ def build_parser() -> argparse.ArgumentParser:
     gain_card.add_argument("--no-color", action="store_true", help="关闭 dashboard ANSI 颜色")
     gain_card.add_argument("--limit", type=int, default=None, help="只读取最近 N 条 gain log；默认读取全部")
 
+    capture = sub.add_parser("capture", help="捕获候选 memory 到 pending queue")
+    capture.add_argument("text", nargs="*", help="要捕获的简短内容；也可配合 --from-session")
+    capture.add_argument("--from-session", nargs="?", const="-", help="从文件或 stdin 读取 session/artifact 文本")
+    capture.add_argument("--type", default="", help="preference/project_fact/decision/invariant/bug_pattern/rejected_option/workflow_lesson/source_pointer")
+    capture.add_argument("--scope", default="project", help="user/project/repo/task/workflow/tool/code_style")
+    capture.add_argument("--cwd", default=".", help="用于推断 project scope 的目录")
+    capture.add_argument("--confidence", type=float, default=0.55)
+    capture.add_argument("--evidence-path", default="")
+    capture.add_argument("--ttl", default="")
+    capture.add_argument("--supersedes", action="append", default=[])
+    capture.add_argument("--alias", action="append", default=[])
+    capture.add_argument("--json", action="store_true", help="输出 JSON")
+
+    recall = sub.add_parser("recall", help="本地 hybrid recall，输出小 memory packet")
+    recall.add_argument("query")
+    recall.add_argument("--cwd", default=".")
+    recall.add_argument("--limit", type=int, default=8)
+    recall.add_argument("--include-pending", action="store_true")
+    recall.add_argument("--json", action="store_true", help="输出 JSON")
+
+    profile = sub.add_parser("profile", help="生成 user/project memory profile")
+    profile.add_argument("--cwd", default=".")
+    profile.add_argument("--no-write", action="store_true")
+    profile.add_argument("--json", action="store_true", help="输出 JSON")
+
+    review = sub.add_parser("review-pending", help="查看 pending memories")
+    review.add_argument("--cwd", default=".")
+    review.add_argument("--all", action="store_true", help="包含全局 pending")
+    review.add_argument("--limit", type=int, default=20)
+    review.add_argument("--json", action="store_true", help="输出 JSON")
+
+    promote = sub.add_parser("promote", help="把 pending memory 提升为 card")
+    promote.add_argument("memory_id")
+    promote.add_argument("--cwd", default=".")
+    promote.add_argument("--verified", action="store_true", help="显式标记 verified；默认 partial")
+    promote.add_argument("--scope", default="", help="覆盖 pending scope")
+    promote.add_argument("--json", action="store_true", help="输出 JSON")
+
+    promote_trellis = sub.add_parser("promote-trellis", help="显式裁决 Trellis artifact：distill/reject/keep-pointer")
+    promote_trellis.add_argument("--source-card", required=True, help="Trellis card id")
+    promote_trellis.add_argument("--decision", choices=["distill", "reject", "keep-pointer"], required=True)
+    promote_trellis.add_argument("--decided-by", required=True, help="human:<name>|review:<path>|agent:<model>@<session>")
+    promote_trellis.add_argument("--basis", default="", help="裁决依据简述")
+    promote_trellis.add_argument("--basis-file", default="", help="裁决依据文件")
+    promote_trellis.add_argument("--output-type", default="source_pointer", help="distill 输出 memory type，默认 source_pointer")
+    promote_trellis.add_argument("--summary", default="", help="distill 后的新记忆摘要")
+    promote_trellis.add_argument("--evidence", default="", help="distill evidence path，默认 Trellis source path")
+    promote_trellis.add_argument("--cwd", default=".")
+    promote_trellis.add_argument("--json", action="store_true", help="输出 JSON")
+
+    forget = sub.add_parser("forget", help="忘记 pending 或 card id，recall 会过滤")
+    forget.add_argument("memory_id")
+    forget.add_argument("--cwd", default=".")
+    forget.add_argument("--reason", default="")
+    forget.add_argument("--json", action="store_true", help="输出 JSON")
+
+    supersede = sub.add_parser("supersede", help="标记 old memory 被 new memory/card 取代")
+    supersede.add_argument("old_id")
+    supersede.add_argument("new_id")
+    supersede.add_argument("--cwd", default=".")
+    supersede.add_argument("--reason", default="")
+    supersede.add_argument("--json", action="store_true", help="输出 JSON")
+
+    agent_hook = sub.add_parser("agent-hook", help="Claude/Codex hook: automatic recall/capture/profile, fail-open")
+    agent_hook.add_argument("event", help="UserPromptSubmit, SessionStart, Stop, PreCompact, PostCompact")
+    agent_hook.add_argument("--host", default="codex", help="codex/claude/opencode")
+    agent_hook.add_argument("--cwd", default=".", help="fallback working directory")
+    agent_hook.add_argument("--limit", type=int, default=6)
+    agent_hook.add_argument("--no-capture", action="store_true", help="只 recall/profile，不写 pending")
+    agent_hook.add_argument("--verbose", action="store_true", help="显示完整 recall summaries/evidence；默认 compact")
+    agent_hook.add_argument("--json", action="store_true", help="输出 JSON")
+
+    bench = sub.add_parser("benchmark", help="MemoryBench-lite: accuracy/latency/tokens/wrong recall")
+    bench.add_argument("cases", nargs="?", default="", help="JSONL/JSON cases; default .xmem/benchmarks/memorybench.jsonl")
+    bench.add_argument("--cwd", default=".")
+    bench.add_argument("--limit", type=int, default=8)
+    bench.add_argument("--json", action="store_true", help="输出 JSON")
+
+    smfs = sub.add_parser("smfs", help="SMFS-lite: export cards as files or run semantic grep")
+    smfs_sub = smfs.add_subparsers(dest="smfs_cmd", required=True, metavar="<操作>", parser_class=XmemArgumentParser)
+    smfs_export = smfs_sub.add_parser("export", help="导出 ~/.xmem/smfs/cards/*.md 文件投影")
+    smfs_export.add_argument("--cwd", default=".")
+    smfs_export.add_argument("--limit", type=int, default=500)
+    smfs_export.add_argument("--json", action="store_true", help="输出 JSON")
+    smfs_grep = smfs_sub.add_parser("grep", help="semantic grep-lite over local memory")
+    smfs_grep.add_argument("query")
+    smfs_grep.add_argument("--cwd", default=".")
+    smfs_grep.add_argument("--limit", type=int, default=8)
+    smfs_grep.add_argument("--json", action="store_true", help="输出 JSON")
+
+    maintain = sub.add_parser("maintain", help="检查 memory TTL、重复候选、pending 合并建议")
+    maintain.add_argument("--cwd", default=".")
+    maintain.add_argument("--limit", type=int, default=250)
+    maintain.add_argument("--json", action="store_true", help="输出 JSON")
+
+    sub.add_parser("mcp", help="启动 stdio MCP server，暴露 memory/capture recall profile")
+
     tail = sub.add_parser("tail", help="查看最近 registry events")
     tail.add_argument("--limit", type=int, default=10)
     tail.add_argument("--json", action="store_true", help="输出 JSON")
@@ -397,6 +511,137 @@ def main(argv: List[str] | None = None) -> int:
         else:
             print(gateway_packet(packet))
         return 0
+    if args.cmd == "capture":
+        text = read_capture_text(args)
+        result = capture_memories(
+            text,
+            cwd=Path(args.cwd),
+            scope=args.scope,
+            memory_type=args.type,
+            confidence=args.confidence,
+            evidence_path=args.evidence_path,
+            ttl=args.ttl,
+            supersedes=args.supersedes,
+            aliases=args.alias,
+            source="session" if args.from_session is not None else "manual",
+        )
+        if args.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            print(f"captured: {result['created']}")
+            for item in result["pending"]:
+                print(f"- {item['id']} [{item['type']}] {item['path']}")
+        return 0
+    if args.cmd == "recall":
+        packet = build_recall(args.query, cwd=Path(args.cwd), limit=args.limit, include_pending=args.include_pending)
+        if args.json:
+            print(json.dumps(packet, ensure_ascii=False, indent=2))
+        else:
+            print(format_recall(packet))
+        return 0
+    if args.cmd == "profile":
+        packet = synthesize_profile(cwd=Path(args.cwd), write=not args.no_write)
+        if args.json:
+            print(json.dumps(packet, ensure_ascii=False, indent=2))
+        else:
+            paths = packet.get("paths") or {}
+            print("profile:")
+            for key, value in paths.items():
+                print(f"- {key}: {value}")
+            if not paths:
+                print(packet.get("user_profile", "").strip())
+        return 0
+    if args.cmd == "review-pending":
+        packet = review_pending(cwd=Path(args.cwd), include_all=args.all, limit=args.limit)
+        if args.json:
+            print(json.dumps(packet, ensure_ascii=False, indent=2))
+        else:
+            print(format_pending_review(packet))
+        return 0
+    if args.cmd == "promote":
+        result = promote_memory(args.memory_id, cwd=Path(args.cwd), verified=args.verified, target_scope=args.scope)
+        if args.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            print(f"promoted: {result['card_id']} -> {result['path']}")
+        return 0
+    if args.cmd == "promote-trellis":
+        result = promote_trellis_memory(
+            source_card=args.source_card,
+            decision=args.decision,
+            decided_by=args.decided_by,
+            basis=args.basis,
+            basis_file=args.basis_file,
+            output_type=args.output_type,
+            summary=args.summary,
+            evidence=args.evidence,
+            cwd=Path(args.cwd),
+        )
+        if args.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            print(f"trellis decision: {result['decision']} audit={result['audit_path']}")
+            if result.get("output_pending_id"):
+                print(f"pending: {result['output_pending_id']} -> {result.get('output_path')}")
+        return 0
+    if args.cmd == "forget":
+        result = forget_memory(args.memory_id, cwd=Path(args.cwd), reason=args.reason)
+        if args.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            print(f"forgotten: {result['id']} ({result['scope']})")
+        return 0
+    if args.cmd == "supersede":
+        result = supersede_memory(args.old_id, args.new_id, cwd=Path(args.cwd), reason=args.reason)
+        if args.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            print(f"superseded: {result['old_id']} -> {result['new_id']}")
+        return 0
+    if args.cmd == "agent-hook":
+        output = run_agent_hook(
+            args.event,
+            host=args.host,
+            cwd=Path(args.cwd),
+            limit=args.limit,
+            emit_json=args.json,
+            verbosity="verbose" if args.verbose else "compact",
+            capture=not args.no_capture,
+        )
+        if output:
+            print(output)
+        return 0
+    if args.cmd == "benchmark":
+        packet = run_memory_benchmark(Path(args.cases) if args.cases else None, cwd=Path(args.cwd), limit=args.limit)
+        if args.json:
+            print(json.dumps(packet, ensure_ascii=False, indent=2))
+        else:
+            print(format_benchmark(packet))
+        return 0
+    if args.cmd == "smfs":
+        if args.smfs_cmd == "export":
+            packet = export_smfs(cwd=Path(args.cwd), limit=args.limit)
+            if args.json:
+                print(json.dumps(packet, ensure_ascii=False, indent=2))
+            else:
+                print(format_smfs_export(packet))
+            return 0
+        if args.smfs_cmd == "grep":
+            packet = grep_smfs(args.query, cwd=Path(args.cwd), limit=args.limit)
+            if args.json:
+                print(json.dumps(packet, ensure_ascii=False, indent=2))
+            else:
+                print(format_smfs_grep(packet))
+            return 0
+    if args.cmd == "maintain":
+        packet = build_memory_maintenance(cwd=Path(args.cwd), limit=args.limit)
+        if args.json:
+            print(json.dumps(packet, ensure_ascii=False, indent=2))
+        else:
+            print(format_memory_maintenance(packet))
+        return 0
+    if args.cmd == "mcp":
+        return run_mcp_server()
     if args.cmd == "suppress":
         row = record_suppression(args.card, args.for_query, args.reason)
         if args.json:
@@ -464,6 +709,21 @@ def merge_cards(primary: list[dict[str, Any]], extra: list[dict[str, Any]]) -> l
     return merged
 
 
+def read_capture_text(args: argparse.Namespace) -> str:
+    parts: list[str] = []
+    if args.from_session is not None:
+        if args.from_session == "-":
+            parts.append(sys.stdin.read())
+        else:
+            parts.append(Path(args.from_session).read_text(encoding="utf-8"))
+    if args.text:
+        parts.append(" ".join(args.text))
+    text = "\n".join(part for part in parts if part).strip()
+    if not text:
+        raise SystemExit("capture requires text or --from-session")
+    return text
+
+
 def help_cmd() -> int:
     print(
         "\n".join(
@@ -483,6 +743,20 @@ def help_cmd() -> int:
                 "- xmem gain                # 查看完整 telemetry / Top 查询 / Top Cards 面板",
                 "- xmem gain --summary      # 只看关键摘要",
                 "- xmem gain card <id>      # 解释某个 card 的命中来源和最近 query",
+            "- xmem capture --type preference \"...\"  # 捕获候选 memory 到 pending",
+            "- xmem review-pending       # 查看待审核 memory",
+            "- xmem promote <pending-id> # 提升 pending 为 compact card",
+            "- xmem promote-trellis --source-card <id> --decision distill|reject|keep-pointer --decided-by human:xin --basis \"...\"",
+            "- xmem recall <query>       # 本地 hybrid recall 小包",
+            "- xmem profile --cwd .      # 生成 user/project profile",
+            "- xmem forget <id>          # 忘记 pending 或过滤 card",
+            "- xmem supersede <old> <new> # 标记旧 memory 被新 memory 取代",
+            "- xmem agent-hook UserPromptSubmit --host codex  # Agent 自动 recall/capture",
+            "- xmem benchmark cases.jsonl # MemoryBench-lite: 命中率、延迟、token、错召回",
+            "- xmem smfs export          # 导出 ~/.xmem/smfs/cards/*.md 文件投影",
+            "- xmem smfs grep <query>    # semantic grep-lite over memory",
+            "- xmem maintain             # 检查 TTL/重复/pending 合并建议",
+            "- xmem mcp                  # stdio MCP: memory/capture recall profile",
                 "- xmem why <query>         # 解释为什么匹配",
                 "- xmem open <id|query>     # 打开 card / evidence 摘要",
                 "- xmem new                 # 新项目/新文件夹初始化并注册",

@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 from .toon import compact
 from .source_check import source_freshness
 from .sources import audit_local_sources
+from .trellis_policy import trellis_warnings
 from .util import field_from_text, list_after_key, normalize_text, query_hash, query_terms
 
 
@@ -105,6 +106,7 @@ def build_context(query: str, current: Dict[str, Any] | None, cards: List[Dict[s
         warnings.append("code index matches are generated refs; verify in source files before editing")
     if any(str(c.get("source") or "").startswith("xmem-") and "outbox" in str(c.get("source") or "") for c in cards[:8]):
         warnings.append("xmem outbox matches are pending writebacks/seeds; verify with Project Wiki or Issue Record before treating as truth")
+    warnings.extend(w for w in trellis_warnings(cards) if w not in warnings)
     freshness = source_freshness()
     if freshness.get("status") != "fresh":
         warnings.append("source exports are newer than registry or registry is missing; run xmem sync before relying on this packet")

@@ -42,6 +42,22 @@ xmem gateway "query" --cwd "$PWD" --format toon
 xmem context "query"
 xmem why "query"
 xmem open "query"
+xmem capture --type preference "preference: local-first memory"
+xmem capture --from-session session.md --scope project
+xmem review-pending
+xmem promote <pending-id>
+xmem promote-trellis --source-card <id> --decision distill|reject|keep-pointer --decided-by human:xin --basis "..."
+xmem recall "query"
+xmem profile --cwd .
+xmem forget <memory-or-card-id>
+xmem supersede <old-id> <new-id>
+xmem agent-hook UserPromptSubmit --host codex
+xmem agent-hook Stop --host claude
+xmem benchmark .xmem/benchmarks/memorybench.jsonl
+xmem smfs export
+xmem smfs grep "query"
+xmem maintain
+xmem mcp
 xmem new
 xmem check --sources
 xmem fix
@@ -56,14 +72,22 @@ xmem gain card <id>
 1. Run `xmem setup` on a new machine/workspace when xmem has not been configured yet.
 2. Launchers/hooks should run `xmem gateway "<user request>" --cwd "$PWD"` before normal skill routing; obey `decision: inject|skip`.
 3. Run `xmem resume "<issue|domain|service|task>"` when taking over an existing task, cross-project/domain/service/deploy/COS/copy-domain task, historical bug, or fresh session before reading long handoffs.
-4. Run `xmem preflight "<task>"` before development or bugfix edits to surface historical bug-patterns, invariants, and required checks.
-5. Run `xmem context "<task>"` before broad repo traversal or project selection.
-6. If `source_freshness.status` is not `fresh`, run `xmem sync` before relying on the packet.
-7. Trust only cards marked `verified`; treat `inferred`, `partial`, `stale`, `unknown`, and `disputed` as hints.
-8. For edits that hit a feature with invariant cards, run `xmem check` before final response.
-9. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
-10. Use `xmem gain` when asked what xmem saved.
-11. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
+4. For durable conversation lessons, use `xmem capture` first. Captured memories are pending, redacted, and not truth until `xmem review-pending` plus `xmem promote`.
+5. `xmem capture --from-session` accepts structured blocks with `type`, `summary`, `scope`, `confidence`, `evidence_path`, `ttl`, `supersedes`, and `aliases`.
+6. Trellis imports and any generic card/export/sync path carrying `source_tool=trellis` or `.trellis/**` are guarded source pointers only. When recall/context/gateway/resume/preflight hits Trellis, obey the D3/registry warning: Trellis does not own lifecycle, done, or ship. Do not use generic `xmem promote` on Trellis cards; use `xmem promote-trellis` with `--decided-by` and `--basis` to distill a new pending memory or keep/reject the pointer.
+7. Use `xmem recall "<query>"` for compact local hybrid memory packets and `xmem profile --cwd .` to refresh user/project profile Markdown.
+8. Agent launchers may call `xmem agent-hook UserPromptSubmit --host codex|claude` for automatic recall/capture and `xmem agent-hook Stop --host codex|claude` for profile refresh; hooks are fail-open, compact by default, and never promote directly. Use `--verbose` or `--json` only for debugging.
+9. Use `xmem benchmark` for local MemoryBench-lite accuracy/latency/context-token/wrong-recall checks; use `xmem mcp` for stdio MCP tools.
+10. Use `xmem smfs export` to project cards into `~/.xmem/smfs/cards/**/*.md`; use `xmem smfs grep "<query>"` for semantic grep-lite.
+11. Use `xmem maintain` to report TTL decay, duplicate card candidates, and duplicate pending memories; do not auto-promote or auto-delete.
+12. Run `xmem preflight "<task>"` before development or bugfix edits to surface historical bug-patterns, invariants, and required checks.
+13. Run `xmem context "<task>"` before broad repo traversal or project selection.
+14. If `source_freshness.status` is not `fresh`, run `xmem sync` before relying on the packet.
+15. Trust only cards marked `verified`; treat `inferred`, `partial`, `stale`, `unknown`, and `disputed` as hints.
+16. For edits that hit a feature with invariant cards, run `xmem check` before final response.
+17. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
+18. Use `xmem gain` when asked what xmem saved.
+19. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
 
 `xmem setup` is generic onboarding. It creates `~/.xmem` docs/config, registers the current repo or `--root` workspace roots, can initialize repo-local `.xmem` identity files, and can create a shared memory repo via `--memory-repo`. It must not require SCMP, Project Wiki, Issue Record, Feishu/Lark, Jira, Linear, or any private adapter. Use `--register-only` if writing `.xmem` into discovered repos would be too invasive.
 

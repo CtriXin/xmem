@@ -1,0 +1,84 @@
+id: scmp.webnovel.telemetry-pattern
+type: method
+title: Webnovel adTelemetryV2 and statsEvent implementation pattern
+scope:
+  system: scmp
+  template: webnovel
+aliases:
+  - webnovel telemetry
+  - webnovel adTelemetryV2
+  - webnovel statsEvent
+  - stats_pv_id
+  - JSCallAndroid.statsEvent
+  - JSCallAndroid.adPosition
+  - JSCallAndroid.adTelemetryV2
+truth:
+  status: partial
+  confidence: 0.82
+  basis:
+    - issue_record_cross_checked
+    - source_branch_inspected
+    - mixed_prod_and_test_evidence
+  last_checked_at: 2026-05-26T07:46:21Z
+summary: >-
+  For future webnovel batch rollout, use ai_novabeats 1.0.19.4/1.0.19.6 as the
+  stable adTelemetryV2 source pattern and ptc_v5_reading test commit a430dc7 as
+  the Nuxt port reference. statsEvent should correlate Firebase in_page and
+  JSCallAndroid.statsEvent with the same low-leakage stats_pv_id.
+source_patterns:
+  adTelemetryV2:
+    stable_source: ai_novabeats 1.0.19.4 utils/ad-telemetry.ts
+    bridge_context_fix: ai_novabeats 1.0.19.6
+    ptc_v5_reading_port: commit a430dc7 composables/useAdTelemetryV2.ts
+    events:
+      - init
+      - scroll
+      - resize
+      - status_change
+      - pagehide
+      - click
+  statsEvent:
+    source_projects:
+      - ai_novabeats
+      - ptc_v5_reading
+    event_name: in_page
+    correlation: stats_pv_id
+    retry_behavior: ptc_v5_reading test branch adds 3s fallback and up to 8s bridge retry.
+  legacy_bridge:
+    keep:
+      - JSCallAndroid.adPosition
+      - JSCallAndroid.adClick
+must_include:
+  - Keep one stable adTelemetryV2 payload schema; eventType changes meaning, not shape.
+  - Preserve JSCallAndroid bridge context by calling injected methods with the original bridge object.
+  - Keep legacy adPosition/adClick alongside adTelemetryV2 unless the owner explicitly removes compatibility.
+  - Use stats_pv_id in both Firebase in_page params and JSCallAndroid.statsEvent extra.
+  - Keep statsEvent extra low-leakage; do not copy full Firebase payloads into client extra.
+  - For webnovel2/Nuxt, include bridge-injection retry/fallback because one-shot mount calls can miss Android injection.
+forbid:
+  - Do not reintroduce per-domain enableAdPositionReport gates for webnovel1/webnovel2 rollout.
+  - Do not treat ai_novabeats production evidence as proof that every ptc_v5_reading production domain is updated.
+  - Do not remove legacy adPosition/adClick while adding adTelemetryV2.
+checks:
+  - Local build or targeted type/lint check for touched telemetry files.
+  - Runtime mock captures adTelemetryV2 and legacy adPosition where applicable.
+  - Runtime mock captures statsEvent(in_page) with extra.stats_pv_id.
+  - No Android bridge "non-injected object" error in console.
+evidence:
+  - kind: progress
+    path: /Users/xin/feature-update/.ai/plan/progress/webnovel-telemetry-nuxt404-summary-20260526.md
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ai_novabeats-wt-ad-telemetry-v2/novoki-ad-telemetry-v2-20260422/issue.md
+    note: ai_novabeats adTelemetryV2 stable source and validation.
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ai_novabeats-wt-jsbridge-fix/novoki-jsbridge-fix-20260424/issue.md
+    note: JSCallAndroid bridge context fix for adTelemetryV2/adClick/adPosition.
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ai_novabeats/stats-event-in-page-historical-20260512/issue.md
+    note: ai_novabeats stats_pv_id correlation pattern.
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ptc_v5_reading/stats-event-in-page-story-20260512/issue.md
+    note: ptc_v5_reading statsEvent retry/fallback and online validation.
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/feature-update/task3-ad-impression-3076-templates-20260524/issue.md
+    note: webnovel adPosition global reporting follow-up.

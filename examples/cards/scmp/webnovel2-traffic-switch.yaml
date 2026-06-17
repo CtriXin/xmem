@@ -29,9 +29,14 @@ template: webnovel2
 project: ptc_v5_reading
 repo: git@gitlab.adsconflux.xyz:ptc/fe/ptc_v5_reading.git
 repo_local_hints:
+  - /Users/xin/ptc_v5_reading
+historical_worktree_hints:
   - /Users/xin/ptc_v5_reading__home3_ads_t102748
   - /Users/xin/ptc_v5_reading__test_sync_home3_20260523
   - /Users/xin/ptc_v5_reading_wt_1.0.19.9
+local_hint_policy:
+  - Treat repo_local_hints as convenience only; verify the path exists before use.
+  - Historical worktree hints may be absent on the current host; use the base repo plus git branch inspection instead of broad filesystem search.
 prod_service: ptc-v5-novabeats1
 validation_service: ptc-v5-novabeats1-test
 prod_pipeline_hint: ptc-v5-novabeats1-2210
@@ -39,6 +44,21 @@ validation_pipeline_hint: ptc-v5-novabeats1-test-2440
 prod_branch_hint: t102748-home3-ads-20260522
 validation_branch_hint: test/nuxt-cos-fallback-20260514
 approval_group: 域名自动化流程
+feature_support:
+  ad_telemetry:
+    status: test_branch_port_available
+    ref_card: scmp.webnovel.telemetry-pattern
+    note: ptc_v5_reading test commit a430dc7 ports adTelemetryV2 while preserving legacy adPosition/adClick behavior.
+  stats_event:
+    status: test_service_verified
+    ref_card: scmp.webnovel.telemetry-pattern
+    note: statsEvent uses stats_pv_id and bridge retry/fallback on the test branch.
+  nuxt_cos_fallback:
+    status: validation_service_verified_only
+    ref_card: scmp.nuxt-cos-fallback-hard-constraints
+    services:
+      - ptc-v5-novabeats1-test
+    note: Do not infer production support; Dockerfile/COS/env/backfill gates still apply per rollout.
 role_semantics:
   - validation_service is not a generic test environment; it is a candidate service used to validate new feature behavior before traffic switch.
   - Service names may contain -test, but agents must not infer QA/test-environment semantics from the name.
@@ -67,6 +87,7 @@ apex_www_policy:
   - Always live-verify each target with rf getcf / lookup before switch.
 common_verification:
   - xmem preflight 网文2 <domain> traffic switch
+  - xmem context webnovel telemetry Nuxt COS fallback
   - lookup <domain>
   - rf getcf <domain>
   - SCMP safe-access for current service domains plus target sample domain.
@@ -80,8 +101,15 @@ stale_policy:
   - Domain-to-service binding and current deploy state must be live verified before deploy or traffic switch.
   - Repo-to-service relation can be used as verified starting truth for routing.
   - Branch hints are task/time scoped and must be checked against git/SCMP before release.
+  - Nuxt/COS fallback support is validation-service evidence only unless current production rollout evidence says otherwise.
   - Project Wiki pending rows are hint-only unless promoted by Project Wiki export.
 evidence:
+  - kind: progress
+    path: /Users/xin/feature-update/.ai/plan/progress/webnovel-telemetry-nuxt404-summary-20260526.md
+  - kind: method-card
+    path: /Users/xin/auto-skills/CtriXin-repo/xmem/examples/cards/scmp/nuxt-cos-fallback-hard-constraints.yaml
+  - kind: method-card
+    path: /Users/xin/auto-skills/CtriXin-repo/xmem/examples/cards/scmp/webnovel-telemetry-pattern.yaml
   - kind: issue
     path: /Users/xin/issue-tracking/issues/ptc_v5_reading/sync-biography-home3-to-test-20260523/issue.md
   - kind: issue

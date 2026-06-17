@@ -1,0 +1,81 @@
+id: scmp.ssr-no-cdn-deploy-guard
+type: method
+title: SCMP SSR no-CDN deploy guard
+scope:
+  system: scmp
+  feature: ssr-no-cdn-deploy
+aliases:
+  - SSR no-CDN deploy
+  - empty .deploy-path
+  - omit deploy path
+  - ptc-ai-inflation
+  - browser User-Agent curl smoke
+  - deploy wait pipeline infer
+  - TencentKey not required
+truth:
+  status: partial
+  confidence: 0.84
+  basis:
+    - verified_issue_record
+    - deployment_evidence
+    - single_incident_method
+  last_checked_at: 2026-05-26T13:47:55Z
+summary: >-
+  For Docker SSR services that serve assets from the pod and do not use CDN/COS,
+  omit .deploy-path entirely. An empty .deploy-path can block SCMP deploy payload
+  guards. Keep approval fields compact, avoid TencentKey/CDN upload unless COS
+  fallback is introduced, and use curl with a browser User-Agent when Python
+  urllib gets a fronted-domain 403 during route smoke.
+approval_fields:
+  include:
+    - Git URL
+    - deploy branch
+    - Node version
+    - Docker image
+    - start command
+    - port
+    - build needed
+    - build and push needed
+    - TencentKey needed
+    - CDN upload needed
+    - refresh after deploy
+  compact_rule: If a field is not applicable, answer no directly.
+deploy_policy:
+  deploy_path: omit_for_ssr_no_cdn
+  tencent_key: not_required_unless_cos_or_cdn_upload
+  cdn_upload: not_required_unless_assets_are_offloaded
+  refresh: run_after_deploy_when_public_cache_or_fronted_domain_is involved
+must_include:
+  - For SSR/no-CDN services, delete empty .deploy-path before deploy; do not commit a placeholder file.
+  - Keep new-service approval messages to compact runtime/deploy fields; avoid product narrative and local logs.
+  - If scmp deploy --wait does not poll because pipeline id is missing, infer the pipeline from deploy stdout or manually poll runtime current until terminal state.
+  - Treat run success as incomplete until pod convergence, refresh when needed, safe-access, and route smoke pass.
+  - If Python urllib returns 403 on a fronted production route, retry with curl and a browser User-Agent before marking route smoke failed.
+  - Do not claim www/apex sibling domains verified until upstream binding and live smoke pass for that exact host.
+forbid:
+  - Do not add TencentKey or CDN/COS upload to SSR pod-served services without an actual COS/CDN fallback requirement.
+  - Do not paste raw deploy/current/pod JSON into xmem; cite compact evidence paths.
+  - Do not treat scmp.py deploy stdout as enough evidence without runtime current/pod/safe-access checks.
+  - Do not claim www.inflation-a.storygi.com verified from apex-only evidence.
+checks:
+  - .deploy-path does not exist for SSR/no-CDN deploys, or payload guard reports deploy_path_policy=omit.
+  - Approval readback contains compact runtime fields and no long product narrative.
+  - Runtime current/pod evidence reaches terminal success and image convergence.
+  - safe-access passes after refresh when refresh is needed.
+  - Route smoke uses curl/browser User-Agent if Python urllib gets 403.
+evidence:
+  - kind: issue
+    path: /Users/xin/issue-tracking/issues/ptc-ai-inflation/t102631-global-inflation-site/issue.md
+    note: Verified ptc-ai-inflation SSR deployment, empty .deploy-path removal, safe-access, and route smoke.
+  - kind: artifact
+    path: /Users/xin/ptc-ai-inflation/.scmp-runs/deploy-0.1.0.2/summary.json
+    note: Deploy summary shows deploy_path_policy=omit and payload guard passed.
+  - kind: artifact
+    path: /Users/xin/ptc-ai-inflation/.scmp-runs/deploy-0.1.0.2/safe-access-after-refresh.json
+    note: Safe-access passed after refresh.
+  - kind: artifact
+    path: /Users/xin/ptc-ai-inflation/.scmp-runs/deploy-0.1.0.2/route-smoke-curl.log
+    note: Curl route smoke with browser User-Agent passed for production routes.
+  - kind: local-card
+    path: /Users/xin/scmp-ops/.xmem/cards/scmp.rule.approval-message-runtime-fields.yaml
+    note: Existing SCMP approval runtime fields rule; keep owner source in scmp-ops.
