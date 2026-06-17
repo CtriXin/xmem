@@ -117,7 +117,9 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--alias", action="append", default=[])
     init.add_argument("--force", action="store_true", help="允许覆盖已有 .xmem")
 
-    sub.add_parser("index", help="把本地 .xmem cards 写入全局 index").add_argument("path", nargs="?", default=".")
+    index_p = sub.add_parser("index", help="把本地 .xmem cards 写入全局 index")
+    index_p.add_argument("path", nargs="?", default=None, help="repo 路径；默认当前目录")
+    index_p.add_argument("--cwd", default="", help="兼容 Agent 调用习惯；等同于指定 repo 路径")
 
     imp = sub.add_parser("import", help="导入 read-only sources")
     imp_sub = imp.add_subparsers(dest="source", required=True, metavar="<source>", parser_class=XmemArgumentParser)
@@ -354,6 +356,10 @@ def build_parser() -> argparse.ArgumentParser:
     why.add_argument("query")
     why.add_argument("--json", action="store_true", help="输出 JSON")
 
+    why_last = sub.add_parser("why-last", help="显示最近 N 次检索/hook 实际注入了什么(读 gain.jsonl)")
+    why_last.add_argument("limit", nargs="?", type=int, default=10, help="最近多少条，默认 10")
+    why_last.add_argument("--json", action="store_true", help="输出 JSON")
+
     fix = sub.add_parser("fix", help="记录 alias 纠错或争议")
     fix.add_argument("entity", nargs="?")
     fix.add_argument("items", nargs="*", help="可写 wrong=... correct=... basis=...，否则按提示回答")
@@ -401,7 +407,10 @@ def main(argv: List[str] | None = None) -> int:
         print(f"global: {home_dir()}")
         return 0
     if args.cmd == "index":
-        count = index_local(Path(args.path))
+        if args.cwd and args.path:
+            print("xmem index: use either positional path or --cwd, not both", file=sys.stderr)
+            return 2
+        count = index_local(Path(args.cwd or args.path or "."))
         print(f"indexed {count} local cards")
         return 0
     if args.cmd == "import":
@@ -686,6 +695,8 @@ def main(argv: List[str] | None = None) -> int:
         return open_cmd(args)
     if args.cmd == "why":
         return why_cmd(args)
+    if args.cmd == "why-last":
+        return why_last_cmd(args)
     if args.cmd == "fix":
         return fix_cmd(args)
     if args.cmd == "hook":
@@ -1094,6 +1105,45 @@ def why_cmd(args: argparse.Namespace) -> int:
             print(f"{i}. {item['id']} [{item['truth']}] score={item['score']}")
             print(f"   why: {item['why']}")
             print(f"   source: {item['source_ref']}")
+    return 0
+
+
+def why_last_cmd(args: argparse.Namespace) -> int:
+    """Show what the last N retrievals/hooks actually surfaced, from gain.jsonl.
+
+    Makes the otherwise-invisible auto-injection observable: each line is one
+    real recall event with the query, the top card it returned, and why.
+    """
+    from .util import home_dir, load_jsonl
+
+    relevant_sources = {"recall", "context", "preflight", "gateway", "resume", "why", "search"}
+    rows = [
+        row
+        for row in load_jsonl(home_dir() / "gain.jsonl")
+        if str(row.get("event", "")).rsplit(".", 1)[-1] in {"hit", "miss"}
+        and str(row.get("source", "")) in relevant_sources
+    ]
+    recent = rows[-max(1, args.limit):]
+    if args.json:
+        print(json.dumps(recent, ensure_ascii=False, indent=2))
+        return 0
+    if not recent:
+        print("(gain.jsonl 还没有检索事件)")
+        return 0
+    print(f"最近 {len(recent)} 次检索注入(query → top card → why):")
+    for row in recent:
+        ts = str(row.get("ts", ""))[:16].replace("T", " ")
+        event = str(row.get("event", ""))
+        query = str(row.get("query", "")).replace("\n", " ").strip()
+        if len(query) > 56:
+            query = query[:55] + "…"
+        top = str(row.get("top_card", "")) or "—"
+        status = str(row.get("top_status", "")) or "?"
+        score = row.get("top_score", 0)
+        matches = row.get("matches", 0)
+        why = str(row.get("top_why", "")) or "—"
+        print(f"  {ts}  {event:<14} q=\"{query}\"")
+        print(f"      → {top}  [{status} score={score} matches={matches}]  why={why}")
     return 0
 
 

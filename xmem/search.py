@@ -10,6 +10,40 @@ from .util import append_jsonl, home_dir, load_jsonl, normalize_text, query_hash
 
 TOKEN_SAVING_EVENTS = {"context", "preflight", "resume", "gateway"}
 
+# Query terms that substring-match a large fraction of the card alias/metadata
+# blob and therefore carry no real signal. Kept small and conservative: common
+# CJK function words plus pasted-screenshot / url noise. Identity still flows
+# through the variant / exact-alias path, so dropping these only removes noise.
+NOISE_TERMS = frozenset({
+    "需要", "没有", "可以", "应该", "继续", "已经", "这个", "那个", "就是", "什么",
+    "怎么", "我们", "你们", "他们", "这样", "那样", "但是", "所以", "因为", "如果",
+    "或者", "还是", "一个", "这些", "那些", "知道", "觉得", "现在", "然后", "出来",
+    "image", "img", "png", "jpg", "jpeg", "screenshot",
+    "the", "and", "for", "you", "are", "this", "that", "with", "none", "null",
+})
+
+
+def is_weak_term(term_norm: str) -> bool:
+    """True for a query term too generic to count as alias/metadata evidence.
+
+    A single character or bare stopword substring-matches a large share of the
+    2k+ card alias blob, so an unanchored ``in`` test turns it into a high-scoring
+    phantom hit (e.g. ``alias_term:需要``). Real identity matching goes through the
+    variant / exact-alias path, so skipping these terms only drops noise.
+    """
+    return len(term_norm) < 2 or term_norm in NOISE_TERMS
+
+
+def digit_boundary_match(term_norm: str, text: str) -> bool:
+    """Match a pure-number term only when it stands as a whole number in ``text``.
+
+    Stops ``2`` from matching inside ``0602`` / ``v5.2`` / dates while still letting
+    a real numeric id like ``4638`` match ``adx-4638``.
+    """
+    if not term_norm:
+        return False
+    return re.search(r"(?<![0-9])" + re.escape(term_norm) + r"(?![0-9])", text) is not None
+
 
 def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_event: str = "search") -> List[Dict[str, Any]]:
     terms = query_terms(query)[:32]
@@ -84,13 +118,24 @@ def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_
             if not term:
                 continue
             term_norm = normalize_text(term)
-            if term_norm and term_norm in alias_norm:
+            if not term_norm or is_weak_term(term_norm):
+                # Single chars / stopwords match nearly every card's alias blob.
+                continue
+            if term_norm.isdigit():
+                # Pure numbers only count at numeric boundaries, so a bare "2"
+                # no longer phantom-matches inside "0602" / "v5.2" / dates.
+                in_alias = digit_boundary_match(term_norm, alias_norm)
+                in_meta = digit_boundary_match(term_norm, meta_norm)
+            else:
+                in_alias = term_norm in alias_norm
+                in_meta = term_norm in meta_norm
+            if in_alias:
                 score += 3.0
                 why.append(f"alias_term:{term}")
-            elif term_norm and term_norm in meta_norm:
+            elif in_meta:
                 score += 2.0
                 why.append(f"metadata_term:{term}")
-            elif term_norm and body_contains(term_norm, term):
+            elif body_contains(term_norm, term):
                 # Body matches are evidence hints, not identity proof.
                 score += 0.35
                 why.append(f"body_term:{term}")
