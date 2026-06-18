@@ -2041,7 +2041,6 @@ def test_mcp_stdio(tmp_path: Path):
 
     assert responses[0]["result"]["serverInfo"]["name"] == "xmem"
     assert any(tool["name"] == "memory/recall" for tool in responses[1]["result"]["tools"])
-    assert any(tool["name"] == "memory/semantic_grep" for tool in responses[1]["result"]["tools"])
     assert any(tool["name"] == "memory/maintain" for tool in responses[1]["result"]["tools"])
     assert promoted["card_id"] in responses[2]["result"]["content"][0]["text"]
 

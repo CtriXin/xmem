@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import json
-import re
 import sys
 from pathlib import Path
 from typing import Any, Dict
 
 from . import __version__
 from .maintenance import build_memory_maintenance
-from .memory import build_recall, capture_memories, compact_text, review_pending, synthesize_profile
-from .util import home_dir, slugify
+from .memory import build_recall, capture_memories, review_pending, synthesize_profile
 
 
 TOOLS = [
@@ -58,15 +56,6 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {"cwd": {"type": "string"}, "limit": {"type": "integer"}, "all": {"type": "boolean"}},
-        },
-    },
-    {
-        "name": "memory/semantic_grep",
-        "description": "Run semantic grep-lite over local memory.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"query": {"type": "string"}, "cwd": {"type": "string"}, "limit": {"type": "integer"}},
-            "required": ["query"],
         },
     },
     {
@@ -150,49 +139,11 @@ def call_tool(name: str, arguments: Dict[str, Any]) -> str:
             include_all=bool(arguments.get("all")),
             limit=int(arguments.get("limit") or 20),
         )
-    elif name == "memory/semantic_grep":
-        packet = semantic_grep_packet(str(arguments.get("query") or ""), cwd=cwd, limit=int(arguments.get("limit") or 8))
     elif name == "memory/maintain":
         packet = build_memory_maintenance(cwd=cwd, limit=int(arguments.get("limit") or 250))
     else:
         raise ValueError(f"unknown tool: {name}")
     return json.dumps(packet, ensure_ascii=False, indent=2)
-
-
-def semantic_grep_packet(query: str, *, cwd: Path | None = None, limit: int = 8) -> Dict[str, Any]:
-    packet = build_recall(query, cwd=cwd, limit=limit, include_pending=True)
-    hits = []
-    for item in packet.get("memories") or []:
-        hits.append(
-            {
-                "id": item.get("id"),
-                "type": item.get("type"),
-                "title": item.get("title"),
-                "score": item.get("score"),
-                "truth": item.get("truth"),
-                "why": item.get("why") or [],
-                "source_ref": item.get("source_ref") or item.get("path"),
-                "smfs_path": semantic_file_path(item),
-                "snippet": compact_text(str(item.get("summary") or ""), 220),
-            }
-        )
-    return {
-        "schema": "xmem.smfs_grep.v1",
-        "query": query,
-        "mode": "semantic_grep_lite",
-        "signals": packet.get("ranking", {}).get("signals") or [],
-        "hits": hits,
-        "pending_hints": packet.get("pending") or [],
-        "token_estimate": packet.get("token_estimate", 0),
-    }
-
-
-def semantic_file_path(item: Dict[str, Any]) -> str:
-    card_id = str(item.get("id") or "memory")
-    source = str(item.get("source_ref") or item.get("path") or "")
-    match = re.search(r"/([^/]+)/\.xmem/cards/", source)
-    project = match.group(1) if match else "global"
-    return str(home_dir() / "smfs" / "cards" / slugify(project, "project") / f"{slugify(card_id, 'memory')}.md")
 
 
 def result_response(request_id: Any, result: Dict[str, Any]) -> Dict[str, Any]:
