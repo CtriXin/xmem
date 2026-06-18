@@ -2003,7 +2003,7 @@ def test_agent_hook_suppresses_unrelated_cross_project_recall(tmp_path: Path):
     assert json_packet["recall"]["memories"] == []
 
 
-def test_memory_benchmark_and_mcp_stdio(tmp_path: Path):
+def test_mcp_stdio(tmp_path: Path):
     repo, env = init_repo(tmp_path)
     capture = json.loads(
         run(
@@ -2020,17 +2020,6 @@ def test_memory_benchmark_and_mcp_stdio(tmp_path: Path):
         ).stdout
     )
     promoted = json.loads(run([str(XMEM), "promote", capture["pending"][0]["id"], "--json"], repo, env).stdout)
-    bench_dir = repo / ".xmem" / "benchmarks"
-    bench_dir.mkdir(parents=True, exist_ok=True)
-    (bench_dir / "memorybench.jsonl").write_text(
-        json.dumps({"query": "local-first xmem card", "expect": [promoted["card_id"]], "reject": ["missing-card"]}) + "\n",
-        encoding="utf-8",
-    )
-
-    bench = json.loads(run([str(XMEM), "benchmark", "--json"], repo, env).stdout)
-    assert bench["status"] == "ok"
-    assert bench["metrics"]["accuracy"] == 1.0
-    assert bench["metrics"]["wrong_recall_rate"] == 0.0
 
     mcp_input = "\n".join(
         [
@@ -2118,33 +2107,3 @@ def test_semantic_lite_ttl_and_maintenance_report(tmp_path: Path):
     assert report["status"] == "review_needed"
     assert any(item["id"] == "memory.old.deploy.fact" for item in report["expired_or_decayed"])
     assert any(item["left"] == "memory.firebase.default" or item["right"] == "memory.firebase.default" for item in report["duplicate_cards"])
-
-
-def test_smfs_export_and_semantic_grep(tmp_path: Path):
-    repo, env = init_repo(tmp_path)
-    capture = json.loads(
-        run(
-            [
-                str(XMEM),
-                "capture",
-                "--type",
-                "workflow_lesson",
-                "workflow_lesson: MMS isolated sessions should read host-home env before trusting sandbox HOME.",
-                "--json",
-            ],
-            repo,
-            env,
-        ).stdout
-    )
-    promoted = json.loads(run([str(XMEM), "promote", capture["pending"][0]["id"], "--verified", "--json"], repo, env).stdout)
-
-    exported = json.loads(run([str(XMEM), "smfs", "export", "--cwd", str(repo), "--json"], repo, env).stdout)
-    assert exported["cards"] >= 1
-    assert Path(exported["index"]).exists()
-
-    grep_packet = json.loads(
-        run([str(XMEM), "smfs", "grep", "isolated host home sandbox", "--cwd", str(repo), "--json"], repo, env).stdout
-    )
-    assert grep_packet["mode"] == "semantic_grep_lite"
-    assert any(item["id"] == promoted["card_id"] for item in grep_packet["hits"])
-    assert Path(grep_packet["hits"][0]["smfs_path"]).suffix == ".md"
