@@ -10,3 +10,4 @@ dist/
 .codegraph/
 .level-up/
 .ai/agent-release-notes.md
+.worktrees/
