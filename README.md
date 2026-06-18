@@ -113,8 +113,6 @@ xmem why "car ads lazyload"
 xmem open ads.lazyload
 xmem new
 xmem check --sources
-xmem fix
-xmem suppress --card ads.lazyload --for-query "ads lazyload change" --reason irrelevant
 xmem gain
 xmem gain confirm "ads lazyload"
 ```
@@ -293,33 +291,17 @@ xmem capture --from-session session.md --scope project --confidence 0.6
 xmem review-pending
 xmem promote <pending-id>        # writes a compact card, default truth is partial
 xmem promote <pending-id> --verified
-xmem promote-trellis --source-card <id> --decision distill --decided-by human:xin --basis "reviewed"
 xmem recall "local-first memory" # compact hybrid recall packet
 xmem profile --cwd .             # writes ~/.xmem/profile/user.md and project profile
-xmem forget <memory-or-card-id>
-xmem supersede <old-id> <new-id>
 xmem agent-hook UserPromptSubmit --host codex
 xmem agent-hook Stop --host claude
-xmem benchmark .xmem/benchmarks/memorybench.jsonl
-xmem smfs export
-xmem smfs grep "isolated host home"
-xmem maintain
-xmem mcp
 ```
 
 P1 retrieval is local hybrid: existing card scoring plus SQLite FTS5, keyword, semantic-lite n-gram rerank, project match, confidence, recency, TTL decay, and lifecycle filtering. Files remain truth; SQLite and FTS are generated cache. Optional embeddings can be added later, but xmem does not require non-stdlib dependencies for the local memory path.
 
 `xmem capture --from-session` also accepts structured blocks with `type`, `summary`, `scope`, `confidence`, `evidence_path`, `ttl`, `supersedes`, and `aliases`. These fields stay on the pending record so review/promotion keeps the evidence trail.
 
-`xmem promote-trellis` is the only Trellis-specific promotion path. `distill` creates a new pending memory from a reviewed claim, `keep-pointer` leaves the Trellis card as a guarded source pointer, and `reject` records the decision only. Every decision writes `~/.xmem/audit/trellis-promotion-audit.jsonl`; the original Trellis card remains non-verified.
-
 `xmem agent-hook` is for Claude/Codex style automatic memory. `UserPromptSubmit` emits a compact recall packet only when useful and captures durable-looking prompt facts into pending; `Stop`/`SessionEnd` refresh profile files and captures durable transcript lessons into pending. Hooks are fail-open and do not promote memory directly. Default hook output is compact; use `--verbose` or `--json` only when debugging recall details.
-
-`xmem smfs export` projects indexed cards to `~/.xmem/smfs/cards/**/*.md` so agents can inspect memory as files without a daemon. `xmem smfs grep "<query>"` is semantic grep-lite over the same local memory packet.
-
-`xmem maintain` reports expired/decayed TTL cards, duplicate card candidates, and duplicate pending memories. It does not rewrite truth; use `xmem supersede` or `xmem forget` only after evidence review.
-
-`xmem benchmark` is a local MemoryBench-lite runner for JSONL/JSON cases with `query`, `expect`, and optional `reject`. It reports accuracy, latency, estimated injected tokens, and wrong recall rate. `xmem mcp` exposes stdio tools for `memory/capture`, `memory/recall`, `memory/semantic_grep`, `memory/maintain`, `context/profile`, and `memory/review_pending`.
 
 ## Agent hooks
 
@@ -426,8 +408,6 @@ Preflight severity policy: hints only route the next read; warnings require pres
 
 If a query hits a correction card, xmem expands the canonical alias as an extra search internally and marks the packet as `guided_by_correction` instead of pretending the wrong alias is reliable truth.
 
-If a card is true but irrelevant for the current query, use `xmem suppress --card <id> --for-query <query-or-hash> --reason irrelevant`. This writes a local feedback row and downranks that card for the exact query hash only; it does not change card truth, Project Wiki, or Issue Record.
-
 When a query hits a verified `traffic.switch` card, `xmem context` surfaces a `traffic_switch` packet before lower-confidence Project Wiki pending rows. This gives agents prod/validation service, repo, branch hints, approval group, common verification, stale policy, and "what lookup can be skipped" guidance without scanning issue-tracking. Domain/service binding and latest deploy state still require live verification.
 
 Traffic switch wording matters: `validation_service` is a candidate traffic target used to verify new behavior before cutover. It is not a generic test environment, even when the service name contains `-test`.
@@ -461,15 +441,9 @@ xmem preflight <query>      # dev-start bug guards and required checks
 xmem preflight --fields domain=... task=...  # structured preflight to avoid context pollution
 xmem check --sources        # validate Project Wiki / Issue Record exports
 xmem import project-memory  # import CONTEXT/ADR/OpenSpec/Spec Kit/Trellis from this folder
-xmem import openspec        # import OpenSpec files only
-xmem import speckit         # import Spec Kit files only
-xmem import trellis         # import Trellis files only
-xmem promote-trellis --source-card <id> --decision distill|reject|keep-pointer --decided-by human:xin --basis "..."
 xmem new                    # create/register .xmem for this folder
 xmem why <query>            # explain matches
 xmem open <card-id-or-query>
-xmem fix                    # record alias correction/dispute
-xmem suppress --card <id> --for-query <query/hash>  # mark true-but-irrelevant match for ranking only
 xmem gain                   # full gain event/query/card dashboard
 xmem gain --summary         # key gain summary only
 xmem gain --detail          # compatibility alias for the full dashboard

@@ -9,7 +9,6 @@ from typing import Any, List
 
 from . import __version__
 from .agent_hooks import run_agent_hook
-from .benchmark import format_benchmark, run_memory_benchmark
 from .checks import check_diff
 from .code_index import code_index_status, import_code_indexes
 from .context import build_context, canonical_queries_from_corrections
@@ -49,7 +48,6 @@ from .preflight import build_preflight
 from .resume import build_resume
 from .search import latest_events, record_suppression, search_cards
 from .setup import setup_workspace
-from .smfs import export_smfs, format_smfs_export, format_smfs_grep, grep_smfs
 from .source_check import check_source_exports, compact_source_health
 from .sources import audit_local_sources, index_registered_sources, load_sources, register_local_root, registered_roots, sources_path
 from .store import connect, rows
@@ -71,6 +69,29 @@ class XmemArgumentParser(argparse.ArgumentParser):
         self._optionals.title = "选项"
         if add_help:
             self.add_argument("-h", "--help", action="help", help="显示帮助并退出")
+
+    def _check_value(self, action, value):
+        hidden = getattr(action, "_xmem_hidden_choices", set())
+        if hidden and value not in action.choices:
+            visible_choices = {key: val for key, val in action.choices.items() if key not in hidden}
+            original_choices = action.choices
+            action.choices = visible_choices
+            try:
+                return super()._check_value(action, value)
+            finally:
+                action.choices = original_choices
+        return super()._check_value(action, value)
+
+
+def add_hidden_parser(subparsers, name: str, **kwargs):
+    parser = subparsers.add_parser(name, help=argparse.SUPPRESS, **kwargs)
+    hidden = getattr(subparsers, "_xmem_hidden_choices", set())
+    hidden.add(name)
+    subparsers._xmem_hidden_choices = hidden
+    subparsers._choices_actions = [
+        action for action in subparsers._choices_actions if getattr(action, "dest", None) != name
+    ]
+    return parser
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -136,11 +157,11 @@ def build_parser() -> argparse.ArgumentParser:
     patterns_imp.add_argument("path", nargs="?", default="bug-patterns.jsonl")
     ctx_imp = imp_sub.add_parser("context-docs", help="导入 CONTEXT.md 和 ADR Markdown")
     ctx_imp.add_argument("path", nargs="?", default=".")
-    openspec_imp = imp_sub.add_parser("openspec", help="导入 OpenSpec specs / changes")
+    openspec_imp = add_hidden_parser(imp_sub, "openspec")
     openspec_imp.add_argument("path", nargs="?", default=".")
-    speckit_imp = imp_sub.add_parser("speckit", help="导入 Spec Kit specs / plans / tasks / constitution")
+    speckit_imp = add_hidden_parser(imp_sub, "speckit")
     speckit_imp.add_argument("path", nargs="?", default=".")
-    trellis_imp = imp_sub.add_parser("trellis", help="导入 Trellis specs / tasks / workspace memory")
+    trellis_imp = add_hidden_parser(imp_sub, "trellis")
     trellis_imp.add_argument("path", nargs="?", default=".")
     memory_imp = imp_sub.add_parser("project-memory", help="导入已知 project memory / spec sources")
     memory_imp.add_argument("path", nargs="?", default=".")
@@ -187,7 +208,7 @@ def build_parser() -> argparse.ArgumentParser:
     gateway.add_argument("--json", action="store_true", help="输出 JSON（等同 --format json）")
     gateway.add_argument("--dry-run", action="store_true", help="只展示 would inject/skip，不代表已注入")
 
-    suppress = sub.add_parser("suppress", help="标记某 card 对某 query 不相关，只影响 ranking")
+    suppress = add_hidden_parser(sub, "suppress")
     suppress.add_argument("--card", required=True, help="card id")
     suppress.add_argument("--for-query", required=True, help="原 query 或 query_hash")
     suppress.add_argument("--reason", default="irrelevant", help="原因，默认 irrelevant")
@@ -284,7 +305,7 @@ def build_parser() -> argparse.ArgumentParser:
     promote.add_argument("--scope", default="", help="覆盖 pending scope")
     promote.add_argument("--json", action="store_true", help="输出 JSON")
 
-    promote_trellis = sub.add_parser("promote-trellis", help="显式裁决 Trellis artifact：distill/reject/keep-pointer")
+    promote_trellis = add_hidden_parser(sub, "promote-trellis")
     promote_trellis.add_argument("--source-card", required=True, help="Trellis card id")
     promote_trellis.add_argument("--decision", choices=["distill", "reject", "keep-pointer"], required=True)
     promote_trellis.add_argument("--decided-by", required=True, help="human:<name>|review:<path>|agent:<model>@<session>")
@@ -296,13 +317,13 @@ def build_parser() -> argparse.ArgumentParser:
     promote_trellis.add_argument("--cwd", default=".")
     promote_trellis.add_argument("--json", action="store_true", help="输出 JSON")
 
-    forget = sub.add_parser("forget", help="忘记 pending 或 card id，recall 会过滤")
+    forget = add_hidden_parser(sub, "forget")
     forget.add_argument("memory_id")
     forget.add_argument("--cwd", default=".")
     forget.add_argument("--reason", default="")
     forget.add_argument("--json", action="store_true", help="输出 JSON")
 
-    supersede = sub.add_parser("supersede", help="标记 old memory 被 new memory/card 取代")
+    supersede = add_hidden_parser(sub, "supersede")
     supersede.add_argument("old_id")
     supersede.add_argument("new_id")
     supersede.add_argument("--cwd", default=".")
@@ -318,30 +339,12 @@ def build_parser() -> argparse.ArgumentParser:
     agent_hook.add_argument("--verbose", action="store_true", help="显示完整 recall summaries/evidence；默认 compact")
     agent_hook.add_argument("--json", action="store_true", help="输出 JSON")
 
-    bench = sub.add_parser("benchmark", help="MemoryBench-lite: accuracy/latency/tokens/wrong recall")
-    bench.add_argument("cases", nargs="?", default="", help="JSONL/JSON cases; default .xmem/benchmarks/memorybench.jsonl")
-    bench.add_argument("--cwd", default=".")
-    bench.add_argument("--limit", type=int, default=8)
-    bench.add_argument("--json", action="store_true", help="输出 JSON")
-
-    smfs = sub.add_parser("smfs", help="SMFS-lite: export cards as files or run semantic grep")
-    smfs_sub = smfs.add_subparsers(dest="smfs_cmd", required=True, metavar="<操作>", parser_class=XmemArgumentParser)
-    smfs_export = smfs_sub.add_parser("export", help="导出 ~/.xmem/smfs/cards/*.md 文件投影")
-    smfs_export.add_argument("--cwd", default=".")
-    smfs_export.add_argument("--limit", type=int, default=500)
-    smfs_export.add_argument("--json", action="store_true", help="输出 JSON")
-    smfs_grep = smfs_sub.add_parser("grep", help="semantic grep-lite over local memory")
-    smfs_grep.add_argument("query")
-    smfs_grep.add_argument("--cwd", default=".")
-    smfs_grep.add_argument("--limit", type=int, default=8)
-    smfs_grep.add_argument("--json", action="store_true", help="输出 JSON")
-
-    maintain = sub.add_parser("maintain", help="检查 memory TTL、重复候选、pending 合并建议")
+    maintain = add_hidden_parser(sub, "maintain")
     maintain.add_argument("--cwd", default=".")
     maintain.add_argument("--limit", type=int, default=250)
     maintain.add_argument("--json", action="store_true", help="输出 JSON")
 
-    sub.add_parser("mcp", help="启动 stdio MCP server，暴露 memory/capture recall profile")
+    add_hidden_parser(sub, "mcp")
 
     tail = sub.add_parser("tail", help="查看最近 registry events")
     tail.add_argument("--limit", type=int, default=10)
@@ -360,7 +363,7 @@ def build_parser() -> argparse.ArgumentParser:
     why_last.add_argument("limit", nargs="?", type=int, default=10, help="最近多少条，默认 10")
     why_last.add_argument("--json", action="store_true", help="输出 JSON")
 
-    fix = sub.add_parser("fix", help="记录 alias 纠错或争议")
+    fix = add_hidden_parser(sub, "fix")
     fix.add_argument("entity", nargs="?")
     fix.add_argument("items", nargs="*", help="可写 wrong=... correct=... basis=...，否则按提示回答")
     fix.add_argument("--json", action="store_true", help="输出 JSON")
@@ -620,28 +623,6 @@ def main(argv: List[str] | None = None) -> int:
         if output:
             print(output)
         return 0
-    if args.cmd == "benchmark":
-        packet = run_memory_benchmark(Path(args.cases) if args.cases else None, cwd=Path(args.cwd), limit=args.limit)
-        if args.json:
-            print(json.dumps(packet, ensure_ascii=False, indent=2))
-        else:
-            print(format_benchmark(packet))
-        return 0
-    if args.cmd == "smfs":
-        if args.smfs_cmd == "export":
-            packet = export_smfs(cwd=Path(args.cwd), limit=args.limit)
-            if args.json:
-                print(json.dumps(packet, ensure_ascii=False, indent=2))
-            else:
-                print(format_smfs_export(packet))
-            return 0
-        if args.smfs_cmd == "grep":
-            packet = grep_smfs(args.query, cwd=Path(args.cwd), limit=args.limit)
-            if args.json:
-                print(json.dumps(packet, ensure_ascii=False, indent=2))
-            else:
-                print(format_smfs_grep(packet))
-            return 0
     if args.cmd == "maintain":
         packet = build_memory_maintenance(cwd=Path(args.cwd), limit=args.limit)
         if args.json:
@@ -754,25 +735,15 @@ def help_cmd() -> int:
                 "- xmem gain                # 查看完整 telemetry / Top 查询 / Top Cards 面板",
                 "- xmem gain --summary      # 只看关键摘要",
                 "- xmem gain card <id>      # 解释某个 card 的命中来源和最近 query",
-            "- xmem capture --type preference \"...\"  # 捕获候选 memory 到 pending",
-            "- xmem review-pending       # 查看待审核 memory",
-            "- xmem promote <pending-id> # 提升 pending 为 compact card",
-            "- xmem promote-trellis --source-card <id> --decision distill|reject|keep-pointer --decided-by human:xin --basis \"...\"",
-            "- xmem recall <query>       # 本地 hybrid recall 小包",
-            "- xmem profile --cwd .      # 生成 user/project profile",
-            "- xmem forget <id>          # 忘记 pending 或过滤 card",
-            "- xmem supersede <old> <new> # 标记旧 memory 被新 memory 取代",
-            "- xmem agent-hook UserPromptSubmit --host codex  # Agent 自动 recall/capture",
-            "- xmem benchmark cases.jsonl # MemoryBench-lite: 命中率、延迟、token、错召回",
-            "- xmem smfs export          # 导出 ~/.xmem/smfs/cards/*.md 文件投影",
-            "- xmem smfs grep <query>    # semantic grep-lite over memory",
-            "- xmem maintain             # 检查 TTL/重复/pending 合并建议",
-            "- xmem mcp                  # stdio MCP: memory/capture recall profile",
+                "- xmem capture --type preference \"...\"  # 捕获候选 memory 到 pending",
+                "- xmem review-pending       # 查看待审核 memory",
+                "- xmem promote <pending-id> # 提升 pending 为 compact card",
+                "- xmem recall <query>       # 本地 hybrid recall 小包",
+                "- xmem profile --cwd .      # 生成 user/project profile",
+                "- xmem agent-hook UserPromptSubmit --host codex  # Agent 自动 recall/capture",
                 "- xmem why <query>         # 解释为什么匹配",
                 "- xmem open <id|query>     # 打开 card / evidence 摘要",
                 "- xmem new                 # 新项目/新文件夹初始化并注册",
-                "- xmem fix                 # 记录 alias 纠错或争议",
-                "- xmem suppress --card <id> --for-query <query/hash>  # 这张卡本次不相关，只降 ranking",
                 "",
                 "代码索引：sync 会读取已存在的 .ai/map/map.db / .codegraph/codegraph.db，只写轻量 ref；代码文件仍是真相。",
                 "",

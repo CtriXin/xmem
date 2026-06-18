@@ -8,7 +8,6 @@ from typing import Any, Dict
 from . import __version__
 from .maintenance import build_memory_maintenance
 from .memory import build_recall, capture_memories, review_pending, synthesize_profile
-from .smfs import grep_smfs
 
 
 TOOLS = [
@@ -57,15 +56,6 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {"cwd": {"type": "string"}, "limit": {"type": "integer"}, "all": {"type": "boolean"}},
-        },
-    },
-    {
-        "name": "memory/semantic_grep",
-        "description": "Run semantic grep-lite over local memory.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"query": {"type": "string"}, "cwd": {"type": "string"}, "limit": {"type": "integer"}},
-            "required": ["query"],
         },
     },
     {
@@ -149,8 +139,6 @@ def call_tool(name: str, arguments: Dict[str, Any]) -> str:
             include_all=bool(arguments.get("all")),
             limit=int(arguments.get("limit") or 20),
         )
-    elif name == "memory/semantic_grep":
-        packet = grep_smfs(str(arguments.get("query") or ""), cwd=cwd, limit=int(arguments.get("limit") or 8))
     elif name == "memory/maintain":
         packet = build_memory_maintenance(cwd=cwd, limit=int(arguments.get("limit") or 250))
     else:
