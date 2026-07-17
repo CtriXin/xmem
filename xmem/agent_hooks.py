@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
+from .hook_outcomes import record_hook_inject
 from .memory import build_recall, capture_memories, compact_text, estimate_tokens, synthesize_profile
 from .util import query_terms, utc_now
 
@@ -17,6 +18,7 @@ STOP_EVENTS = {"stop", "sessionend", "session_end", "precompact", "postcompact"}
 PROMPT_KEYS = {"prompt", "user_prompt", "userprompt", "message", "input", "query", "text"}
 CWD_KEYS = {"cwd", "working_directory", "workspace", "workspace_dir", "project_dir", "repo_path", "root"}
 TRANSCRIPT_KEYS = {"transcript_path", "transcript", "conversation_path", "session_path"}
+SESSION_ID_KEYS = {"session_id", "sessionid", "thread_id"}
 HOOK_RECALL_QUERY_LIMIT = 1200
 HOOK_NOISE_MARKERS = (
     "sessionstart hook (completed)",
@@ -65,12 +67,19 @@ def run_agent_hook(
             "generated_at": utc_now(),
         }
     if emit_json:
-        return json.dumps(result, ensure_ascii=False, indent=2)
-    if verbosity == "verbose":
-        return format_agent_hook_result_verbose(result)
-    if verbosity == "silent":
-        return ""
-    return format_agent_hook_result(result)
+        output = json.dumps(result, ensure_ascii=False, indent=2)
+    elif verbosity == "verbose":
+        output = format_agent_hook_result_verbose(result)
+    elif verbosity == "silent":
+        output = ""
+    else:
+        output = format_agent_hook_result(result)
+    if output and result.get("ok") and result.get("event") in RECALL_EVENTS:
+        try:
+            record_hook_inject(result, output)
+        except Exception:
+            pass
+    return output
 
 
 def build_agent_hook_result(
@@ -130,6 +139,8 @@ def build_agent_hook_result(
         "event": event_norm,
         "action": action,
         "cwd": str(hook_cwd),
+        "session_id": first_text(payload, SESSION_ID_KEYS),
+        "transcript_path": first_text(payload, TRANSCRIPT_KEYS),
         "recall": recall,
         "captured": captured,
         "profile_refs": (profile.get("paths") or {}) if profile else {},
