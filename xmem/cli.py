@@ -14,6 +14,7 @@ from .code_index import code_index_status, import_code_indexes
 from .context import build_context, canonical_queries_from_corrections
 from .gain import format_card_gain_dashboard, format_gain_dashboard, record_gain_confirmation, summarize_card_gain, summarize_gain
 from .gateway import run_gateway
+from .hook_outcomes import build_hook_outcomes, format_hook_outcomes
 from .health import backup_health, build_doctor_report
 from .hooks import outbox_counts, run_hook
 from .maintenance import build_memory_maintenance, format_memory_maintenance
@@ -261,6 +262,10 @@ def build_parser() -> argparse.ArgumentParser:
     gain_reject.add_argument("--note", default="")
     gain_reject.add_argument("--task", default="")
     gain_reject.add_argument("--json", action="store_true", help="输出 JSON")
+    gain_outcomes = gain_sub.add_parser("hook-outcomes", help="统计 agent-hook 注入的 card 是否被 assistant 引用（消费率）")
+    gain_outcomes.add_argument("--days", type=int, default=14, help="统计窗口天数，默认 14")
+    gain_outcomes.add_argument("--host", default="", help="只看指定 host（claude/codex）")
+    gain_outcomes.add_argument("--json", action="store_true", help="输出 JSON")
     gain_card = gain_sub.add_parser("card", help="解释某个 top_card 为什么高频命中")
     gain_card.add_argument("card_id")
     gain_card.add_argument("--json", action="store_true", help="输出 JSON")
@@ -1340,6 +1345,13 @@ def gain_cmd(args: argparse.Namespace) -> int:
             print(json.dumps(row, ensure_ascii=False, indent=2))
         else:
             print(f"gain rejected: {args.query}")
+        return 0
+    if gain_cmd_name == "hook-outcomes":
+        data = build_hook_outcomes(days=args.days, host=args.host)
+        if args.json:
+            print(json.dumps(data, ensure_ascii=False, indent=2))
+        else:
+            print(format_hook_outcomes(data))
         return 0
     if gain_cmd_name == "card":
         data = summarize_card_gain(args.card_id, limit=args.limit)
