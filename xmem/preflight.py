@@ -260,10 +260,15 @@ def build_gate(
         required_before_deploy.append("Use compact pod/safe-access/Feishu summaries; keep raw responses in evidence files.")
 
     blockers = dedupe_blockers(blockers)
-    severity = "block" if blockers else ("warn" if guard_cards or deploy_task or compact_guard else "hint")
+    blocking = blocking_only(blockers)
+    severity = (
+        "block" if blocking
+        else "warn" if blockers or guard_cards or deploy_task or compact_guard
+        else "hint"
+    )
     return {
         "severity": severity,
-        "can_proceed": not blockers,
+        "can_proceed": not blocking,
         "blockers": blockers,
         "required_before_edit": unique_strings(required_before_edit),
         "required_before_deploy": unique_strings(required_before_deploy),
@@ -311,8 +316,21 @@ def preflight_query_quality(query: str, fields: Dict[str, str], cards: List[Dict
     }
 
 
+# xmem 对自己"没把握"不等于任务有风险。这类条目照常报出来供人判断，
+# 但不再让 can_proceed 变 false —— 真实证据类 blocker(source_stale /
+# ambiguous_target / runtime pattern)才拦。2026-09-03：SCM-99 实测，
+# 目标已由上游 path_contract 明确给出时，它仍以 low_confidence 判 block，
+# executor 直接绕过照样完成，该 gate 只剩噪音。
+ADVISORY_BLOCKER_CODES = {"low_confidence_preflight_query"}
+
+
 def blocker(code: str, text: str) -> Dict[str, str]:
-    return {"code": code, "text": text, "severity": "block"}
+    severity = "advisory" if code in ADVISORY_BLOCKER_CODES else "block"
+    return {"code": code, "text": text, "severity": severity}
+
+
+def blocking_only(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [i for i in items if str(i.get("severity") or "block") != "advisory"]
 
 
 def runtime_blocker_text(code: str) -> str:

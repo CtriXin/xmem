@@ -20,6 +20,10 @@ NOISE_TERMS = frozenset({
     "或者", "还是", "一个", "这些", "那些", "知道", "觉得", "现在", "然后", "出来",
     "image", "img", "png", "jpg", "jpeg", "screenshot",
     "the", "and", "for", "you", "are", "this", "that", "with", "none", "null",
+    # Function words carry no identity. "per" (from a UI label "Hours per Day")
+    # was still scoring a project card on 2026-09-03 after the boundary fix.
+    "per", "from", "into", "when", "what", "which", "was", "were", "has", "have",
+    "but", "not", "its", "out", "over", "under", "then", "than",
 })
 
 
@@ -43,6 +47,40 @@ def digit_boundary_match(term_norm: str, text: str) -> bool:
     if not term_norm:
         return False
     return re.search(r"(?<![0-9])" + re.escape(term_norm) + r"(?![0-9])", text) is not None
+
+
+_LATIN_TERM_RE = re.compile(r"^[a-z0-9]+$")
+
+
+_SEPARATED_ALIAS_RE = re.compile(r"[.\-_]")
+
+
+def is_separated_alias(alias_norm: str) -> bool:
+    """True for a structured identifier (``a.b.c`` / ``a-b-c``), not prose.
+
+    ``normalize_text`` strips whitespace, so a multi-word title collapses into
+    one run ("Ads Context" -> "adscontext") and has no internal boundary left to
+    anchor on. Only aliases that kept a real separator can be boundary-matched.
+    """
+    return bool(_SEPARATED_ALIAS_RE.search(alias_norm))
+
+
+def latin_boundary_match(term_norm: str, text: str) -> bool:
+    """Match a latin term only at a label boundary of ``text``.
+
+    Domain/service aliases keep their ``.``/``-``/``_`` separators through
+    ``normalize_text``, so a real identity hit lands on a whole label. Without
+    this, a plain ``in`` test lets an ordinary English word from the task text
+    impersonate a domain: on 2026-09-03 (SCM-99) the term ``day`` — from the UI
+    label "Days per Week" — substring-hit ``playdaysi.com``, ``likeplaygo.com``
+    and ``gogame.smartcard.creditcard``, scoring them above the actual target.
+    """
+    for match in re.finditer(re.escape(term_norm), text):
+        before = text[match.start() - 1] if match.start() > 0 else ""
+        after = text[match.end()] if match.end() < len(text) else ""
+        if not before.isalnum() and not after.isalnum():
+            return True
+    return False
 
 
 def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_event: str = "search") -> List[Dict[str, Any]]:
@@ -81,6 +119,9 @@ def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_
             if alias_norm:
                 alias_norms.append(alias_norm)
         meta_norm = normalize_text(meta)
+        # Per-part copies so a latin term can be boundary-checked against each
+        # metadata value on its own; the joined blob loses those boundaries.
+        meta_norms = [n for n in (normalize_text(str(x).lower()) for x in meta_parts) if n]
         alias_norm = normalize_text(alias_text)
         score = 0.0
         why: List[str] = []
@@ -126,7 +167,20 @@ def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_
                 # no longer phantom-matches inside "0602" / "v5.2" / dates.
                 in_alias = digit_boundary_match(term_norm, alias_norm)
                 in_meta = digit_boundary_match(term_norm, meta_norm)
+            elif _LATIN_TERM_RE.match(term_norm):
+                # On structured aliases (domains, service slugs) a latin term must
+                # land on a whole label. Prose aliases lost their spaces in
+                # normalization, so they keep the plain substring test.
+                in_alias = any(
+                    latin_boundary_match(term_norm, a) if is_separated_alias(a) else term_norm in a
+                    for a in alias_norms
+                )
+                in_meta = any(
+                    latin_boundary_match(term_norm, m) if is_separated_alias(m) else term_norm in m
+                    for m in meta_norms
+                )
             else:
+                # CJK has no word boundary to anchor on; keep the substring test.
                 in_alias = term_norm in alias_norm
                 in_meta = term_norm in meta_norm
             if in_alias:

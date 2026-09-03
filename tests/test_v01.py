@@ -1142,7 +1142,14 @@ def test_preflight_fields_avoid_noisy_raw_query_and_clarify_unanchored_target(tm
     assert packet["query_input"]["raw_query"] == "old ptc_moviecenter evidence ad lazyload"
     assert packet["query_input"]["quality"]["status"] == "needs_clarification"
     assert packet["readiness"] == "needs_clarification"
-    assert packet["can_proceed"] is False
+    # An unanchored target is reported, not blocked: xmem being unsure about the
+    # target is not evidence that the task is risky, and callers that already got
+    # a resolved implementation_root from upstream must not be stopped by it.
+    # Evidence-backed blockers (source_stale / ambiguous_target / runtime
+    # patterns) still set can_proceed False.
+    assert packet["can_proceed"] is True
+    assert packet["severity"] == "warn"
+    assert [b["severity"] for b in packet["blockers"] if b["code"] == "low_confidence_preflight_query"] == ["advisory"]
     assert packet["must_keep"] == []
     assert packet["invariants"] == []
     assert "query_input:" in text_packet
