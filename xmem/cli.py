@@ -108,6 +108,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("help", help="显示最常用命令卡片")
 
+    lookup = sub.add_parser("lookup", help="只读历史来源检索：不建库、不迁移、不写 telemetry")
+    lookup.add_argument("query")
+    lookup.add_argument("--registry", type=Path)
+    lookup.add_argument("--limit", type=int, default=8)
+    lookup.add_argument("--json", action="store_true")
+
     status = sub.add_parser("status", help="查看索引位置、数量和 source 状态")
     status.add_argument("--json", action="store_true", help="输出 JSON")
 
@@ -396,6 +402,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: List[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.cmd == "lookup":
+        from .readonly import lookup
+        print(json.dumps(lookup(args.query, args.registry, args.limit), ensure_ascii=False, indent=2))
+        return 0
     if args.cmd == "help":
         return help_cmd()
     if args.cmd == "status":

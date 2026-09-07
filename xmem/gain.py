@@ -13,7 +13,7 @@ from .util import append_jsonl, home_dir, load_jsonl, slugify, utc_now, write_js
 
 
 def summarize_gain(limit: Optional[int] = None) -> Dict[str, object]:
-    rows = load_jsonl(home_dir() / "gain.jsonl", limit=limit)
+    rows = [row for row in load_jsonl(home_dir() / "gain.jsonl", limit=limit) if not row.get("dry_run")]
     events = Counter(row.get("event", "unknown") for row in rows)
     queries = Counter(str(row.get("query") or "") for row in rows if row.get("query"))
     top_cards = {str(row.get("top_card") or "") for row in rows if row.get("top_card")}
@@ -58,8 +58,10 @@ def summarize_gain(limit: Optional[int] = None) -> Dict[str, object]:
         "events": dict(events),
         "limit": limit,
         "scope": "all" if limit is None else "latest",
-        "estimated_tokens_saved": tokens,
-        "actual_tokens_saved": actual_tokens,
+        "estimated_tokens_saved": None,
+        "legacy_estimated_tokens_saved": tokens,
+        "actual_tokens_saved": actual_tokens or None,
+        "benefit_status": "reported_measurement" if actual_tokens else "unknown",
         "estimated_bug_prevented": bugs,
         "matches": matches,
         "rows": len(rows),
@@ -240,7 +242,8 @@ def aggregate_top_cards(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def summarize_card_gain(card_id: str, limit: Optional[int] = None) -> Dict[str, object]:
     target = str(card_id or "").strip()
-    rows = [row for row in load_jsonl(home_dir() / "gain.jsonl", limit=limit) if str(row.get("top_card") or "") == target]
+    rows = [row for row in load_jsonl(home_dir() / "gain.jsonl", limit=limit)
+            if not row.get("dry_run") and str(row.get("top_card") or "") == target]
     summary = aggregate_top_cards(rows)
     base = summary[0] if summary else {
         "card_id": target,
@@ -271,6 +274,9 @@ def summarize_card_gain(card_id: str, limit: Optional[int] = None) -> Dict[str, 
     ]
     return {
         **base,
+        "legacy_estimated_tokens_saved": base["estimated_tokens_saved"],
+        "estimated_tokens_saved": None,
+        "benefit_status": "unknown",
         "rows": len(rows),
         "limit": limit,
         "recent_hits": recent,
@@ -495,7 +501,7 @@ def format_gain_summary_dashboard(data: Dict[str, object], *, color: bool = Fals
             color,
             value_style=gain_confidence_style(confidence),
         ),
-        metric("真实收益", f"confirmed={human_number(actual_tokens)} tokens；rough={human_number(rough_tokens)} 只看趋势", color, value_style="green" if actual_tokens else "dim"),
+        metric("真实收益", f"reported={human_number(actual_tokens)} tokens；归因需核验" if actual_tokens else "unknown；命中不代表节省 tokens 或避免 Bug", color, value_style="green" if actual_tokens else "dim"),
         metric(
             "命中概览",
             f"{retrieval_calls} calls / hit {retrieval_hits} / miss {retrieval_misses}；context {context_hits}，preflight {preflight_hits}",
@@ -648,8 +654,8 @@ def format_gain_detail_dashboard(data: Dict[str, object], *, color: bool = False
         metric("返回候选累计", int(data.get("matches") or 0), color),
         metric("check 运行次数", int(observed.get("guardrail_checks") or 0), color),
         metric("规则告警次数", int(observed.get("guardrail_prevented") or 0), color, value_style="yellow"),
-        metric("理论少读 tokens", human_number(int(data.get("estimated_tokens_saved") or 0)), color, value_style="green"),
-        metric("确认省 tokens", human_number(int(data.get("actual_tokens_saved") or 0)), color, value_style="green"),
+        metric("理论少读 tokens", "unknown（已取消命中数估算）", color, value_style="dim"),
+        metric("确认省 tokens", human_number(int(data["actual_tokens_saved"])) if data.get("actual_tokens_saved") else "unknown", color, value_style="dim"),
         metric("风险提示次数", int(data.get("estimated_bug_prevented") or 0), color, value_style="yellow"),
         metric("日志计数字段", "rows / hit / miss / check / matches", color, value_style="dim"),
         metric("估算字段(非事实)", "理论少读 tokens；不是账单/真实省量", color, value_style="dim"),
@@ -781,7 +787,7 @@ def format_card_gain_dashboard(data: Dict[str, object], *, color: bool = False, 
         metric("Card", data.get("card_id", ""), color, value_style="cyan"),
         metric("命中次数", int(data.get("count") or 0), color),
         metric("状态", data.get("status") or "-", color, value_style=status_style(str(data.get("status") or ""))),
-        metric("粗估Token", human_number(int(data.get("estimated_tokens_saved") or 0)), color, value_style="green" if int(data.get("estimated_tokens_saved") or 0) else "dim"),
+        metric("真实收益", "unknown；检索记录不证明节省", color, value_style="dim"),
         metric("Matches", int(data.get("matches") or 0), color),
         metric("平均分", f"{float(data.get('avg_score') or 0):.2f}", color),
         metric("来源", ", ".join(map(str, data.get("sources") or [])) or "-", color, value_style="dim"),

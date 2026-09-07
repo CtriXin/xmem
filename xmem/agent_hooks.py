@@ -48,6 +48,10 @@ def run_agent_hook(
     capture: bool = True,
     stdin_text: str | None = None,
 ) -> str:
+    from .readonly import stride_context
+    if stride_context():
+        return json.dumps({"schema": "xmem.agent_hook.v1", "ok": True, "action": "skip",
+                           "reason": "Stride uses explicit read-only lookup", "readonly": True}) if emit_json else ""
     try:
         result = build_agent_hook_result(
             event,
@@ -91,6 +95,10 @@ def build_agent_hook_result(
     capture: bool,
     stdin_text: str,
 ) -> Dict[str, Any]:
+    from .readonly import stride_context
+    if stride_context():
+        return {"schema": "xmem.agent_hook.v1", "ok": True, "action": "skip",
+                "reason": "Stride uses explicit read-only lookup", "readonly": True}
     payload = parse_payload(stdin_text)
     event_norm = normalize_event(event or first_text(payload, {"hook_event_name", "event", "name"}))
     hook_cwd = choose_cwd(payload, cwd)

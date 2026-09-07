@@ -4,6 +4,57 @@ Lightweight cross-project memory for agents. xmem is a truth index, not a heavy 
 
 Current package version: `0.1.42`.
 
+## Historical read-only compatibility
+
+Stride uses an explicit lookup instead of the legacy automatic memory loop:
+
+```bash
+./bin/xmem lookup "service:demo" --registry /absolute/path/registry.sqlite --limit 8 --json
+```
+
+The JSON contract is `xmem.lookup.v1` (`readonly=true`, `historical_only=true`).
+Python callers may use `xmem.readonly.lookup(query, registry=Path(...), limit=8)`.
+The canonical `bin/xmem` entry runs lookup with Python bytecode writes disabled.
+Lookup does not create a missing registry, migrate schemas, sync sources, capture
+memories, synthesize profiles, inject pending memories, or record telemetry. It
+opens SQLite with `mode=ro&immutable=1` and `query_only`; a nonempty WAL or a
+database change during lookup returns `status=unavailable`, without checkpointing.
+Callers should continue without historical hints on `unavailable`, never trigger
+sync or other repair as an automatic fallback.
+
+Results group Project Wiki and Issue Record index/export cards by adapter family
+and exact `source_ref`, retaining each producer's original card ID and source
+path. New imports update one canonical index card plus producer provenance;
+pre-existing duplicate rows are not deleted. Different status/body declarations
+are conservatively reported as `conflict` until the owner reconciles the source;
+the index does not guess whether differently shaped declarations are equivalent.
+Other card families retain card identity because one file may contain many rules.
+
+Each variant separates `indexed_at` (index maintenance), `source_checked_at`
+(source-declared verification, never manufactured from an import/receipt/modified
+date), and `source_mtime_ns`/`indexed_sha256` (file observation). `current` means
+only that indexed source bytes are unchanged. Missing, changed, or legacy sources
+without fingerprints remain `missing`, `changed`, or `unknown`. Even unchanged
+sources have `effective_truth=historical`; conflicting sources have `disputed`.
+No result verifies runtime state or authorizes an action. Source reads are capped
+at 4 MB per file; a larger source has unknown freshness.
+
+Exact environment marker `STRIDE_EXECUTION_CONTEXT=stride-v1` makes xmem
+`agent-hook` and `gateway` return `skip` before recall/capture/profile/pending
+injection or telemetry. It selects memory behavior only, never permissions or
+production approval. Hosts own reliable marker selection. Missing or other
+values preserve the existing OII path; history directories and hook capabilities
+remain installed. Explicit xmem mutation commands are not disabled by this
+marker and must not be used as a Stride lookup fallback.
+
+New retrieval events have unknown token benefit; no `matches * 1200` estimate is
+generated. Gateway dry-runs do not record consumption or savings. Gain summaries
+exclude rows explicitly marked `dry_run`; old unlabeled events cannot be reliably
+reclassified. Historical estimates remain in `legacy_estimated_tokens_saved`
+for audit, never as measured benefit. A nonzero `actual_tokens_saved` is a reported
+measurement whose attribution still requires review; an unmeasured zero remains
+unknown. Legacy per-query/card/event rough counters are historical diagnostics.
+
 ## What's New in 0.1.42
 
 This release tightens SCMP deploy memory and gateway intent filtering.
@@ -50,7 +101,7 @@ This release adds `xmem resume`, a compact takeover packet for fresh sessions or
 - `xmem resume --fields issue=... domain=... service=... task=...` lets hooks/agents pass clean structured targets and avoid old-context pollution.
 - The packet returns identity, current gate, historical pitfalls, invariants, must_keep/avoid, required checks, recent evidence refs, token_savers, next_reads, and next_action.
 - `resume` is a read model only: it does not verify live runtime state, does not own Project Wiki / Issue Record truth, and does not replace tests or deploy checks.
-- `resume` events now count as token-saving retrieval in `xmem gain`, so future reports can show whether takeover packets were actually used.
+- Historical releases counted `resume` matches as estimated token-saving retrieval. Current lookup/gain policy above retires that estimate; hits cannot prove use.
 
 ## What's New in 0.1.37
 
@@ -93,7 +144,7 @@ Read these first when a future agent needs to resume xmem work without transcrip
 - Return development preflight packets that surface historical bug patterns before edits.
 - Return resume packets for taking over existing tasks without reading long handoffs first.
 - Return gateway decisions so launchers can auto-inject compact memory only when useful.
-- Track xmem telemetry and rough, uncalibrated savings hints with `xmem gain`.
+- Track retrieval telemetry and separately reported outcomes with `xmem gain`; unmeasured benefit remains unknown.
 
 ## Quick start
 
@@ -420,7 +471,7 @@ When a longer query contains a verified compact alias such as `网文二 repo va
 
 `xmem gain` summarizes lookup, `context`, `preflight`, and `check` telemetry from `~/.xmem/gain.jsonl`. The default view is now the full event/query/card dashboard. Use `xmem gain --summary` for the short key summary with real confidence result, confirmed-vs-rough tokens, hit overview, risk signals, top query order, and the few queries that most need review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. In detail view, `Top 查询` aggregates query text, while `Top Cards` aggregates `top_card` ids from retrieval logs. Top card status/confidence is hydrated from the current registry when old gain rows did not record it. The `Top Card 解释` section shows common/recent queries, sources, avg score, and top why for noisy cards. Use `xmem gain card <id>` to inspect one card's common queries and recent hits. The bar column is `粗估占比`: relative rough-token share inside that section, not progress or confirmed savings. `xmem gain --detail` remains as a compatibility alias for the default full dashboard.
 
-Hit/miss/pass/prevented are log counts; `hit` only means candidates were returned. Token savings are rough, uncalibrated estimates for context/preflight/resume/gateway-inject matches, not billing truth. Risk hints come from rule warnings, not confirmed production bugs. By default, `xmem gain` reads all gain rows; use `--limit N` only when you want a recent slice.
+Hit/miss/pass/prevented are log counts; `hit` only means candidates were returned. Token savings are unknown unless separately measured and reported. Historical rough estimates are retained only for audit. Risk hints come from rule warnings, not confirmed production bugs. By default, `xmem gain` reads all non-dry-run gain rows; use `--limit N` only when you want a recent slice.
 
 The gain dashboard self-calibrates its own confidence labels. It reports whether the current data is only telemetry/proxy or partially calibrated, surfaces high rough estimates that need review, and records future match quality fields such as `top_score`, `top_status`, and `top_why`.
 

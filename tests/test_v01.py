@@ -213,15 +213,17 @@ def test_gain_reports_queries_and_guardrails(tmp_path: Path):
     summary_gain = run([str(XMEM), "gain", "--summary"], repo, env).stdout
 
     assert gain["top_queries"][0]["query"] == "ad lazyload"
-    assert gain["top_queries"][0]["estimated_tokens_saved"] > 0
+    assert gain["top_queries"][0]["estimated_tokens_saved"] == 0
     assert gain["top_cards"][0]["card_id"]
-    assert gain["top_cards"][0]["estimated_tokens_saved"] > 0
+    assert gain["top_cards"][0]["estimated_tokens_saved"] == 0
+    assert gain["estimated_tokens_saved"] is None
+    assert gain["benefit_status"] == "unknown"
     assert gain["top_cards"][0]["common_queries"]
     assert gain["top_cards"][0]["recent_query"]
     assert gain["observed"]["context_hits"] == 1
     assert gain["calibration"]["status"] == "proxy_only"
     assert gain["calibration"]["confidence"] == "low"
-    assert gain["calibration"]["needs_review"]
+    assert not gain["calibration"]["needs_review"]  # No fabricated savings to rank for calibration.
     assert gain["recent_queries"][0]["top_card"]
     assert gain["recent_guardrails"]
     assert "XMEM Gain 收益面板" in text_gain
@@ -258,13 +260,14 @@ def test_gain_distinguishes_lookup_from_context_savings(tmp_path: Path):
 
     lookup_gain = json.loads(run([str(XMEM), "gain", "--json"], repo, env).stdout)
     assert lookup_gain["observed"]["context_queries"] == 0
-    assert lookup_gain["estimated_tokens_saved"] == 0
+    assert lookup_gain["estimated_tokens_saved"] is None
     assert any(item["event"] == "find.hit" for item in lookup_gain["by_event"])
 
     run([str(XMEM), "context", "ad lazyload"], repo, env)
     context_gain = json.loads(run([str(XMEM), "gain", "--json"], repo, env).stdout)
     assert context_gain["observed"]["context_hits"] == 1
-    assert context_gain["estimated_tokens_saved"] > 0
+    assert context_gain["estimated_tokens_saved"] is None
+    assert context_gain["benefit_status"] == "unknown"
 
 
 def test_gain_hydrates_top_card_status_from_current_registry(tmp_path: Path):

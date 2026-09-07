@@ -8,8 +8,6 @@ from .store import connect, rows
 from .util import append_jsonl, home_dir, load_jsonl, normalize_text, query_hash, query_terms, query_variants, utc_now
 
 
-TOKEN_SAVING_EVENTS = {"context", "preflight", "resume", "gateway"}
-
 # Query terms that substring-match a large fraction of the card alias/metadata
 # blob and therefore carry no real signal. Kept small and conservative: common
 # CJK function words plus pasted-screenshot / url noise. Identity still flows
@@ -221,7 +219,6 @@ def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_
     if record_gain:
         top = result[0] if result else {}
         safe_event = gain_event if gain_event.replace("_", "").replace("-", "").isalnum() else "search"
-        estimated_tokens_saved = len(result) * 1200 if safe_event in TOKEN_SAVING_EVENTS else 0
         append_jsonl(home_dir() / "gain.jsonl", {
             "ts": utc_now(),
             "event": f"{safe_event}.hit" if result else f"{safe_event}.miss",
@@ -229,9 +226,9 @@ def search_cards(query: str, limit: int = 10, *, record_gain: bool = True, gain_
             "query": query,
             "matches": len(result),
             "cards_considered": len(cards),
-            "estimated_tokens_saved": estimated_tokens_saved,
-            "estimate_formula": "matches * 1200" if estimated_tokens_saved else "",
-            "estimate_kind": "rough_upper_bound_not_billing" if estimated_tokens_saved else "",
+            "estimated_tokens_saved": None,
+            "estimate_formula": "",
+            "estimate_kind": "unknown; retrieval is not measured benefit",
             "top_card": top.get("card_id", ""),
             "top_score": top.get("score", 0),
             "top_status": top.get("status", ""),

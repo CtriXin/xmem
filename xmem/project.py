@@ -166,7 +166,8 @@ def card_from_file(path: Path, default_project: str = "") -> Dict[str, Any]:
         "confidence": confidence,
         "aliases": aliases,
         "body": text,
-        "updated_at": utc_now(),
+        "updated_at": field_from_text(text, "last_checked_at") or "",
+        "source_checked_at": field_from_text(text, "last_checked_at") or None,
         "source": "local-card",
         "source_ref": str(path),
     }
