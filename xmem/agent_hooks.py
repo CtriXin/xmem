@@ -100,6 +100,13 @@ def build_agent_hook_result(
         return {"schema": "xmem.agent_hook.v1", "ok": True, "action": "skip",
                 "reason": "Stride uses explicit read-only lookup", "readonly": True}
     payload = parse_payload(stdin_text)
+    from .memory_scope import memory_scope
+    # Only the hook envelope's cwd is an execution location. Nested tool input,
+    # quoted paths and prompt text must not select a memory scope.
+    scope = memory_scope(payload.get("cwd") or cwd)
+    if scope["context"] == "stride-v1":
+        return {"schema": "xmem.agent_hook.v1", "ok": True, "action": "skip", "readonly": True,
+                "reason": "Stride uses explicit read-only lookup", "memory_scope": scope}
     event_norm = normalize_event(event or first_text(payload, {"hook_event_name", "event", "name"}))
     hook_cwd = choose_cwd(payload, cwd)
     prompt = extract_prompt(payload)

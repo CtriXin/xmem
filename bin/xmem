@@ -21,7 +21,11 @@ if [ "${1:-}" = lookup ]; then
   shift
   PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" PYTHONDONTWRITEBYTECODE=1 exec "$PYTHON_BIN" -B -m xmem.readonly "$@"
 fi
-if [ "${STRIDE_EXECUTION_CONTEXT:-}" = stride-v1 ]; then
+if [ "${1:-}" = memory-scope ]; then
+  shift
+  PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" PYTHONDONTWRITEBYTECODE=1 exec "$PYTHON_BIN" -B -m xmem.memory_scope "$@"
+fi
+if [ "${STRIDE_EXECUTION_CONTEXT:-}" = stride-v1 ] || [ "${1:-}" = agent-hook ] || [ "${1:-}" = gateway ]; then
   PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" PYTHONDONTWRITEBYTECODE=1 exec "$PYTHON_BIN" -B -m xmem "$@"
 fi
 PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" exec "$PYTHON_BIN" -m xmem "$@"

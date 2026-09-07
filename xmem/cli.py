@@ -113,6 +113,9 @@ def build_parser() -> argparse.ArgumentParser:
     lookup.add_argument("--registry", type=Path)
     lookup.add_argument("--limit", type=int, default=8)
     lookup.add_argument("--json", action="store_true")
+    scope = sub.add_parser("memory-scope", help="只读选择 Stride/OII 记忆行为；不授予动作权限")
+    scope.add_argument("--cwd", default=".")
+    scope.add_argument("--json", action="store_true")
 
     status = sub.add_parser("status", help="查看索引位置、数量和 source 状态")
     status.add_argument("--json", action="store_true", help="输出 JSON")
@@ -402,6 +405,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: List[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.cmd == "memory-scope":
+        from .memory_scope import memory_scope
+        print(json.dumps(memory_scope(args.cwd), ensure_ascii=False))
+        return 0
     if args.cmd == "lookup":
         from .readonly import lookup
         print(json.dumps(lookup(args.query, args.registry, args.limit), ensure_ascii=False, indent=2))

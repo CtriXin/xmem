@@ -47,6 +47,24 @@ values preserve the existing OII path; history directories and hook capabilities
 remain installed. Explicit xmem mutation commands are not disabled by this
 marker and must not be used as a Stride lookup fallback.
 
+Native sessions can also select memory scope from a verified task-owned cwd:
+`./bin/xmem memory-scope --cwd /absolute/task/workspace --json` returns
+`xmem.memory_scope.v1`. The shared `xmem.memory_scope.memory_scope(cwd)` helper
+accepts the exact marker, otherwise resolves cwd containment under
+`STRIDE_HOME/tasks/<task-id>/workspace` or the canonical/legacy
+`~/.local/share/stride{,-v1,-v3}` homes and reads the existing task row with SQLite
+`mode=ro`/`query_only`. A similarly named directory, quoted path or task title is
+insufficient. Missing or unreadable databases retain legacy behavior. The global
+agent hook uses the envelope's top-level `cwd`, never a nested tool-input path;
+gateway uses its declared `--cwd`. Neither path captures, profiles or injects
+pending memory for a matching Stride task.
+
+Scope reads active WAL data and does not instantiate Stride Store, initialize a
+schema or change task data/status. SQLite may update/create SHM reader
+coordination; this is **not** the byte-for-byte file immutability contract of
+`lookup`. No task match or context marker grants action authority: the packet has
+`authority=none`, and SCMP target/permission/release checks remain independent.
+
 New retrieval events have unknown token benefit; no `matches * 1200` estimate is
 generated. Gateway dry-runs do not record consumption or savings. Gain summaries
 exclude rows explicitly marked `dry_run`; old unlabeled events cannot be reliably

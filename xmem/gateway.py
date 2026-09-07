@@ -157,10 +157,12 @@ def run_gateway(
     budget: int = 700,
     dry_run: bool = False,
 ) -> Dict[str, Any]:
-    from .readonly import stride_context
-    if stride_context():
+    from .memory_scope import memory_scope
+    scope = memory_scope(cwd)
+    if scope["context"] == "stride-v1":
         return {"schema": "xmem.gateway.v1", "decision": "skip", "action": "skip",
                 "dry_run": dry_run, "readonly": True, "packet": {}, "warnings": [],
+                "memory_scope": scope,
                 "reason": "Stride uses explicit read-only lookup; this context grants no action authority"}
     clean_fields = redact_fields(fields or {})
     clean_query = redact_text(raw_query or "")
