@@ -143,7 +143,7 @@ def pending_inbox_to_export_card(item: Dict[str, Any], file: Path, line_no: int)
             "status": "partial",
             "confidence": confidence,
             "basis": ["project_wiki_agent_inbox_pending_writeback"],
-            "last_checked_at": updated_at,
+            "last_checked_at": str(payload.get("verifiedAt") or ""),
             "use_policy": "hint_only_until_project_wiki_accepts",
         },
         "pending": {
@@ -293,7 +293,7 @@ def import_issue_tracking(path: Path) -> Dict[str, int]:
                 "source": "issue-tracking",
             })
             card_id = f"issue.{slugify(slug)}"
-            upsert_card(conn, {
+            indexed_id = upsert_card(conn, {
                 "card_id": card_id,
                 "project_id": project_id,
                 "type": "evidence.issue",
@@ -310,7 +310,7 @@ def import_issue_tracking(path: Path) -> Dict[str, int]:
             ev_id = "issue-tracking." + hashlib.sha1(str(issue).encode()).hexdigest()[:16]
             upsert_evidence(conn, {
                 "evidence_id": ev_id,
-                "card_id": card_id,
+                "card_id": indexed_id,
                 "project_id": project_id,
                 "kind": "issue-record",
                 "ref": slug,
@@ -357,9 +357,10 @@ def import_xmem_export(path: Path, source: str = "xmem-export", *, skip_bug_patt
                     item = bug_pattern_to_export_card(item)
                 card = card_from_export_item(item, file, line_no, source)
                 upsert_project_from_export(conn, item, card, source)
-                upsert_card(conn, card)
+                indexed_id = upsert_card(conn, card)
                 cards += 1
                 for ev in evidence_from_export_item(item, card, source):
+                    ev["card_id"] = indexed_id
                     upsert_evidence(conn, ev)
                     evidence += 1
         log_event(conn, "import.xmem-export", payload={"path": str(path), "source": source, "cards": cards, "evidence": evidence, "skipped_bug_patterns": skipped_bug_patterns})
@@ -906,7 +907,7 @@ def card_from_export_item(item: Dict[str, Any], file: Path, line_no: int, source
     cid = str(item.get("id") or item.get("card_id") or export_row_id(item, file, line_no))
     status = normalize_status(truth.get("status") or item.get("status") or "unknown")
     confidence = safe_float(truth.get("confidence", item.get("confidence")), 0.95 if status == "verified" else 0.5)
-    updated_at = str(truth.get("last_checked_at") or item.get("updatedAt") or item.get("updated_at") or utc_now())
+    updated_at = str(truth.get("last_checked_at") or item.get("updatedAt") or item.get("updated_at") or "")
     aliases = export_aliases(item)
     body = json.dumps(item, ensure_ascii=False, sort_keys=True)
     return {
@@ -920,6 +921,7 @@ def card_from_export_item(item: Dict[str, Any], file: Path, line_no: int, source
         "aliases": aliases[:100],
         "body": body,
         "updated_at": updated_at,
+        "source_checked_at": truth.get("last_checked_at") or None,
         "source": source,
         "source_ref": str(item.get("source_ref") or item.get("sourcePath") or f"{file}:{line_no}"),
     }
@@ -946,7 +948,7 @@ def bug_pattern_to_export_card(item: Dict[str, Any]) -> Dict[str, Any]:
         "status": normalize_status(truth.get("status") or item.get("status") or "partial"),
         "confidence": truth.get("confidence", item.get("confidence") or 0.7),
         "basis": truth.get("basis") or ["issue_record_pattern"],
-        "last_checked_at": truth.get("last_checked_at") or item.get("updatedAt") or item.get("updated_at") or utc_now(),
+        "last_checked_at": truth.get("last_checked_at") or "",
     }
     summary = item.get("summary") or summarize_bug_pattern(item)
     out = dict(item)

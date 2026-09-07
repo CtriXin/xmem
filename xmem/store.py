@@ -69,6 +69,10 @@ CREATE INDEX IF NOT EXISTS idx_cards_project ON cards(project_id);
 CREATE INDEX IF NOT EXISTS idx_cards_type ON cards(type);
 CREATE INDEX IF NOT EXISTS idx_evidence_project ON evidence(project_id);
 CREATE INDEX IF NOT EXISTS idx_alias_entity ON aliases(entity_kind, entity_id);
+CREATE TABLE IF NOT EXISTS card_provenance (
+  card_id TEXT NOT NULL, source TEXT NOT NULL, path TEXT NOT NULL, body TEXT NOT NULL,
+  PRIMARY KEY(card_id,source,path)
+);
 """
 
 
@@ -85,6 +89,11 @@ def connect() -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(cards)")}
+    for name, kind in (("indexed_at", "TEXT"), ("source_checked_at", "TEXT"),
+                       ("source_mtime_ns", "INTEGER"), ("source_sha256", "TEXT")):
+        if name not in columns:
+            conn.execute(f"ALTER TABLE cards ADD COLUMN {name} {kind}")
     return conn
 
 
@@ -107,8 +116,9 @@ def upsert_project(conn: sqlite3.Connection, project: Dict[str, Any]) -> None:
         upsert_alias(conn, alias, "project", project["project_id"], 1.0)
 
 
-def upsert_card(conn: sqlite3.Connection, card: Dict[str, Any]) -> None:
-    card = guard_trellis_card_for_index(card)
+def upsert_card(conn: sqlite3.Connection, card: Dict[str, Any]) -> str:
+    from .provenance import merge_import, stamp
+    card = merge_import(conn, stamp(guard_trellis_card_for_index(card)))
     aliases = card.get("aliases") or []
     conn.execute(
         """INSERT INTO cards(card_id,project_id,type,title,path,status,confidence,aliases_json,body,updated_at,source,source_ref)
@@ -124,8 +134,11 @@ def upsert_card(conn: sqlite3.Connection, card: Dict[str, Any]) -> None:
             card.get("source", "local"), card.get("source_ref", ""),
         ),
     )
+    conn.execute("UPDATE cards SET indexed_at=?,source_checked_at=?,source_mtime_ns=?,source_sha256=? WHERE card_id=?",
+                 (card["indexed_at"], card["source_checked_at"], card["source_mtime_ns"], card["source_sha256"], card["card_id"]))
     for alias in aliases + [card.get("title", ""), card["card_id"]]:
         upsert_alias(conn, alias, "card", card["card_id"], float(card.get("confidence", 0.5)))
+    return card["card_id"]
 
 
 def upsert_evidence(conn: sqlite3.Connection, evidence: Dict[str, Any]) -> None:

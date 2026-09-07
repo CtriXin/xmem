@@ -157,6 +157,13 @@ def run_gateway(
     budget: int = 700,
     dry_run: bool = False,
 ) -> Dict[str, Any]:
+    from .memory_scope import memory_scope
+    scope = memory_scope(cwd)
+    if scope["context"] == "stride-v1":
+        return {"schema": "xmem.gateway.v1", "decision": "skip", "action": "skip",
+                "dry_run": dry_run, "readonly": True, "packet": {}, "warnings": [],
+                "memory_scope": scope,
+                "reason": "Stride uses explicit read-only lookup; this context grants no action authority"}
     clean_fields = redact_fields(fields or {})
     clean_query = redact_text(raw_query or "")
     current = detect_current_project(cwd)
@@ -598,11 +605,12 @@ def merge_cards(primary: list[dict[str, Any]], extra: list[dict[str, Any]]) -> l
 
 
 def record_gateway_event(packet: Dict[str, Any], cards: List[Dict[str, Any]]) -> None:
+    if packet.get("dry_run"):
+        return  # A would-inject preview is not an actual exposure or saving.
     search = packet.get("search") or {}
     decision = str(packet.get("decision") or "skip")
     event = f"gateway.{decision}"
     matches = int(search.get("matches") or 0)
-    estimated = matches * 1200 if decision == "inject" else 0
     append_jsonl(
         home_dir() / "gain.jsonl",
         {
@@ -613,9 +621,9 @@ def record_gateway_event(packet: Dict[str, Any], cards: List[Dict[str, Any]]) ->
             "query_hash": query_hash((packet.get("query_input") or {}).get("search_query", "")),
             "matches": matches,
             "cards_considered": len(cards),
-            "estimated_tokens_saved": estimated,
-            "estimate_formula": "matches * 1200" if estimated else "",
-            "estimate_kind": "rough_upper_bound_not_billing" if estimated else "",
+            "estimated_tokens_saved": None,
+            "estimate_formula": "",
+            "estimate_kind": "unknown; retrieval is not measured benefit",
             "top_card": search.get("top_card", ""),
             "top_score": search.get("top_score", 0),
             "top_status": search.get("top_status", ""),
