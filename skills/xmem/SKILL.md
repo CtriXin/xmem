@@ -1,170 +1,31 @@
 ---
 name: xmem
-description: Use when the user asks for xmem, cross-project memory, project truth index, prior similar project work, domain/service/deploy/COS/copy-domain routing, preserving feature invariants, importing Project Wiki / issue-tracking evidence, or compact agent context for existing projects.
+description: Read-only historical lookup when prior project evidence or a similar past issue would help the current task. Returns source pointers, freshness and conflicts; it does not own current truth or task state.
 ---
 
 # xmem
 
-xmem is a lightweight truth index between wiki and DB. Use it to find durable project facts, methods, invariants, and evidence without scanning every repo.
-
-Truth rule: `.xmem/*.yaml`, source Markdown, code, git, runtime APIs, and human confirmations are truth. `~/.xmem/registry.sqlite` is generated index/cache only.
-
-## What's New
-
-`xmem 0.1.42` adds SCMP branch deploy tag memory and keeps the `xmem gateway` launcher/hook layer. The supported path is:
-
-- `xmem gateway <user request>` is for MMS/Codex/Claude/OpenCode entry layers. It searches only for domain/service/deploy/COS/copy-domain/history/bugfix-shaped tasks, returns compact memory when useful, and skips simple local edits.
-- Gateway filters ad-specific cards when a task is clearly about log/raw-output text that merely contains `ads.txt` or advertising config snippets; do not infer an advertising task from log content alone.
-- Built-in SCMP cards now recall that branch deploy should use `--branch` plus `--version`; `--tag` is only for a real git/release tag, not a commit hash.
-- `xmem resume <issue|domain|service|query>` combines context routing and preflight guardrails into compact task memory for fresh sessions.
-- `xmem resume --fields issue=... domain=... service=... task=...` lets hooks/agents avoid old-context pollution.
-- Built-in SCMP cards now recall `coscli secretID is missing` as a likely isolated HOME / real credential path issue before long config debugging loops.
-- Built-in SCMP cards now recall new copy-domain tasks where lookup/rf misses should route through template names and old sibling domains.
-- `xmem setup` creates `~/.xmem`, generic docs/config/schema examples, and project/source registrations.
-- MMS public installs can opt in with `bash install.sh --install-xmem`; `--dry-run` previews the write/install/setup plan without changing files.
-- Installer-style setup should use `--register-only` when low-touch onboarding matters; avoid writing repo-local `.xmem` into many repos automatically.
-- xmem must stay generic by default: no SCMP, Project Wiki, Issue Record, Feishu/Lark, Jira, Linear, or cloud backup dependency.
-- In isolated sessions, host-home env (`XMEM_HOST_HOME`, `MMS_HOST_HOME`, `HOST_HOME`, `REAL_HOME`) should be honored so agents do not create or read the wrong registry.
-
-## Short Commands
+用现有历史索引找来源线索，继续在原 Stride task 工作。默认唯一检索入口：
 
 ```bash
-xmem help
-xmem setup
-xmem status
-xmem doctor
-xmem sync
-xmem preflight "query"
-xmem preflight --fields domain=example.com task="query"
-xmem resume "query"
-xmem resume --fields issue=demo domain=example.com task="query"
-xmem gateway "query" --cwd "$PWD" --format toon
-xmem context "query"
-xmem why "query"
-xmem open "query"
-xmem capture --type preference "preference: local-first memory"
-xmem capture --from-session session.md --scope project
-xmem review-pending
-xmem promote <pending-id>
-xmem recall "query"
-xmem profile --cwd .
-xmem agent-hook UserPromptSubmit --host codex
-xmem agent-hook Stop --host claude
-xmem new
-xmem check --sources
-xmem gain
-xmem gain --summary
-xmem gain card <id>
+xmem lookup "具体项目或问题" --limit 8 --json
 ```
 
-## Workflow
+可显式用 `--registry /absolute/path/registry.sqlite` 指定已有库。返回 `xmem.lookup.v1`、`readonly=true`、`historical_only=true`；入口不建库、不迁移、不 sync、不 capture/profile/pending injection、不记录 telemetry。
 
-1. Run `xmem setup` on a new machine/workspace when xmem has not been configured yet.
-2. Launchers/hooks should run `xmem gateway "<user request>" --cwd "$PWD"` before normal skill routing; obey `decision: inject|skip`.
-3. Run `xmem resume "<issue|domain|service|task>"` when taking over an existing task, cross-project/domain/service/deploy/COS/copy-domain task, historical bug, or fresh session before reading long handoffs.
-4. For durable conversation lessons, use `xmem capture` first. Captured memories are pending, redacted, and not truth until `xmem review-pending` plus `xmem promote`.
-5. `xmem capture --from-session` accepts structured blocks with `type`, `summary`, `scope`, `confidence`, `evidence_path`, `ttl`, `supersedes`, and `aliases`.
-6. Trellis imports and any generic card/export/sync path carrying `source_tool=trellis` or `.trellis/**` are guarded source pointers only. When recall/context/gateway/resume/preflight hits Trellis, obey the D3/registry warning: Trellis does not own lifecycle, done, or ship.
-7. Use `xmem recall "<query>"` for compact local hybrid memory packets and `xmem profile --cwd .` to refresh user/project profile Markdown.
-8. Agent launchers may call `xmem agent-hook UserPromptSubmit --host codex|claude` for automatic recall/capture and `xmem agent-hook Stop --host codex|claude` for profile refresh; hooks are fail-open, compact by default, and never promote directly. Use `--verbose` or `--json` only for debugging.
-9. Run `xmem preflight "<task>"` before development or bugfix edits to surface historical bug-patterns, invariants, and required checks.
-10. Run `xmem context "<task>"` before broad repo traversal or project selection.
-11. If `source_freshness.status` is not `fresh`, run `xmem sync` before relying on the packet.
-12. Trust only cards marked `verified`; treat `inferred`, `partial`, `stale`, `unknown`, and `disputed` as hints.
-13. For edits that hit a feature with invariant cards, run `xmem check` before final response.
-14. Add or update a small card when durable knowledge is discovered; avoid long wiki prose.
-15. Use `xmem gain` when asked what xmem saved.
-16. Use `xmem doctor` when maintenance state is unclear; it aggregates registry, source exports, local card portability, backup health, outbox, and current repo registration.
+## 读取结果
 
-`xmem setup` is generic onboarding. It creates `~/.xmem` docs/config, registers the current repo or `--root` workspace roots, can initialize repo-local `.xmem` identity files, and can create a shared memory repo via `--memory-repo`. It must not require SCMP, Project Wiki, Issue Record, Feishu/Lark, Jira, Linear, or any private adapter. Use `--register-only` if writing `.xmem` into discovered repos would be too invasive.
+- `status=unavailable` 或无匹配时继续直接读当前项目来源，不自动 setup、index 或 sync。
+- `state=conflict` 保留双方 producer 的 `variants` 和路径；不要静默选一方为正确。
+- `current` 只表示 source bytes 与索引指纹相同；`effective_truth=historical` 仍不是当前 runtime、发布、权限或业务验收。
+- `changed` / `missing` / `unknown` 是来源核验边界。直接读取需要的真实 source；不要通过重新索引冒充事实复核。
+- `indexed_at` 是索引维护时间；`source_checked_at` 是 source 声明的核验时间。mtime、receipt 时间和最近索引时间不能补成事实已验证。
+- 命中次数、dry-run、would-inject 不证明实际采用或节省 token。没有可归因 measurement 的收益写 `unknown`。
 
-`xmem gateway` is the auto-use layer. It should be called by launchers/hooks before skill routing, not manually by the user. If it returns `decision: skip`, continue normally and do not mention xmem. If it returns `decision: inject`, read the compact `packet` and continue normal work. Gateway is fail-open and redacts common secret syntaxes before output/logging.
+## 当前边界
 
-`xmem resume` is the takeover packet. Use it before reading long handoffs or full skill docs when the user gives an issue slug, domain, service, repo, or task phrase. Read `identity`, `current_gate`, `historical_pitfalls`, `must_keep`, `avoid`, `required_checks`, `recent_evidence`, `token_savers`, and `next_action`. It is a read model, not a truth owner: live runtime state, current deploy status, and dynamic bindings still need owner-system verification.
+新任务不自动运行 gateway、resume、preflight、hook、sync、capture、profile 或写卡。历史索引里的 next_action/required_checks/blocker 是待核实线索，不能直接恢复 OII、阻断原任务或授予生产权限。经验先保存在原 task；只有经过修复验证且具有适用范围的规则才考虑进入 Stride learning，不另建一份真值库。
 
-For SCMP/COS deploy tasks, if a session sees `coscli secretID is missing`, `COS deploy`, or isolated credential errors, run xmem resume/preflight against that phrase before manual config archaeology. The expected guard is `scmp.coscli.isolated-home-env`: check real HOME/REAL_PATH env first, then extract compact deploy fields instead of reading full deploy config/logs.
+已实现的 `STRIDE_EXECUTION_CONTEXT=stride-v1` 或经过真实 task-owned cwd 核对的 memory scope，仅让 hook/gateway 跳过 memory 副作用，绝不是动作授权。缺标识的旧 CLI 行为仍兼容；不要主动调用旧入口来填补 lookup 缺口。显式 mutation 命令未被这个 marker 禁用。
 
-For copy-domain tasks, if new domains do not resolve through lookup/rf yet, run xmem resume/preflight with the task id, template name, and any old sibling domain. The expected guard is `scmp.rule.copy-domain-resolve-by-sibling-template`: do not treat new-domain lookup miss as final truth; resolve service/repo from template/sibling history first, then live-verify binding after ops completes.
-
-`xmem gain` shows the full event/query/card dashboard by default. Use `xmem gain --summary` only when a short key signal is enough: real confidence result, confirmed-vs-rough token numbers, hit overview, risk signals, top query order, and a few queries needing review. Top queries are sorted by calls desc, then matches desc, then rough tokens desc. In detail view, `Top 查询` is query-text aggregation, `Top Cards` is top-card aggregation, missing old telemetry status/confidence is hydrated from current registry, `Top Card 解释` shows common/recent queries plus source/score/why, and `粗估占比` bars are relative rough-token share inside that section, not progress or confirmed savings. Use `xmem gain card <id>` when one card looks noisy or surprisingly high-frequency. `xmem gain --detail` remains a compatibility alias for the default full dashboard.
-
-Policy rule: when deciding whether a memory is truth, hint, or blocker, use `docs/policies/truth-level.md`, `docs/policies/preflight-severity.md`, and `docs/policies/promotion-policy.md`. In short: Project Wiki pending is hint-only, Issue patterns may be partial until repeated/reviewed, dynamic SCMP facts need live verification, and preflight blockers must stop edits/deploy.
-
-Output rule: use `docs/policies/agent-output-compactness.md` when tool output may be large. Prefer compact summaries and evidence paths; avoid pasting raw SCMP pod JSON, broad issue-tracking grep, safe-access card JSON, Feishu read-back payloads, repeated `_notice` text, or long skill docs into agent context.
-
-Layered symbolic rule: use `docs/policies/layered-symbolic-memory.md` for context/preflight packets. Read compact top sections first, then drill down through `node_id`, `memory_layer`, `evidence_ref`, `source_ref`, and `source_path` only when details matter. Do not create lossy summaries without a source path.
-
-`xmem resume` is LLM-first for takeover; `xmem context` is LLM-first for exploratory retrieval. For resume, prefer structured `--fields issue=... domain=... service=... task=...` when a hook or handoff has clean fields.
-
-`xmem context` is LLM-first: use `symbolic_memory`, `resolution.status`, `suggested_queries`, `correction_guidance`, `why`, `truth`, `source_ref`, `warnings`, and `next_reads` to decide what to read next. Do not infer a single project when `do_not_assume_single_project` is true. Duplicate cards may be fused; read `supporting_cards` for alternate sources behind the primary card.
-
-If a long query contains a verified compact alias such as `网文二 repo validation_service`, treat the verified identity anchor as the route and use the extra words as requested fields. Do not surface weak same-template relation cards once a verified identity family is locked.
-
-For SCMP/domain/service work, also read `traffic_switch` and `gain_hints` when present. A verified `traffic.switch` card can be used as the starting route for prod/validation service, repo, branch hints, approval group, common verification, and skipped lookup guidance. Domain/service binding and latest deploy state still need live verification; Project Wiki pending candidates remain hint-only.
-
-Traffic switch wording rule: `validation_service` is a candidate traffic target for validating new behavior before cutover, not a generic test environment. Do not infer test-environment semantics only because a service name contains `-test`.
-
-`xmem preflight` is the development-start packet. Use `severity`, `can_proceed`, `blockers`, `required_before_edit`, `required_before_deploy`, `readiness`, `risk_level`, `known_bug_patterns`, `must_keep`, `avoid`, `known_failure_modes`, `required_checks`, and `source_refs` before editing. If `severity` is `block` or `can_proceed` is false, stop edits/deploy until blockers are resolved. If `readiness` is `blocked_source_stale`, sync first; if it is `needs_disambiguation`, resolve the project/entity before changing code.
-
-For hook-generated or noisy prompts, prefer `xmem preflight --fields domain=... service=... repo=... task=... mode=...`. Structured preflight ignores old raw context when fields are present. If domain/service/repo fields do not resolve to a verified target anchor, treat `readiness: needs_clarification` as a blocker and rebuild the query instead of using returned guardrails.
-
-For SCMP/Feishu/issue/rg/log-heavy work, preflight may activate compact-output guardrails. Prefer compact JSON/TOON summaries, store bulky raw output as evidence files, and check current issue/progress, xmem context, Project Wiki index, and directed repo reads before broad grep.
-
-## Agent hooks
-
-When acting as an agent, use xmem hooks without asking the user to remember commands:
-
-- On session/task start: run the `start` hook to register the project and refresh local cards.
-- On session/task end: a silent `finish` hook without text may record a close marker; it must not create memory or inject context.
-- When durable knowledge is discovered: run a `note` or `finish` hook with a short LLM-written summary.
-- For bugfix/release/deploy work: use `fix`, `release`, or `deploy` events so xmem can queue Project Wiki and issue-tracking follow-up.
-
-Hook rule: xmem may create `.xmem/cards/hook.*.yaml`, append a Project Wiki write request, or create an issue seed. It must not silently rewrite Project Wiki Markdown or promote guessed data to a final issue record.
-
-MMS sessions normally inject this skill and run lightweight xmem session-start/session-end hooks automatically. Do not ask the user to install or remember hook commands inside MMS-launched Codex/Claude/OpenCode/agy sessions.
-
-## Sync
-
-Use `xmem sync` as the default refresh. It rebuilds `~/.xmem/registry.sqlite` from Project Wiki, issue-tracking, built-in cards, `~/.xmem/cards`, and known local folders in `~/.xmem/sources.json`.
-
-These imports are read-only. They create searchable cards and evidence pointers in `~/.xmem/registry.sqlite`. If `xmem status` shows `0 cards`, run `xmem sync`; in isolated agent sessions it should still use `/Users/xin/.xmem`.
-
-If present, xmem also consumes compact source exports:
-
-- `project-wiki/data/xmem-export.cards.jsonl`
-- `project-wiki/data/agent-inbox.jsonl`
-- `issue-tracking/index/xmem-export.cards.jsonl`
-- `issue-tracking/index/bug-patterns.jsonl`
-- `~/.xmem/outbox/project-wiki/*.json`
-- `~/.xmem/outbox/issue-tracking/*.md`
-
-These exports are bridge/index inputs only; Project Wiki and Issue Record remain the source truth.
-Project Wiki `agent-inbox.jsonl` rows are pending writebacks only: xmem imports them as `wiki.pending` / `partial` / hint-only cards. They must not override verified Project Wiki truth.
-xmem outbox writes are also imported as pending hints only: Project Wiki JSON requests become `wiki.pending`, and Issue Record seeds become `evidence.issue` until the owning source accepts/exports them.
-
-Use `xmem check --sources` when Project Wiki or Issue Record changes its export. Missing optional exports are reported as optional_missing; malformed JSONL rows, duplicate ids, invalid truth status, or invalid confidence are errors.
-
-`xmem sync` rebuilds the generated SQLite registry atomically through a temp file and final swap, so concurrent agents should keep reading the previous complete registry until the new one is ready.
-
-If registered repos already have `.ai/map/map.db` or `.codegraph/codegraph.db`, sync imports only compact `code.index` / `code.hotspot` refs. These refs help route an Agent to likely files/symbols, but generated DBs and source files remain truth; verify in code before editing. `map` is the primary quick code map, while `codegraph` is an optional deep-symbol tool.
-
-## Source Routing
-
-- Project/entity truth goes to Project Wiki: service, repo, domain, branch, deploy target, owner, business name, oral alias.
-- Bug truth goes to Issue Record: symptom, root cause, fix pattern, verification, regression guard, evidence paths.
-- xmem truth stays compact: cross-project method/invariant/relation cards with source pointers only.
-- Code structure truth stays in source files plus generated `.ai/map` / `.codegraph` indexes; xmem stores only routing refs.
-- Do not duplicate full Project Wiki or Issue Record truth into xmem; xmem is the control plane and generated index consumer.
-- When source exports change, require `xmem check --sources` and `xmem sync`; context should be treated as stale until `source_freshness.status` is `fresh`.
-- Promotion rule: candidate -> owner source review -> export -> `xmem sync`; never promote pending rows, single-incident bug patterns, or dynamic runtime state silently.
-- Output rule: store raw logs/JSON as evidence paths and feed agents compact summaries first.
-
-## New folders and corrections
-
-Use `xmem new` in a new folder. It creates `.xmem/`, writes an identity card from git/package/folder evidence, and registers the folder so future `xmem sync` can find it from other projects.
-
-`xmem check` uses local and indexed invariant/rule/guard cards to inspect the current git diff. Treat warnings as blockers until the invariant is preserved or consciously updated.
-
-## Card schema
-
-Read `references/card-schema.md` when creating or revising cards.
+旧能力和历史库不删除。只有明确维护旧 xmem/OII 时才读 [历史完整说明](references/history/skill-before-stride-20260908.md) 并确认所选命令的真实副作用；它不是新任务默认工作流。
