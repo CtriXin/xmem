@@ -2,7 +2,7 @@
 
 Lightweight cross-project memory for agents. xmem is a truth index, not a heavy wiki or RAG platform. It stores small cards with truth status, evidence pointers, and fast search metadata.
 
-Current package version: `0.1.42`.
+Current package version: `0.1.43`.
 
 ## Historical read-only compatibility
 
@@ -72,6 +72,15 @@ reclassified. Historical estimates remain in `legacy_estimated_tokens_saved`
 for audit, never as measured benefit. A nonzero `actual_tokens_saved` is a reported
 measurement whose attribution still requires review; an unmeasured zero remains
 unknown. Legacy per-query/card/event rough counters are historical diagnostics.
+
+## What's New in 0.1.43
+
+This release fixes silent overwrites caused by non-ASCII (e.g. Chinese) names collapsing to the same id.
+
+- New `xmem.util.stable_slug`: identical to `slugify` for pure-ASCII input; when the input contains non-ASCII characters it appends an 8-char sha1 of the raw value, so `广告位` and `小说模板` no longer both become `project`.
+- Applied to identity keys: `xmem fix` correction card id/file, `import issue-tracking` issue card id and project id, bug-pattern card id (when the row has no `id`), issue-outbox seeds, Project Wiki pending/entity ids, markdown-import project id, export `scope.project` project id, and `xmem init` / `xmem setup` project id.
+- Before this fix, e.g. two `xmem fix <中文实体>` calls wrote the same `alias-correction.project.yaml` and the second correction silently replaced the first; two Chinese bug-pattern titles reported `cards: 2` but left one card.
+- Migration: ASCII ids are unchanged. Cards/projects previously stored under a collapsed id (`project`, `issue.project`, `issue-pattern.project`, `alias-correction.project`) stay in the registry until `xmem rebuild`; the old `~/.xmem/cards/corrections/alias-correction.project.yaml` file holds only the last correction written and should be re-entered or removed manually.
 
 ## What's New in 0.1.42
 

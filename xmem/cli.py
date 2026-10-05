@@ -1249,10 +1249,10 @@ def prompt(label: str, default: str = "", allow_blank: bool = False) -> str:
 
 
 def write_fix_card(entity: str, wrong: str, correct: str, basis: str, note: str = "") -> Path:
-    from .util import slugify
+    from .util import stable_slug
 
     status = "verified" if correct else "disputed"
-    cid = f"alias-correction.{slugify(entity)}"
+    cid = f"alias-correction.{stable_slug(entity)}"
     path = home_dir() / "cards" / "corrections" / f"{cid}.yaml"
     data: dict[str, Any] = {
         "id": cid,

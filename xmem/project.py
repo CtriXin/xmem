@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 from .store import connect, log_event, upsert_card, upsert_project
 from .sources import register_local_root
 from .toon import project_snapshot
-from .util import append_jsonl, emit_yaml, field_from_text, front_value, git_root, git_value, list_after_key, read_json, slugify, utc_now
+from .util import append_jsonl, emit_yaml, field_from_text, front_value, git_root, git_value, list_after_key, read_json, stable_slug, utc_now
 
 
 def detect_tech_stack(root: Path) -> str:
@@ -54,7 +54,7 @@ def detect_project(root: Path) -> Dict[str, Any]:
     sha = git_value(root, "rev-parse", "--short", "HEAD")
     pkg_name = package_name(root)
     base = pkg_name or (remote.split(":")[-1].split("/")[-1].removesuffix(".git") if remote else root.name)
-    project_id = slugify(base)
+    project_id = stable_slug(base)
     aliases = [root.name]
     if pkg_name and pkg_name not in aliases:
         aliases.append(pkg_name)
@@ -84,7 +84,7 @@ def init_project(path: Path, project_id: str = "", aliases: List[str] | None = N
     (xdir / "events.jsonl").touch(exist_ok=True)
     project = detect_project(root)
     if project_id:
-        project["project_id"] = slugify(project_id)
+        project["project_id"] = stable_slug(project_id)
     if aliases:
         project["aliases"] = list(dict.fromkeys(project.get("aliases", []) + aliases))
     pfile = xdir / "project.yaml"

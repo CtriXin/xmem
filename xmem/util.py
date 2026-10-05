@@ -75,6 +75,25 @@ def slugify(value: str, fallback: str = "project") -> str:
     return value or fallback
 
 
+def stable_slug(value: str, fallback: str = "project") -> str:
+    """Slug for use as an identity key (card_id / project_id / file name).
+
+    ``slugify`` keeps only ``[a-z0-9._-]``, so any non-ASCII text (e.g. Chinese
+    titles, entity names, directory names) is dropped. Two different Chinese
+    names would both collapse to the same slug (often just ``fallback``) and the
+    second upsert would silently overwrite the first card/project. When the raw
+    value carries non-ASCII characters we append a short content hash so distinct
+    inputs keep distinct ids. Pure-ASCII inputs return exactly ``slugify(value)``
+    so existing ids stay unchanged.
+    """
+    raw = str(value or "").strip()
+    slug = slugify(raw, fallback)
+    if raw and any(ord(ch) > 127 for ch in raw):
+        digest = hashlib.sha1(raw.encode("utf-8")).hexdigest()[:8]
+        return f"{slug}-{digest}"
+    return slug
+
+
 def query_hash(value: str) -> str:
     normalized = normalize_text(value or "")
     return hashlib.sha1(normalized.encode("utf-8")).hexdigest()[:12]
