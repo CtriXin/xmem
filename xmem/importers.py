@@ -8,7 +8,7 @@ from typing import Any, Dict, Iterable, List
 
 from .store import connect, log_event, upsert_card, upsert_evidence, upsert_project
 from .trellis_policy import guarded_trellis_body
-from .util import field_from_text, flatten_strings, home_dir, read_json, slugify, utc_now
+from .util import field_from_text, flatten_strings, home_dir, read_json, slugify, stable_slug, utc_now
 
 VALID_STATUSES = {"verified", "inferred", "partial", "stale", "disputed", "unknown"}
 
@@ -39,7 +39,7 @@ def import_project_wiki(path: Path) -> Dict[str, int]:
             fields = ent.get("fields") or {}
             aliases = list(dict.fromkeys([str(x) for x in [ent.get("name"), ent.get("title"), *ent.get("aliases", [])] if x]))
             aliases += [str(x) for x in flatten_strings({k: fields.get(k) for k in ("git", "local", "service", "alias", "aliases") if k in fields}) if x]
-            project_id = slugify(eid.replace(":", "."), "wiki-entity")
+            project_id = stable_slug(eid.replace(":", "."), "wiki-entity")
             if etype in {"Service", "Repo", "Domain", "Project"}:
                 upsert_project(conn, {
                     "project_id": project_id,
@@ -134,10 +134,10 @@ def pending_inbox_to_export_card(item: Dict[str, Any], file: Path, line_no: int)
     updated_at = str(item.get("receivedAt") or payload.get("verifiedAt") or payload.get("updatedAt") or utc_now())
     project_id = project or service or target.replace(":", ".") or (domains[0] if domains else "")
     out = {
-        "id": f"project-wiki.pending.{slugify(row_id)}",
+        "id": f"project-wiki.pending.{stable_slug(row_id)}",
         "type": "wiki.pending",
         "title": title,
-        "project_id": slugify(project_id, "project-wiki-pending"),
+        "project_id": stable_slug(project_id, "project-wiki-pending"),
         "aliases": aliases[:120],
         "truth": {
             "status": "partial",
@@ -278,7 +278,7 @@ def import_issue_tracking(path: Path) -> Dict[str, int]:
             status_raw = field_from_text(text, "Status") or "unknown"
             todo = "[TODO" in text or "path/to/file" in text
             status = "inferred" if todo else ("verified" if any(x in status_raw.lower() for x in ["done", "verified", "closed"]) else "partial")
-            project_id = slugify(project)
+            project_id = stable_slug(project)
             aliases = list(dict.fromkeys([project, slug, title, field_from_text(text, "Service"), field_from_text(text, "Domain"), branch]))
             upsert_project(conn, {
                 "project_id": project_id,
@@ -292,7 +292,7 @@ def import_issue_tracking(path: Path) -> Dict[str, int]:
                 "updated_at": utc_now(),
                 "source": "issue-tracking",
             })
-            card_id = f"issue.{slugify(slug)}"
+            card_id = f"issue.{stable_slug(slug)}"
             indexed_id = upsert_card(conn, {
                 "card_id": card_id,
                 "project_id": project_id,
@@ -471,8 +471,8 @@ def issue_seed_to_card(file: Path, source: str) -> Dict[str, Any]:
     verified = "verified" in status_raw.lower()
     aliases = list(dict.fromkeys([project, issue_id, title, repo, branch, work_type, xmem_card, summarize_issue(text, 500)]))
     return {
-        "card_id": f"xmem.issue-outbox.{slugify(issue_id, 'issue')}",
-        "project_id": slugify(project, "xmem-issue-outbox"),
+        "card_id": f"xmem.issue-outbox.{stable_slug(issue_id, 'issue')}",
+        "project_id": stable_slug(project, "xmem-issue-outbox"),
         "type": "evidence.issue",
         "title": f"Pending Issue Record seed: {title}",
         "path": str(file),
@@ -642,7 +642,7 @@ def import_markdown_cards(root: Path, files: List[Path], source: str, classifier
     if not files:
         return {"cards": 0, "evidence": 0, "skipped": str(root)}
     base = root if root.is_dir() else root.parent
-    project_id = slugify(base.name, "project")
+    project_id = stable_slug(base.name, "project")
     cards = 0
     evidence = 0
     with connect() as conn:
@@ -929,7 +929,7 @@ def card_from_export_item(item: Dict[str, Any], file: Path, line_no: int, source
 
 def bug_pattern_to_export_card(item: Dict[str, Any]) -> Dict[str, Any]:
     title = str(item.get("title") or item.get("name") or item.get("symptom") or "bug pattern")
-    cid = str(item.get("id") or item.get("card_id") or f"issue-pattern.{slugify(title)}")
+    cid = str(item.get("id") or item.get("card_id") or f"issue-pattern.{stable_slug(title)}")
     symptom = bug_field(item, "symptom", "symptoms")
     root_cause = bug_field(item, "root_cause", "rootCause")
     fix_pattern = bug_field(item, "fix_pattern", "fix", "fixPattern", "guardrail")
@@ -1053,9 +1053,9 @@ def project_from_export(item: Dict[str, Any]) -> str:
     scope = item.get("scope") if isinstance(item.get("scope"), dict) else {}
     for key in ("project", "service", "repo", "domain", "entity"):
         if scope.get(key):
-            return slugify(str(scope[key]))
+            return stable_slug(str(scope[key]))
     if str(item.get("type") or "").startswith("wiki.") and item.get("id"):
-        return slugify(str(item["id"]).removeprefix("project-wiki."))
+        return stable_slug(str(item["id"]).removeprefix("project-wiki."))
     return ""
 
 

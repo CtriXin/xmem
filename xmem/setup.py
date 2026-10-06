@@ -6,7 +6,7 @@ from typing import Any, Iterable
 
 from .project import init_project
 from .sources import register_local_root
-from .util import git_root, git_value, home_dir, slugify, utc_now
+from .util import git_root, git_value, home_dir, stable_slug, utc_now
 
 SKIP_DIRS = {
     ".git",
@@ -188,7 +188,7 @@ def create_memory_repo(path: Path, *, dry_run: bool = False) -> dict[str, Any]:
         target.write_text(text, encoding="utf-8")
         data["files_written"].append(str(target))
 
-    project = init_project(root, project_id=slugify(root.name or "xmem-memory"), aliases=["xmem memory", "project memory"])
+    project = init_project(root, project_id=stable_slug(root.name or "xmem-memory"), aliases=["xmem memory", "project memory"])
     data["project"] = {"project_id": project.get("project_id", ""), "root": project.get("root", str(root)), "truth": str(root / ".xmem")}
     return data
 
